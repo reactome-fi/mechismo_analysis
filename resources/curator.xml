@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- This xml specify some system-wide properties for the curator tool. This is not the user preference, and cannot be modified from the application.  -->
+<curator>
+	<uneditableAttributes>
+		<attribute name="DB_ID" />
+		<attribute name="_Protege_id" />
+		<attribute name="_displayName" />
+		<attribute name="modified" />
+		<attribute name="created" />
+		<attribute name="__is_ghost" />
+	</uneditableAttributes>
+	<hiddenAttributes>
+		<attribute name="_Protege_id" />
+		<attribute name="__is_ghost" />
+		<attribute name="_applyToAllEditedInstances" />
+	</hiddenAttributes>
+	<QACheckers>
+		<QAChecker name="Imbalance Check" class="org.gk.qualityCheck.ImbalanceChecker" />
+        <QAChecker name="Mandatory Attribute Check" class="org.gk.qualityCheck.MandatoryAttributesCheck" />
+		<QAChecker name="Required Attributes Check" class="org.gk.qualityCheck.RequiredAttributesCheck" />
+	</QACheckers>
+	<autoPropagateAtts>
+		<schemaClass name="Event">
+             <attribute name="_doNotRelease" />
+             <attribute name="_doRelease" />
+             <attribute name="authored" />
+             <attribute name="reviewed" />
+			<attribute name="species" />
+		</schemaClass>
+		<schemaClass name="Reaction">
+			<attribute name="compartment" />
+		</schemaClass>
+		<schemaClass name="Complex">
+			<attribute name="species" />
+			<attribute name="compartment" />
+		</schemaClass>
+	</autoPropagateAtts>
+	<attributeAutoFillers>
+		<autoFiller target="LiteratureReference.pubMedIdentifier" class="org.gk.database.util.LiteratureReferenceAttributeAutoFiller" />
+		<autoFiller target="ReferencePeptideSequence.identifier" class="org.gk.database.util.ReferencePeptideSequenceAutoFiller" />
+	</attributeAutoFillers>
+	<deletedInstances>
+		<controlledVocabulary instanceClass="DeletedControlledVocabulary" />
+	</deletedInstances>
+    <importedPathwayDb>
+        <dataSource dbId="210689" name="Panther Pathways" />
+        <dataSource dbId="424025" name="NCI-Nature PID" />
+        <dataSource dbId="229095" name="Cancer Cell Map" />
+        <dbHost>brie8.cshl.edu</dbHost>
+        <dbName>test_reactome_plus_i_v2</dbName>
+    </importedPathwayDb>
+    <!-- A key to write local instances that have unexpected InstanceEdits to the central database
+         Only a person who handles a MOD Reactome should be allowed to commit such an instance. Otherwise,
+         these instances are generated from some software bugs, and should never be committed to the central
+         database. -->
+    <enableCommitLocalHasMoreInstance>false</enableCommitLocalHasMoreInstance>
+</curator>
