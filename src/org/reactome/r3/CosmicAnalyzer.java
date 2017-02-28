@@ -26,7 +26,9 @@ import org.reactome.r3.util.FileUtility;
  *
  */
 public class CosmicAnalyzer {
-    private final String DIR_NAME = "datasets/COSMIC/v78/";
+//    private final String DIR_NAME = "datasets/COSMIC/v78/";
+    // As of February 27, 2017, use v80
+    private final String DIR_NAME = "datasets/COSMIC/v80/";
     
     /**
      * Default constructor.
@@ -85,15 +87,21 @@ public class CosmicAnalyzer {
         String fileName = DIR_NAME + "CosmicMutantExport.tsv";
         FileUtility fu = new FileUtility();
         fu.setInput(fileName);
+        // Header line
         String line = fu.readLine();
+        String[] headers = line.split("\t");
+        for (int i = 0; i < headers.length; i++)
+            System.out.println(i + "\t" + headers[i]);
         Set<String> mutationTypes = new HashSet<String>();
         while ((line = fu.readLine()) != null) {
             String[] tokens = line.split("\t");
-            mutationTypes.add(tokens[19]);
+            mutationTypes.add(tokens[19]); // header 19 should be "Mutation Description"
         }
         fu.close();
         System.out.println("Total mutation types: " + mutationTypes.size());
-        for (String type : mutationTypes)
+        List<String> list = new ArrayList<String>(mutationTypes);
+        Collections.sort(list);
+        for (String type : list)
             System.out.println(type);
     }
     

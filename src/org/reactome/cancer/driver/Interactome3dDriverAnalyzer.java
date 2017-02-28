@@ -426,6 +426,22 @@ public class Interactome3dDriverAnalyzer {
     }
     
     /**
+     * This method takes a reaction directly from the Reactome database, expand is into a set
+     * of interactions in genes, load structures using interactome3d data, and then perform mutation
+     * interface analysis based on the cosmic annotation. The actual running is performed for all
+     * human reactions in the database.
+     * @throws Exception
+     */
+    @Test
+    public void checkAllHumanReactions() throws Exception {
+        CancerDriverReactomeAnalyzer reactomeAnalyzer = new CancerDriverReactomeAnalyzer();
+        List<GKInstance> reactions = reactomeAnalyzer.loadHumanReactions();
+        System.out.println("Total reactions: " + reactions.size());
+        
+        
+    }
+    
+    /**
      * Use this method to perform a one-stop analysis based on a FI file for one reaction.
      * The method will check structure PPI data downloaded from interactome3d, find its interaction
      * interfaces, load mutations downloaded from cosmic, and perform enrichment analysis.

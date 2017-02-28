@@ -47,6 +47,25 @@ public class CancerDriverReactomeAnalyzer {
     public CancerDriverReactomeAnalyzer() {
     }
     
+    public List<GKInstance> loadHumanReactions() throws Exception {
+        MySQLAdaptor dba = getDBA();
+        Collection<GKInstance> reactions = dba.fetchInstanceByAttribute(ReactomeJavaConstants.ReactionlikeEvent,
+                                                                        ReactomeJavaConstants.dataSource,
+                                                                        "IS NULL",
+                                                                        null);
+        dba.loadInstanceAttributeValues(reactions, new String[]{
+                ReactomeJavaConstants.species
+        });
+        List<GKInstance> rtn = new ArrayList<>();
+        for (GKInstance reaction : reactions) {
+            GKInstance species = (GKInstance) reaction.getAttributeValue(ReactomeJavaConstants.species);
+            if (species == null || !species.getDBID().equals(48887L))
+                continue;
+            rtn.add(reaction);
+        }
+        return rtn;
+    }
+    
     @Test
     public void testLoadReactionIdToFIsWithFeatures() throws Exception {
         Map<Long, Set<String>> idsToLines = loadReactionIdToFIsWithFeatures();
@@ -514,7 +533,7 @@ public class CancerDriverReactomeAnalyzer {
     
     public MySQLAdaptor getDBA() throws Exception {
         MySQLAdaptor dba = new MySQLAdaptor("localhost",
-                                            "reactome_55_plus_i",
+                                            "reactome_59_plus_i",
                                             "root", 
                                             "macmysql01");
         return dba;

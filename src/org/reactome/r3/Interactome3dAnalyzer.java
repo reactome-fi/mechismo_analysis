@@ -57,7 +57,7 @@ public class Interactome3dAnalyzer {
     @Test
     public void compareTwoSetsOfInteractions() throws IOException {
         String dirName = "datasets/interactome3d/2016_06/reactions_fdr_01/";
-        List<File> files01 = getInteractionStructureFiles(dirName + "complete",
+        List<File> files01 = getInteractionStructureFiles(dirName + "complete/interactions",
                                                                 true);
         System.out.println(dirName);
         System.out.println("Total files: " + files01.size());
@@ -66,7 +66,7 @@ public class Interactome3dAnalyzer {
             fis01.add(extractFIFromFileName(file));
         System.out.println("Total FIs: " + fis01.size());
         dirName = "datasets/interactome3d/2016_06/reactions_fdr_05_01/";
-        List<File> files05_01 = getInteractionStructureFiles(dirName + "complete",
+        List<File> files05_01 = getInteractionStructureFiles(dirName + "complete/interactions",
                                                              true);
         System.out.println(dirName);
         System.out.println("Total fils: " + files05_01.size());
@@ -106,7 +106,7 @@ public class Interactome3dAnalyzer {
 //        System.out.println("\trepresentative: " + representFiles.size());
         String completeDir = dirName + "complete";
         Map<String, Integer> fileToRank = loadRank(completeDir);
-        List<File> completeFiles = getInteractionStructureFiles(completeDir, 
+        List<File> completeFiles = getInteractionStructureFiles(completeDir + File.separator + "interactions", 
                                                                 true);
         System.out.println("\tcomplete: " + completeFiles.size());
         
@@ -177,15 +177,22 @@ public class Interactome3dAnalyzer {
         String dirName = "datasets/interactome3d/2016_06/prebuilt/representative/";
         Map<String, File> ppiToPDB = loadPPIToPDBFile(dirName, false);
         System.out.println("Total PPIToPDB: " + ppiToPDB.size());
+        int count = 0;
+        for (String ppi : ppiToPDB.keySet()) {
+            File pdb = ppiToPDB.get(ppi);
+            System.out.println(ppi + ": " + pdb.getName());
+            count ++;
+            if (count == 10)
+                break;
+        }
     }
     
     private List<File> getInteractionStructureFiles(String dirName,
                                                     boolean recursive) throws IOException {
-        return getPDBFiles(dirName, "interactions", recursive);
+        return getPDBFiles(dirName, recursive);
     }
     
     private List<File> getPDBFiles(String dirName,
-                                   String dirPrefixName,
                                    boolean recursive) throws IOException {
         List<File> interactionPDBFiles = new ArrayList<File>();
         List<File> dirs = new ArrayList<File>();
@@ -204,9 +211,6 @@ public class Interactome3dAnalyzer {
                     }
                     if (!file.getName().endsWith(".pdb"))
                         continue;
-                    String parentDirName = file.getParentFile().getName();
-                    if (!parentDirName.startsWith(dirPrefixName))
-                        continue; // We will see interaction PDB only
                     interactionPDBFiles.add(file);
                 }
             }
@@ -227,6 +231,8 @@ public class Interactome3dAnalyzer {
         for (File file : interactionPDBFiles) {
             // Do a simple parsing
             String fi = extractFIFromFileName(file);
+            if (ppiToPDB.containsKey(fi))
+                throw new IllegalStateException("Duplicated PDB for " + fi);
             ppiToPDB.put(fi, file);
         }
         return ppiToPDB;
@@ -240,7 +246,8 @@ public class Interactome3dAnalyzer {
      * @throws IOException
      */
     public Map<String, Set<String>> loadProteinToPDBFiles(String dirName) throws IOException {
-        List<File> proteinPDBFiles = getPDBFiles(dirName, "proteins", true);
+        List<File> proteinPDBFiles = getPDBFiles(dirName + File.separator + "proteins", 
+                                                 true);
         Map<String, Set<String>> proteinToPDBs = new HashMap<String, Set<String>>();
         for (File pdbFile : proteinPDBFiles) {
             String fileName = pdbFile.getName();
