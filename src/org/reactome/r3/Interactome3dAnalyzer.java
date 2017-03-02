@@ -424,6 +424,26 @@ public class Interactome3dAnalyzer {
         return chainToMatch;
     }
     
+    @Test
+    public void testMapCoordinatesToUniProtInPDB() throws Exception {
+        ProteinSequenceHandler sequenceHandler = new ProteinSequenceHandler();
+        Map<String, Sequence> accToSeq = sequenceHandler.loadSwissProtSequences();
+        Map<String, String> accToGene = new UniProtAnalyzer().getUniProtAccessionToGeneName();
+        String interactomeDirName = "datasets/interactome3d/2016_06/prebuilt/representative/";
+        File pdbFile = new File(interactomeDirName + "P01709-P0CG04-MDD-V-set-C1-set-5dur-D-3-111-L-125-212.pdb");
+        Structure structure = StructureIO.getStructure(pdbFile.getAbsolutePath());
+        String[] tokens = pdbFile.getName().split("-");
+        String[] acces = new String[]{tokens[0], tokens[1]};
+        Map<Chain, PDBUniProtMatch> chainToMatch = mapCoordinatesToUniProtInPDB(structure,
+                                                                                acces, 
+                                                                                accToSeq,
+                                                                                accToGene);
+        for (Chain chain : chainToMatch.keySet()) {
+            PDBUniProtMatch match = chainToMatch.get(chain);
+            System.out.println(chain.getChainID() + ": " + match.offset);
+        }
+    }
+    
     public Map<Chain, PDBUniProtMatch> mapCoordinatesToUniProtInPDB(Structure structure,
                                                                     String[] acces,
                                                                     Map<String, Sequence> accToSeq,
@@ -432,6 +452,7 @@ public class Interactome3dAnalyzer {
         
         Map<Chain, PDBUniProtMatch> chainToMatch = new HashMap<Chain, PDBUniProtMatch>();
         for (Chain chain : chains) {
+            System.out.println(chain.getChainID() + ": " + chain.getAtomSequence());
             for (String acc : acces) {
                 Sequence seq = accToSeq.get("UniProt:" + acc);
 //                System.out.println(acc + ": " + seq.getSequence());

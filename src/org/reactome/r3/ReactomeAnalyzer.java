@@ -231,14 +231,57 @@ public class ReactomeAnalyzer {
      * @return
      * @throws Exception
      */
-    public Set<String> generateFIsForReaction(GKInstance reaction) throws Exception {
+    public Set<String> generateAttentativePPIsForReaction(GKInstance rxn,
+                                                          boolean useGeneName) throws Exception {
         Set<String> rxtFIs = new HashSet<String>();
         Set<GKInstance> interactors = new HashSet<GKInstance>();
-        generateFIsForSingleReaction(interactors, 
-                                     rxtFIs,
-                                     reaction,
-                                     false, 
-                                     true);
+        // We will have two steps to generate FIs that most likely interact physically.
+        // The first step is for FIs among inputs and catalysts
+        List input = rxn.getAttributeValuesList(ReactomeJavaConstants.input);
+        if (input != null)
+            interactors.addAll(input);
+        // Get catalyst
+        List cas = rxn.getAttributeValuesList(ReactomeJavaConstants.catalystActivity);
+        if (cas != null) {
+            for (Iterator it1 = cas.iterator(); it1.hasNext();) {
+                GKInstance ca = (GKInstance) it1.next();
+                List catalysts = ca.getAttributeValuesList(ReactomeJavaConstants.physicalEntity);
+                if (catalysts != null)
+                    interactors.addAll(catalysts);
+            }
+        }
+        if (interactors.size() == 0)
+            return rxtFIs; // Nothing needs to be done
+        if (interactors.size() > 1) {
+            generateInteractions(interactors,
+                                 rxtFIs, 
+                                 rxn,
+                                 useGeneName);
+        }
+        // The second step is for FIs between inputs and catalysts and regulators. This is different from
+        // FIs generation, where FIs have also been extracted between two regulators working on the same
+        // reaction.
+        Collection regulations = rxn.getReferers(ReactomeJavaConstants.regulatedEntity);
+        if (regulations == null || regulations.size() == 0)
+            return rxtFIs;
+        for (Iterator it1 = regulations.iterator(); it1.hasNext();) {
+            GKInstance regulation = (GKInstance) it1.next();
+            List regulators = regulation.getAttributeValuesList(ReactomeJavaConstants.regulator);
+            for (Iterator it2 = regulators.iterator(); it2.hasNext();) {
+                GKInstance regulator = (GKInstance) it2.next();
+                if (regulator.getSchemClass().isa(ReactomeJavaConstants.PhysicalEntity)) {
+                    for (GKInstance interactor : interactors) {
+                        if (regulator == interactor)
+                            continue;
+                        generateInteractions(regulator, 
+                                             interactor,
+                                             rxtFIs,
+                                             rxn,
+                                             useGeneName);
+                    }
+                }
+            }
+        }
         return rxtFIs;
     }
     
@@ -248,8 +291,11 @@ public class ReactomeAnalyzer {
                                             "reactome_59_plus_i",
                                             "root",
                                             "macmysql01");
-        GKInstance reaction = dba.fetchInstance(5672965L);
-        Set<String> fis = generateFIsForReaction(reaction);
+//        Long dbId = 5672965L;
+        Long dbId = 5617454L;
+        dbId = 2730888L;
+        GKInstance reaction = dba.fetchInstance(dbId);
+        Set<String> fis = generateAttentativePPIsForReaction(reaction, false);
         System.out.println("Total fis in reaction " + reaction + ": " + fis.size());
         for (String fi : fis)
             System.out.println(fi);
