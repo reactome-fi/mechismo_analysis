@@ -58,12 +58,17 @@ public class CancerDriverReactomeAnalyzer {
                                                                         "IS NULL",
                                                                         null);
         dba.loadInstanceAttributeValues(reactions, new String[]{
-                ReactomeJavaConstants.species
+                ReactomeJavaConstants.species,
+                ReactomeJavaConstants.disease
         });
         List<GKInstance> rtn = new ArrayList<>();
         for (GKInstance reaction : reactions) {
             GKInstance species = (GKInstance) reaction.getAttributeValue(ReactomeJavaConstants.species);
             if (species == null || !species.getDBID().equals(48887L))
+                continue;
+            // Don't want to have disease reactions
+            GKInstance disease = (GKInstance) reaction.getAttributeValue(ReactomeJavaConstants.disease);
+            if (disease != null)
                 continue;
             rtn.add(reaction);
         }

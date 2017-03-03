@@ -118,7 +118,7 @@ public class R3Constants {
     public static final String DATA_SET_DIR = "datasets/";
     // Used to control the UniProt version
 //    public static final String UNIPROT_DIR = DATA_SET_DIR + "UniProt" + File.separator + "release_14_9" + File.separator;
-    public static final String UNIPROT_DIR = DATA_SET_DIR + "UniProt/release_2015_11/";
+    public static final String UNIPROT_DIR = DATA_SET_DIR + "UniProt/release_2016_06/";
     
     // Directory for pFam
     public static final String PFAM_DIR_NAME = DATA_SET_DIR + "Pfam/26.0/";

@@ -24,6 +24,7 @@ import org.biojava.nbio.structure.StructureIO;
 import org.biojava.nbio.structure.align.util.AtomCache;
 import org.gk.model.GKInstance;
 import org.gk.persistence.MySQLAdaptor;
+import org.gk.util.StringUtils;
 import org.junit.Test;
 import org.reactome.px.util.InteractionUtilities;
 import org.reactome.r3.CosmicAnalyzer;
@@ -32,6 +33,7 @@ import org.reactome.r3.Interactome3dAnalyzer;
 import org.reactome.r3.Interactome3dAnalyzer.PDBUniProtMatch;
 import org.reactome.r3.ProteinSequenceHandler;
 import org.reactome.r3.ProteinSequenceHandler.Sequence;
+import org.reactome.r3.ReactomeAnalyzer;
 import org.reactome.r3.UniProtAnalyzer;
 import org.reactome.r3.util.FileUtility;
 import org.reactome.r3.util.MathUtilities;
@@ -48,6 +50,8 @@ public class Interactome3dDriverAnalyzer {
     private Map<String, Integer> geneToLength;
     // a flag
     private boolean needDetails = false;
+    // A temp to hold the min-pvalue from checking interface
+    private double minPValue;
     
     /**
      * Default constructor.
@@ -353,7 +357,7 @@ public class Interactome3dDriverAnalyzer {
             int matched = 0;
             for (String fiWithFeatures : fisWithFeatures) {
                 String[] tokens = fiWithFeatures.split("\t");
-                // Check if PPI shouldl be checked
+                // Check if PPI should be checked
                 if (usePhysicalInteractionsOnly) {
                     boolean ppi = new Boolean(tokens[4]);
                     if (!ppi)
@@ -434,11 +438,110 @@ public class Interactome3dDriverAnalyzer {
      */
     @Test
     public void checkAllHumanReactions() throws Exception {
+        // To control output
+        boolean needReactionOutput = false;
         CancerDriverReactomeAnalyzer reactomeAnalyzer = new CancerDriverReactomeAnalyzer();
         List<GKInstance> reactions = reactomeAnalyzer.loadHumanReactions();
         System.out.println("Total reactions: " + reactions.size());
         
+        Interactome3dAnalyzer interactomeAnalyser = new Interactome3dAnalyzer();
+        String interactomeDirName = "datasets/interactome3d/2016_06/prebuilt/representative/";
+        Map<String, File> fiToPDB = interactomeAnalyser.loadPPIToPDBFile(interactomeDirName, false);
         
+        ReactomeAnalyzer reactomeDataAnalyzer = new ReactomeAnalyzer();
+        boolean hasStructure = false;
+        int total = 0;
+        Set<String> totalFIs = new HashSet<>();
+        if (needReactionOutput)
+            System.out.println("DB_ID\tName\tTotal_FIs\tHasStrucute");
+        for (GKInstance reaction : reactions) {
+            Set<String> fis = reactomeDataAnalyzer.generateAttentativePPIsForReaction(reaction,
+                                                                                      false);
+            if (fis.size() == 0)
+                continue;
+            // Check if there is a structure available from interactome3d
+            hasStructure = false;
+            for (String fi : fis) {
+                if (fiToPDB.containsKey(fi)) {
+                    hasStructure = true;
+                    total ++;
+                    break;
+                }
+            }
+            if (needReactionOutput)
+                System.out.println(reaction.getDBID() + "\t" + 
+                        reaction.getDisplayName() + "\t" +
+                        fis.size() + "\t" + 
+                        hasStructure);
+            totalFIs.addAll(fis);
+        }
+        System.out.println("Total reactions having FI structure: " + total);
+        System.out.println("Total FIs: " + totalFIs.size());
+        
+        // For protein to gene mapping since COSMIC uses genes only
+        UniProtAnalyzer uniprotAnalyzer = new UniProtAnalyzer();
+        Map<String, String> uniprotIdToGene = uniprotAnalyzer.getUniProtAccessionToGeneName();
+        // Get touched genes
+        Set<String> totalProteins = InteractionUtilities.grepIDsFromInteractions(totalFIs);
+        System.out.println("Total proteins: " + totalProteins.size());
+        Set<String> totalGenes = new HashSet<>();
+        for (String protein : totalProteins) {
+            String gene = uniprotIdToGene.get(protein);
+            if (gene == null) {
+//                System.err.println("Cannot find gene for " + protein);
+                continue;
+            }
+            else
+                totalGenes.add(gene);
+        }
+        System.out.println("Total genes: " + totalGenes.size());
+        
+        // Load mutation profiles for genes
+        CosmicAnalyzer cosmicAnalyzer = new CosmicAnalyzer();
+        Map<String, List<CosmicEntry>> geneToCosmicEntries = cosmicAnalyzer.loadMutations(totalGenes);
+        System.out.println("Total genes in cosmic: " + geneToCosmicEntries.size());
+        
+        // Check interactions one by one
+        Map<GKInstance, Double> reactionToMinPValue = new HashMap<>();
+        Map<GKInstance, Integer> reactionToFINumber = new HashMap<>();
+        Map<GKInstance, Set<String>> reactionToSigGenes = new HashMap<>();
+        for (GKInstance reaction : reactions) {
+            Set<String> fis = reactomeDataAnalyzer.generateAttentativePPIsForReaction(reaction,
+                                                                                      false);
+            if (fis.size() == 0)
+                continue;
+            Set<File> pdbFiles = new HashSet<>();
+            for (String fi : fis) {
+                File file = fiToPDB.get(fi);
+                if (file == null)
+                    continue;
+                pdbFiles.add(file);
+            }
+            if (pdbFiles.size() == 0)
+                continue;
+            System.out.println("\nChecking reaction " + reaction);
+            Set<String> accessions = InteractionUtilities.grepIDsFromInteractions(fis);
+            Set<String> sigGenes = checkInterfaces(accessions,
+                                                   uniprotIdToGene,
+                                                   geneToCosmicEntries,
+                                                   pdbFiles);
+            System.out.println(reaction.getDBID() + "\t" + 
+                    reaction.getDisplayName() + "\t" + 
+                    sigGenes.size() + "\t" + 
+                    sigGenes);
+            reactionToMinPValue.put(reaction, minPValue);
+            reactionToFINumber.put(reaction, fis.size());
+            reactionToSigGenes.put(reaction, sigGenes);
+        }
+        
+        System.out.println("\nReactionToMinPValue:");
+        System.out.println("DB_ID\tName\tMin_PValue\tFINumber\tSigGenes");
+        for (GKInstance reaction : reactionToMinPValue.keySet())
+            System.out.println(reaction.getDBID() + "\t" + 
+                               reaction.getDisplayName() + "\t" + 
+                               reactionToMinPValue.get(reaction) + "\t" + 
+                               reactionToFINumber.get(reaction) + "\t" + 
+                               StringUtils.join(", ", new ArrayList<String>(reactionToSigGenes.get(reaction))));
     }
 
     /**
@@ -631,6 +734,7 @@ public class Interactome3dDriverAnalyzer {
         Set<String> significantGenes = new HashSet<String>();
         // Choose pvalue cutoff 0.01
         double pvalueCutoff = 0.01d;
+        minPValue = 1.0d; // The largest
         for (String gene : geneToContacts.keySet()) {
             Set<Integer> contacts = geneToContacts.get(gene);
             Integer length = geneToLength.get(gene);
@@ -646,6 +750,10 @@ public class Interactome3dDriverAnalyzer {
                                geneToSinglePValue.get(gene));
             if (pvalue <= pvalueCutoff || geneToSinglePValue.get(gene) <= pvalueCutoff)
                 significantGenes.add(gene);
+            if (minPValue > pvalue)
+                minPValue = pvalue;
+            if (minPValue > geneToSinglePValue.get(gene))
+                minPValue = geneToSinglePValue.get(gene);
         }
         return significantGenes;
     }

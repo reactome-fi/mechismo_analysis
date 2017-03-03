@@ -347,6 +347,11 @@ public class UniProtAnalyzer {
         String geneName;
         Map<String, Set<String>> nameToAcces = new HashMap<String, Set<String>>();
         for (String fileName : fileNames) {
+            File file = new File(fileName);
+            if (!file.exists()) {
+                System.err.println(file.getAbsolutePath() + " doesn't exist!");
+                continue;
+            }
             fu.setInput(fileName);
             while ((line = fu.readLine()) != null) {
                 if (acc == null && line.startsWith("AC")) { // Want to have the first accession. Acc lines many span more than one
@@ -806,6 +811,11 @@ public class UniProtAnalyzer {
         return map;
     }
     
+    /**
+     * This method has been deprecated. Use method getUniProtAccessionToGeneName() instead.
+     * @return
+     * @throws IOException
+     */
     @Deprecated
     public Map<String, String> loadUniProtToGeneNameMap() throws IOException {
         String mapFile = "/Users/wgm/Documents/caBIG_R3/datasets/HPRD/GeneSymbolToUniProtFromHGNC.txt";
