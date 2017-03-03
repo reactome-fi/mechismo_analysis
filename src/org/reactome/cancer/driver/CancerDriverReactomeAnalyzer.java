@@ -4,6 +4,7 @@
  */
 package org.reactome.cancer.driver;
 
+import java.io.Console;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -15,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import com.sun.java_cup.internal.runtime.Scanner;
 import org.apache.commons.math.stat.correlation.PearsonsCorrelation;
 import org.gk.model.GKInstance;
 import org.gk.model.InstanceUtilities;
@@ -40,7 +42,9 @@ import org.reactome.r3.util.MathUtilities;
 @SuppressWarnings("unchecked")
 public class CancerDriverReactomeAnalyzer {
     private FileUtility fu = new FileUtility();
-    
+    private String mySqlUsername = "root";
+    private String mySqlPassword = "macmysql01";
+
     /**
      * Default constructor.
      */
@@ -65,7 +69,12 @@ public class CancerDriverReactomeAnalyzer {
         }
         return rtn;
     }
-    
+
+    public void SetMySqlCredentials(String un,String pw){
+        mySqlUsername = un;
+        mySqlPassword = pw;
+    }
+
     @Test
     public void testLoadReactionIdToFIsWithFeatures() throws Exception {
         Map<Long, Set<String>> idsToLines = loadReactionIdToFIsWithFeatures();
@@ -532,10 +541,12 @@ public class CancerDriverReactomeAnalyzer {
     }
     
     public MySQLAdaptor getDBA() throws Exception {
+
+
         MySQLAdaptor dba = new MySQLAdaptor("localhost",
                                             "reactome_59_plus_i",
-                                            "root", 
-                                            "macmysql01");
+                                            mySqlUsername,
+                                            mySqlPassword);
         return dba;
     }
     

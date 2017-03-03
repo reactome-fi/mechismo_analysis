@@ -73,7 +73,7 @@ public class FireHoseFileProcessor {
 //        String fileName = "test_data/tcga_ov/ov.maf.txt";
         String fileName = "test_data/tcga_brca/brca.maf.txt";
         fileName = "test_data/tcga_coadread/coadread.maf.txt";
-        MATFileLoader mafFileLoader = new MATFileLoader();
+        MAFFileLoader mafFileLoader = new MAFFileLoader();
         Map<String, Set<String>> sampleToGenes = mafFileLoader.loadSampleToGenes(fileName, false);
         System.out.println("Sample: " + sampleToGenes.size());
         Set<String> genes = new HashSet<String>();

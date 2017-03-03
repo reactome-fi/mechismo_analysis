@@ -19,7 +19,7 @@ import org.apache.commons.math.stat.descriptive.DescriptiveStatistics;
 import org.apache.log4j.Logger;
 import org.junit.Test;
 import org.reactome.annotate.AnnotationHelper;
-import org.reactome.cancer.MATFileLoader;
+import org.reactome.cancer.MAFFileLoader;
 import org.reactome.factorgraph.common.DataType;
 import org.reactome.genome.Transcript;
 import org.reactome.r3.UCSCDataAnalyzer;
@@ -332,7 +332,7 @@ public class CancerDriverInstancesGenerator {
     
     private Map<String, Double> loadGeneToMAFIScore(Set<String> hyperMutatedSamples) throws IOException {
         String mafFileName = getMAFFileName();
-        MATFileLoader fileLoader = new MATFileLoader();
+        MAFFileLoader fileLoader = new MAFFileLoader();
         return fileLoader.loadGeneToMAFIScore(mafFileName,
                                               fiColumnInMAF,
                                               hyperMutatedSamples);
@@ -346,7 +346,7 @@ public class CancerDriverInstancesGenerator {
     private Map<String, Double> loadGeneToMutationClusterScore(Map<String, Integer> geneToLength,
                                                                Set<String> hyperMutatedSamples) throws IOException {
         String mafFileName = getMAFFileName();
-        MATFileLoader fileLoader = new MATFileLoader();
+        MAFFileLoader fileLoader = new MAFFileLoader();
         Map<String, int[]> geneToSiteMutFre = fileLoader.loadGeneToSiteMutationFrequency(mafFileName,
                                                                                          aaChangeColumnInMAF,
                                                                                          hyperMutatedSamples,
@@ -357,7 +357,7 @@ public class CancerDriverInstancesGenerator {
     private Map<String, Double> loadGeneToMutationClusterScoreViaBP(Set<String> hyperMutatedSamples) throws IOException {
         Map<String, Transcript> geneToTx = new UCSCDataAnalyzer().getHumanGeneToTranscript();
         String mafFileName = getMAFFileName();
-        MATFileLoader fileLoader = new MATFileLoader();
+        MAFFileLoader fileLoader = new MAFFileLoader();
         Map<String, int[]> geneToSiteMutFre = fileLoader.loadGeneToNucleotideSiteMutationFrequency(mafFileName, hyperMutatedSamples, geneToTx);
         return calculateGeneToMutationClusterScore(geneToSiteMutFre, 15);
     }
@@ -410,7 +410,7 @@ public class CancerDriverInstancesGenerator {
     
     private Set<String> getHyperMutatedSamples() throws IOException {
         // Do a hard-coded filtering to remove hyper-mutated samples
-        MATFileLoader fileLoader = new MATFileLoader();
+        MAFFileLoader fileLoader = new MAFFileLoader();
         String mafFileName = getMAFFileName();
         Map<String, Integer> sampleToMutationCount = fileLoader.countSampleMutationNumbers(mafFileName);
         Set<String> hyperSamples = new HashSet<String>();
@@ -426,7 +426,7 @@ public class CancerDriverInstancesGenerator {
     private Map<String, Double> loadGeneToMutationRate(Map<String, Integer> geneToLength,
                                                        Set<String> hyperMutatedSamples) throws IOException {
         String mafFileName = getMAFFileName();
-        MATFileLoader fileLoader = new MATFileLoader();
+        MAFFileLoader fileLoader = new MAFFileLoader();
         Map<String, Set<String>> sampleToGenes = fileLoader.loadSampleToGenes(mafFileName,
                                                                               aaChangeColumnInMAF,
                                                                               null,

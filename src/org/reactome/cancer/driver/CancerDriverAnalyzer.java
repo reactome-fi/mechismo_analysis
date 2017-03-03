@@ -19,7 +19,7 @@ import org.apache.commons.math.MathException;
 import org.apache.commons.math3.stat.descriptive.SummaryStatistics;
 import org.apache.log4j.Logger;
 import org.junit.Test;
-import org.reactome.cancer.MATFileLoader;
+import org.reactome.cancer.MAFFileLoader;
 import org.reactome.cancer.NetworkClusterAnalyzer;
 import org.reactome.cancer.driver.CancerDriverInstancesGenerator.NetworkFeature;
 import org.reactome.r3.util.FileUtility;
@@ -325,7 +325,7 @@ public class CancerDriverAnalyzer {
     public void generateSampleToDriversFileForCOADREAD() throws Exception {
         // Mutation file
         String mutationFile = "test_data/tcga_coadread/coadread.maf.txt";
-        MATFileLoader loader = new MATFileLoader();
+        MAFFileLoader loader = new MAFFileLoader();
         Map<String, Set<String>> sampleToGenes = loader.loadSampleToGenes(mutationFile, false);
         NetworkClusterAnalyzer analyzer = new NetworkClusterAnalyzer();
         
@@ -353,7 +353,7 @@ public class CancerDriverAnalyzer {
     public void generateSampleToDriversFileForOV() throws Exception {
         // Mutation file
         String mutationFile = "test_data/tcga_ov/ov.maf.txt";
-        MATFileLoader loader = new MATFileLoader();
+        MAFFileLoader loader = new MAFFileLoader();
         Map<String, Set<String>> sampleToGenes = loader.loadSampleToGenes(mutationFile, false);
         NetworkClusterAnalyzer analyzer = new NetworkClusterAnalyzer();
         
@@ -378,7 +378,7 @@ public class CancerDriverAnalyzer {
     public void generateSampleToDriversFileForBRCA() throws Exception {
         // Mutation file
         String mutationFile = "test_data/tcga_brca/brca.maf.txt";
-        MATFileLoader loader = new MATFileLoader();
+        MAFFileLoader loader = new MAFFileLoader();
         Map<String, Set<String>> sampleToGenes = loader.loadSampleToGenes(mutationFile, false);
         NetworkClusterAnalyzer analyzer = new NetworkClusterAnalyzer();
         

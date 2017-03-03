@@ -30,7 +30,7 @@ import org.reactome.r3.util.InteractionUtilities;
  * @author wgm
  *
  */
-public class MATFileLoader {
+public class MAFFileLoader {
     // The following is a list of pre-defined column names
     protected static final String Tumor_Sample_Barcode = "Tumor_Sample_Barcode";
     protected static final String Variant_Classification = "Variant_Classification";
@@ -39,7 +39,7 @@ public class MATFileLoader {
     // Specify the length of sample name for parsing
     private Integer sampleNameLength = 12; // Default used for TCGA barcode. If this value is null, the whole barcode will be used.
     
-    public MATFileLoader() {
+    public MAFFileLoader() {
     }
     
     public void setSampleNameLength(Integer length) {
