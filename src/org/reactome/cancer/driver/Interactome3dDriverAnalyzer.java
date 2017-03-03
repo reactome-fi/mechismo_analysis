@@ -4,44 +4,28 @@
  */
 package org.reactome.cancer.driver;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
-import org.biojava.nbio.structure.Chain;
-import org.biojava.nbio.structure.Group;
-import org.biojava.nbio.structure.GroupType;
-import org.biojava.nbio.structure.Structure;
-import org.biojava.nbio.structure.StructureIO;
+import org.biojava.nbio.structure.*;
 import org.biojava.nbio.structure.align.util.AtomCache;
 import org.gk.model.GKInstance;
 import org.gk.persistence.MySQLAdaptor;
 import org.gk.util.StringUtils;
 import org.junit.Test;
 import org.reactome.px.util.InteractionUtilities;
-import org.reactome.r3.CosmicAnalyzer;
+import org.reactome.r3.*;
 import org.reactome.r3.CosmicAnalyzer.CosmicEntry;
-import org.reactome.r3.Interactome3dAnalyzer;
 import org.reactome.r3.Interactome3dAnalyzer.PDBUniProtMatch;
-import org.reactome.r3.ProteinSequenceHandler;
 import org.reactome.r3.ProteinSequenceHandler.Sequence;
-import org.reactome.r3.ReactomeAnalyzer;
-import org.reactome.r3.UniProtAnalyzer;
 import org.reactome.r3.util.FileUtility;
 import org.reactome.r3.util.MathUtilities;
 
+import java.io.File;
+import java.io.IOException;
+import java.util.*;
+
 /**
  * This class is used to handle protein 3D structures based on PDB using biojava APIs.
- * @author gwu
  *
+ * @author gwu
  */
 public class Interactome3dDriverAnalyzer {
     private FileUtility fu = new FileUtility();
@@ -52,22 +36,23 @@ public class Interactome3dDriverAnalyzer {
     private boolean needDetails = false;
     // A temp to hold the min-pvalue from checking interface
     private double minPValue;
-    
+
     /**
      * Default constructor.
      */
     public Interactome3dDriverAnalyzer() {
     }
-    
+
     /**
      * This method is used to generate a network view for structures.
+     *
      * @throws Exception
      */
     @Test
     public void generateFINetworkForPDBs() throws Exception {
         String dirName = "datasets/interactome3d/2016_06/reactions_fdr_05/interactions";
-        Map<String, File> fiToFile = new Interactome3dAnalyzer().loadPPIToPDBFile(dirName, 
-                                                                                  false);
+        Map<String, File> fiToFile = new Interactome3dAnalyzer().loadPPIToPDBFile(dirName,
+                false);
         System.out.println("Total FIs downloaded from interactome3d: " + fiToFile.size());
 //        for (String fi : fiToFile.keySet())
 //            System.out.println(fi);
@@ -101,9 +86,10 @@ public class Interactome3dDriverAnalyzer {
         }
         return proteinToGene;
     }
-    
+
     /**
      * Extract a list of analysis results for a set of FIs
+     *
      * @throws Exception
      */
     @Test
@@ -112,7 +98,7 @@ public class Interactome3dDriverAnalyzer {
         //String fileName = dirName + "MutationAnalysisResultsForReactionsFDR_05_PPI_092916.txt";
         String fileName = dirName + "MutationAnalysisResultsForReactionsFDR_05_PPI_101016.txt";
         fileName = dirName + "MutationAnalysisResultsForReactionsFDR_05_101016.txt";
-        
+
         fu.setInput(fileName);
         String line = null;
         Set<String> pdbFiles = new HashSet<String>();
@@ -130,24 +116,23 @@ public class Interactome3dDriverAnalyzer {
                 gene1 = geneList.get(1);
                 gene2 = geneList.get(0);
             }
-            System.out.println(gene1 + " (interacts with) " + gene2 + "\t" + 
-                               geneToPValue.get(gene1) + "\t" + 
-                               geneToPValue.get(gene2) + "\t" + 
-                               (geneToPValue.get(gene1) <= 0.01 ? 1 : 0) + "\t" + 
-                               (geneToPValue.get(gene2) <= 0.01 ? 1 : 0));
+            System.out.println(gene1 + " (interacts with) " + gene2 + "\t" +
+                    geneToPValue.get(gene1) + "\t" +
+                    geneToPValue.get(gene2) + "\t" +
+                    (geneToPValue.get(gene1) <= 0.01 ? 1 : 0) + "\t" +
+                    (geneToPValue.get(gene2) <= 0.01 ? 1 : 0));
         }
         System.out.println("Total analyed PDB files: " + pdbFiles.size());
     }
-    
+
     private Map<String, Double> parseGeneToPValue(FileUtility fu) throws IOException {
         Map<String, Double> geneToPValue = new HashMap<String, Double>();
         String line = fu.readLine(); // Escape the header
         line = fu.readLine(); // Value in the first chain
-        if(_parseGeneToPValue(line, geneToPValue)) {
+        if (_parseGeneToPValue(line, geneToPValue)) {
             line = fu.readLine();
             line = fu.readLine();
-        }
-        else {
+        } else {
             line = fu.readLine(); // Should pick up next line
         }
         if (line.length() == 0)
@@ -155,9 +140,9 @@ public class Interactome3dDriverAnalyzer {
         _parseGeneToPValue(line, geneToPValue);
         return geneToPValue;
     }
-    
+
     private boolean _parseGeneToPValue(String line,
-                                    Map<String, Double> geneToValue) {
+                                       Map<String, Double> geneToValue) {
         if (!line.contains("\t")) {
             String[] tokens = line.split(" ");
             geneToValue.put(tokens[0], 1.0d);
@@ -172,23 +157,22 @@ public class Interactome3dDriverAnalyzer {
         geneToValue.put(gene, pvalue);
         return true;
     }
-    
+
     @Test
     public void extractPValuesFromAnalysisResults() throws Exception {
         String dirName = "results/DriverGenes/Drivers_0816/";
         String fileName = dirName + "MutationAnalysisResultsForReactionsFDR_05_PPI_120516.txt";
-        
+
         String titleLine = "Gene\tLength\tContacts\tRatio\tMutations\tMutationsInContacts";
         boolean isInUse = false;
-        
+
         fu.setInput(fileName);
         String line = null;
         final Map<String, Double> geneToPValue = new HashMap<String, Double>();
         while ((line = fu.readLine()) != null) {
             if (line.startsWith(titleLine)) {
                 isInUse = true;
-            }
-            else if (isInUse) {
+            } else if (isInUse) {
                 if (line.trim().length() == 0) {
                     isInUse = false;
                     continue;
@@ -212,19 +196,20 @@ public class Interactome3dDriverAnalyzer {
                 return pvalue1.compareTo(pvalue2);
             }
         });
-        
-        Set<String> driverGenes = new CancerDriverAnalyzer().getDriverGenes(null);  
+
+        Set<String> driverGenes = new CancerDriverAnalyzer().getDriverGenes(null);
         System.out.println("Total cancer driver genes: " + driverGenes.size());
         System.out.println();
-        
+
         System.out.println("Gene\tP-Value\tCancerGenes");
         for (String gene : geneList)
-            System.out.println(gene + "\t" + geneToPValue.get(gene) + "\t" + 
-                               (driverGenes.contains(gene) ? "1" : "0"));
+            System.out.println(gene + "\t" + geneToPValue.get(gene) + "\t" +
+                    (driverGenes.contains(gene) ? "1" : "0"));
     }
-    
+
     /**
      * A method to analyze the results generated from method checkInteractionInAllReactions.
+     *
      * @throws Exception
      */
     @Test
@@ -234,7 +219,7 @@ public class Interactome3dDriverAnalyzer {
         String fileName = dirName + "MutationAnalysisResultsForReactionsFDR_05_PPI_101016.txt";
         fileName = dirName + "MutationAnalysisResultsForReactionsFDR_05_101016.txt";
         fileName = dirName + "MutationAnalysisResultsForReactionsFDR_05_PPI_120516.txt";
-        
+
         boolean isInSummary = false;
         fu.setInput(fileName);
         String line = null;
@@ -251,8 +236,7 @@ public class Interactome3dDriverAnalyzer {
                 isInSummary = true;
                 // Escape the title line
                 line = fu.readLine();
-            }
-            else if (isInSummary) {
+            } else if (isInSummary) {
                 if (line.length() == 0)
                     continue;
                 String[] tokens = line.split("\t");
@@ -280,7 +264,7 @@ public class Interactome3dDriverAnalyzer {
         for (String gene : missedDriverGenes)
             System.out.print(gene + ", ");
         System.out.println();
-        
+
         // Generate output for Cytoscape
         Set<String> allGenes = new HashSet<String>();
         allGenes.addAll(totalSigGenes);
@@ -290,14 +274,14 @@ public class Interactome3dDriverAnalyzer {
         for (String gene : allGenes) {
             int driverScore = totalCheckedDriverGenes.contains(gene) ? 1 : 0;
             int sigScore = totalSigGenes.contains(gene) ? 2 : 0;
-            int totalScore =  driverScore + sigScore;
-            System.out.println(gene + "\t" + 
-                               totalSigGenes.contains(gene) + "\t" + 
-                               totalCheckedDriverGenes.contains(gene) + "\t" + 
-                               totalScore);
+            int totalScore = driverScore + sigScore;
+            System.out.println(gene + "\t" +
+                    totalSigGenes.contains(gene) + "\t" +
+                    totalCheckedDriverGenes.contains(gene) + "\t" +
+                    totalScore);
         }
     }
-    
+
     private void collectGenes(String txt,
                               Set<String> geneSet) {
         txt = txt.substring(1, txt.length() - 1); // Remove [ and ].
@@ -307,7 +291,7 @@ public class Interactome3dDriverAnalyzer {
         for (String gene : genes)
             geneSet.add(gene);
     }
-    
+
     @Test
     public void checkInteractionInAllReactions() throws Exception {
         // A flag to exclude FIs having no physical interaction evidences
@@ -320,17 +304,17 @@ public class Interactome3dDriverAnalyzer {
         for (Set<String> fis : rxtIdsToFIsWithFeatures.values())
             totalFIs.addAll(fis);
         System.out.println("Total FIs: " + totalFIs.size());
-        
+
         String dirName = "datasets/interactome3d/2016_06/reactions_fdr_05/interactions";
-        Map<String, File> fiToFile = new Interactome3dAnalyzer().loadPPIToPDBFile(dirName, 
-                                                                                  false);
+        Map<String, File> fiToFile = new Interactome3dAnalyzer().loadPPIToPDBFile(dirName,
+                false);
         System.out.println("Total FIs downloaded from interactome3d: " + fiToFile.size());
-        
-        Set<String> driverGenes = new CancerDriverAnalyzer().getDriverGenes(null);        
+
+        Set<String> driverGenes = new CancerDriverAnalyzer().getDriverGenes(null);
         CosmicAnalyzer cosmicAnalyzer = new CosmicAnalyzer();
         Set<String> matchedGenes = getMatchedGenes(rxtIdsToFIsWithFeatures, fiToFile);
         Map<String, List<CosmicEntry>> geneToCosmicEntries = cosmicAnalyzer.loadMutations(matchedGenes);
-        
+
         MySQLAdaptor dba = reactomeAnalyzer.getDBA();
         Set<String> matchedFIs = new HashSet<String>();
         Set<String> totalCheckedFIs = new HashSet<String>();
@@ -340,13 +324,13 @@ public class Interactome3dDriverAnalyzer {
         StringBuilder summary = new StringBuilder();
         summary.append("DB_ID\tName\tTotalCheckedGenes\tSignificantGenes\tDriverGenes\tNewGenes\n");
         for (Long rxtId : rxtIdsToFIsWithFeatures.keySet()) {
-            
+
 //            // For debug
 //            needDetails = true;
 ////            if (rxtId != 5675431L) // PP2A dephosphorylates RAF1
 //            if (rxtId != 2671868L) // Phosphorylated LEPR Binds STAT3  
 //                continue;
-            
+
             genes.clear();
             proteinToGene.clear();
             pdbFiles.clear();
@@ -368,7 +352,7 @@ public class Interactome3dDriverAnalyzer {
                 File structureFile = fiToFile.get(fi);
                 if (structureFile == null)
                     continue;
-                matched ++;
+                matched++;
                 matchedFIs.add(fi);
                 genes.add(tokens[2]);
                 genes.add(tokens[3]);
@@ -379,10 +363,10 @@ public class Interactome3dDriverAnalyzer {
             double ratio = (double) matched / fisWithFeatures.size();
             System.out.println("\n#######################################");
             System.out.println(rxtId + "\t" +
-                               rxt.getDisplayName() + "\t" +  
-                               fisWithFeatures.size() + "\t" + 
-                               matched + "\t" + 
-                               String.format("%.4f", ratio));
+                    rxt.getDisplayName() + "\t" +
+                    fisWithFeatures.size() + "\t" +
+                    matched + "\t" +
+                    String.format("%.4f", ratio));
             if (genes.size() == 0) {
                 System.out.println();
                 continue;
@@ -391,9 +375,9 @@ public class Interactome3dDriverAnalyzer {
             Set<String> cancerGenes = InteractionUtilities.getShared(driverGenes, genes);
             System.out.println("Driver genes: " + cancerGenes);
             Set<String> sigGenes = checkInterfaces(proteinToGene.keySet(),
-                                                   proteinToGene,
-                                                   geneToCosmicEntries,
-                                                   pdbFiles);
+                    proteinToGene,
+                    geneToCosmicEntries,
+                    pdbFiles);
             System.out.println();
             System.out.println("Significant genes: " + sigGenes);
             System.out.println("Driver genes: " + cancerGenes);
@@ -410,7 +394,7 @@ public class Interactome3dDriverAnalyzer {
         System.out.println("\nSummary:");
         System.out.println(summary.toString());
     }
-    
+
     private Set<String> getMatchedGenes(Map<Long, Set<String>> rxtIdsToFIsWithFeatures,
                                         Map<String, File> fiToFile) {
         Set<String> genes = new HashSet<String>();
@@ -428,26 +412,40 @@ public class Interactome3dDriverAnalyzer {
         }
         return genes;
     }
-    
+
     /**
      * This method takes a reaction directly from the Reactome database, expand is into a set
      * of interactions in genes, load structures using interactome3d data, and then perform mutation
      * interface analysis based on the cosmic annotation. The actual running is performed for all
      * human reactions in the database.
+     *
      * @throws Exception
      */
     @Test
     public void checkAllHumanReactions() throws Exception {
-        // To control output
-        boolean needReactionOutput = false;
         CancerDriverReactomeAnalyzer reactomeAnalyzer = new CancerDriverReactomeAnalyzer();
+        checkAllHumanReactions(reactomeAnalyzer);
+    }
+
+    /**
+     * This method takes a reaction directly from the Reactome database, expand is into a set
+     * of interactions in genes, load structures using interactome3d data, and then perform mutation
+     * interface analysis based on the cosmic annotation. The actual running is performed for all
+     * human reactions in the database.
+     *
+     * @throws Exception
+     */
+    @Test
+    public void checkAllHumanReactions(CancerDriverReactomeAnalyzer reactomeAnalyzer) throws Exception {
+// To control output
+        boolean needReactionOutput = false;
         List<GKInstance> reactions = reactomeAnalyzer.loadHumanReactions();
         System.out.println("Total reactions: " + reactions.size());
-        
+
         Interactome3dAnalyzer interactomeAnalyser = new Interactome3dAnalyzer();
         String interactomeDirName = "datasets/interactome3d/2016_06/prebuilt/representative/";
         Map<String, File> fiToPDB = interactomeAnalyser.loadPPIToPDBFile(interactomeDirName, false);
-        
+
         ReactomeAnalyzer reactomeDataAnalyzer = new ReactomeAnalyzer();
         boolean hasStructure = false;
         int total = 0;
@@ -456,7 +454,7 @@ public class Interactome3dDriverAnalyzer {
             System.out.println("DB_ID\tName\tTotal_FIs\tHasStrucute");
         for (GKInstance reaction : reactions) {
             Set<String> fis = reactomeDataAnalyzer.generateAttentativePPIsForReaction(reaction,
-                                                                                      false);
+                    false);
             if (fis.size() == 0)
                 continue;
             // Check if there is a structure available from interactome3d
@@ -464,20 +462,20 @@ public class Interactome3dDriverAnalyzer {
             for (String fi : fis) {
                 if (fiToPDB.containsKey(fi)) {
                     hasStructure = true;
-                    total ++;
+                    total++;
                     break;
                 }
             }
             if (needReactionOutput)
-                System.out.println(reaction.getDBID() + "\t" + 
+                System.out.println(reaction.getDBID() + "\t" +
                         reaction.getDisplayName() + "\t" +
-                        fis.size() + "\t" + 
+                        fis.size() + "\t" +
                         hasStructure);
             totalFIs.addAll(fis);
         }
         System.out.println("Total reactions having FI structure: " + total);
         System.out.println("Total FIs: " + totalFIs.size());
-        
+
         // For protein to gene mapping since COSMIC uses genes only
         UniProtAnalyzer uniprotAnalyzer = new UniProtAnalyzer();
         Map<String, String> uniprotIdToGene = uniprotAnalyzer.getUniProtAccessionToGeneName();
@@ -490,24 +488,23 @@ public class Interactome3dDriverAnalyzer {
             if (gene == null) {
 //                System.err.println("Cannot find gene for " + protein);
                 continue;
-            }
-            else
+            } else
                 totalGenes.add(gene);
         }
         System.out.println("Total genes: " + totalGenes.size());
-        
+
         // Load mutation profiles for genes
         CosmicAnalyzer cosmicAnalyzer = new CosmicAnalyzer();
         Map<String, List<CosmicEntry>> geneToCosmicEntries = cosmicAnalyzer.loadMutations(totalGenes);
         System.out.println("Total genes in cosmic: " + geneToCosmicEntries.size());
-        
+
         // Check interactions one by one
         Map<GKInstance, Double> reactionToMinPValue = new HashMap<>();
         Map<GKInstance, Integer> reactionToFINumber = new HashMap<>();
         Map<GKInstance, Set<String>> reactionToSigGenes = new HashMap<>();
         for (GKInstance reaction : reactions) {
             Set<String> fis = reactomeDataAnalyzer.generateAttentativePPIsForReaction(reaction,
-                                                                                      false);
+                    false);
             if (fis.size() == 0)
                 continue;
             Set<File> pdbFiles = new HashSet<>();
@@ -522,47 +519,33 @@ public class Interactome3dDriverAnalyzer {
             System.out.println("\nChecking reaction " + reaction);
             Set<String> accessions = InteractionUtilities.grepIDsFromInteractions(fis);
             Set<String> sigGenes = checkInterfaces(accessions,
-                                                   uniprotIdToGene,
-                                                   geneToCosmicEntries,
-                                                   pdbFiles);
-            System.out.println(reaction.getDBID() + "\t" + 
-                    reaction.getDisplayName() + "\t" + 
-                    sigGenes.size() + "\t" + 
+                    uniprotIdToGene,
+                    geneToCosmicEntries,
+                    pdbFiles);
+            System.out.println(reaction.getDBID() + "\t" +
+                    reaction.getDisplayName() + "\t" +
+                    sigGenes.size() + "\t" +
                     sigGenes);
             reactionToMinPValue.put(reaction, minPValue);
             reactionToFINumber.put(reaction, fis.size());
             reactionToSigGenes.put(reaction, sigGenes);
         }
-        
+
         System.out.println("\nReactionToMinPValue:");
         System.out.println("DB_ID\tName\tMin_PValue\tFINumber\tSigGenes");
         for (GKInstance reaction : reactionToMinPValue.keySet())
-            System.out.println(reaction.getDBID() + "\t" + 
-                               reaction.getDisplayName() + "\t" + 
-                               reactionToMinPValue.get(reaction) + "\t" + 
-                               reactionToFINumber.get(reaction) + "\t" + 
-                               StringUtils.join(", ", new ArrayList<String>(reactionToSigGenes.get(reaction))));
-    }
-
-    /**
-     * This method takes a reaction directly from the Reactome database, expand is into a set
-     * of interactions in genes, load structures using interactome3d data, and then perform mutation
-     * interface analysis based on the cosmic annotation. The actual running is performed for all
-     * human reactions in the database.
-     * @throws Exception
-     */
-    @Test
-    public void checkAllHumanReactions(CancerDriverReactomeAnalyzer reactomeAnalyzer) throws Exception {
-        List<GKInstance> reactions = reactomeAnalyzer.loadHumanReactions();
-        System.out.println("Total reactions: " + reactions.size());
-
-
+            System.out.println(reaction.getDBID() + "\t" +
+                    reaction.getDisplayName() + "\t" +
+                    reactionToMinPValue.get(reaction) + "\t" +
+                    reactionToFINumber.get(reaction) + "\t" +
+                    StringUtils.join(", ", new ArrayList<String>(reactionToSigGenes.get(reaction))));
     }
 
     /**
      * Use this method to perform a one-stop analysis based on a FI file for one reaction.
      * The method will check structure PPI data downloaded from interactome3d, find its interaction
      * interfaces, load mutations downloaded from cosmic, and perform enrichment analysis.
+     *
      * @throws Exception
      */
     @Test
@@ -572,7 +555,7 @@ public class Interactome3dDriverAnalyzer {
         System.out.println("Total ppiToPDB: " + ppiToPDB.size());        // Genes and proteins
         Set<String> genes = new HashSet<String>();
         Map<String, String> proteinToGene = new HashMap<String, String>();
-        
+
         // Load FIs for the reaction
         Long dbId = 5672965L;
         dbId = 69213L;
@@ -582,7 +565,7 @@ public class Interactome3dDriverAnalyzer {
         // The code there should be refactored.
         //String reactionFIFile = "results/DriverGenes/Drivers_0816/FIsInReaction5617896.txt";
         String reactionFIFile = "results/DriverGenes/Drivers_0816/FIsInReaction" + dbId + ".txt";
-        
+
         FileUtility fu = new FileUtility();
         fu.setInput(reactionFIFile);
         String line = fu.readLine();
@@ -603,8 +586,8 @@ public class Interactome3dDriverAnalyzer {
             }
         }
         fu.close();
-        
-        Set<String> driverGenes = new CancerDriverAnalyzer().getDriverGenes(null);        
+
+        Set<String> driverGenes = new CancerDriverAnalyzer().getDriverGenes(null);
         System.out.println("Total genes: " + genes.size());
         System.out.println("Total proteins: " + proteinToGene.size());
         Set<String> driverGenesinReaction = InteractionUtilities.getShared(driverGenes, genes);
@@ -612,17 +595,17 @@ public class Interactome3dDriverAnalyzer {
         CosmicAnalyzer cosmicAnalyzer = new CosmicAnalyzer();
         Map<String, List<CosmicEntry>> geneToCosmicEntries = cosmicAnalyzer.loadMutations(genes);
         System.out.println("Loaded mutations for genes: " + geneToCosmicEntries.size());
-        
+
         checkInterfaces(proteinToGene.keySet(),
-                        proteinToGene,
-                        geneToCosmicEntries,
-                        pdbFiles);
+                proteinToGene,
+                geneToCosmicEntries,
+                pdbFiles);
     }
-    
+
     @Test
     public void generateFIsForOtherCancerReactionsAndComplexes() throws IOException {
         String dirName = "results/DriverGenes/Drivers_0816/";
-        
+
         // These FIs have been analyzed via the Interactome3d Web site
         String fdr01File = dirName + "FIsInSelectedForInteractome3d_091416.txt";
         Map<String, String> fiToLineFDR01 = loadFIsWithFeaturesFile(fdr01File);
@@ -634,12 +617,12 @@ public class Interactome3dDriverAnalyzer {
         analyzedFIs.addAll(fiToLineFDR01.keySet());
         analyzedFIs.addAll(fiToLineFDR0501.keySet());
         System.out.println("Total analyzed FIs: " + analyzedFIs.size());
-        
+
         // FIs extracted from cancer driver related reactions and complexes
         String fiFileName = dirName + "FIsInCancerReactionsAndComplexes_122116.txt";
         Set<String> allCancerFIs = fu.loadInteractions(fiFileName);
         System.out.println("All cancer FIs: " + allCancerFIs.size());
-        
+
         // Generate a new set of FIs to send to the interactome3d group for local analysis
         Set<String> shared = InteractionUtilities.getShared(allCancerFIs, analyzedFIs);
         System.out.println("Shared: " + shared.size());
@@ -649,7 +632,7 @@ public class Interactome3dDriverAnalyzer {
         String outFileName = dirName + "FIsInCancerReactionsAndComplexes_Filtered_122116.txt";
         fu.saveCollection(allCancerFIs, outFileName);
     }
-    
+
     @Test
     public void generateFIsForFDRBetween05And01() throws IOException {
         String dirName = "results/DriverGenes/Drivers_0816/";
@@ -672,7 +655,7 @@ public class Interactome3dDriverAnalyzer {
             fu.printLine(fiToLineFDR0501.get(fi));
         fu.close();
     }
-    
+
     private Map<String, String> loadFIsWithFeaturesFile(String fileName) throws IOException {
         FileUtility fu = new FileUtility();
         fu.setInput(fileName);
@@ -681,12 +664,12 @@ public class Interactome3dDriverAnalyzer {
         while ((line = fu.readLine()) != null) {
             String[] tokens = line.split("\t");
             fiToLine.put(tokens[0] + "\t" + tokens[1],
-                         line);
+                    line);
         }
         fu.close();
         return fiToLine;
     }
-    
+
     private Set<String> checkInterfaces(Collection<String> accessions,
                                         Map<String, String> accessionToGene,
                                         Map<String, List<CosmicEntry>> geneToCosmicEntries,
@@ -705,29 +688,29 @@ public class Interactome3dDriverAnalyzer {
         for (File pdbFile : pdbFiles) {
             System.out.println(pdbFile.getName());
             Structure structure = StructureIO.getStructure(pdbFile.getAbsolutePath());
-            Map<Chain, List<Integer>> chainToCoordinates = helper.extractContacts(structure); 
+            Map<Chain, List<Integer>> chainToCoordinates = helper.extractContacts(structure);
             String[] tokens = pdbFile.getName().split("-");
             String[] acces = new String[]{tokens[0], tokens[1]};
             Map<Chain, PDBUniProtMatch> chainToMatch = null;
-            if (!tokens[2].equals("EXP")) 
+            if (!tokens[2].equals("EXP"))
                 chainToMatch = helper.mapCoordinatesToUniProtInPDB(structure,
-                                                                   acces,
-                                                                   accToSeq,
-                                                                   accessionToGene);
+                        acces,
+                        accToSeq,
+                        accessionToGene);
             else
                 chainToMatch = helper.getMatchForExpStructure(structure, acces, accessionToGene);
             remapCoordinates(chainToMatch, chainToCoordinates);
-            checkInterfaces(chainToCoordinates, 
-                            chainToMatch, 
-                            geneToCosmicEntries, 
-                            geneToContacts,
-                            geneToSinglePValue);
+            checkInterfaces(chainToCoordinates,
+                    chainToMatch,
+                    geneToCosmicEntries,
+                    geneToContacts,
+                    geneToSinglePValue);
             System.out.println();
         }
-        
+
         if (geneToLength == null)
             geneToLength = new UniProtAnalyzer().loadGeneToProteinLength();
-        
+
         // Check contacts from all interactions
         System.out.println("\nGene\tLength\tContacts\tRatio\tMutations\tMutationsInContacts\tRatio\tP_Value\tp-value(single_aa_in_interface, corrected)");
         CosmicAnalyzer cosmicAnalyzer = new CosmicAnalyzer();
@@ -743,11 +726,11 @@ public class Interactome3dDriverAnalyzer {
             double ratio = contacts.size() / (double) length;
             double mutationRatio = (double) mutationsInContacts.size() / mutations.size();
             double pvalue = MathUtilities.calculateBinomialPValue(ratio, mutations.size(), mutationsInContacts.size());
-            System.out.println(gene + "\t" + length + "\t" + 
-                               contacts.size() + "\t" + ratio + "\t" + 
-                               mutations.size() + "\t" + mutationsInContacts.size() + "\t" + 
-                               mutationRatio + "\t" + pvalue + "\t" + 
-                               geneToSinglePValue.get(gene));
+            System.out.println(gene + "\t" + length + "\t" +
+                    contacts.size() + "\t" + ratio + "\t" +
+                    mutations.size() + "\t" + mutationsInContacts.size() + "\t" +
+                    mutationRatio + "\t" + pvalue + "\t" +
+                    geneToSinglePValue.get(gene));
             if (pvalue <= pvalueCutoff || geneToSinglePValue.get(gene) <= pvalueCutoff)
                 significantGenes.add(gene);
             if (minPValue > pvalue)
@@ -757,7 +740,7 @@ public class Interactome3dDriverAnalyzer {
         }
         return significantGenes;
     }
-    
+
     private void checkInterfaces(Map<Chain, List<Integer>> chainToContactCoordiantes,
                                  Map<Chain, PDBUniProtMatch> chainToMatch,
                                  Map<String, List<CosmicEntry>> geneToMutations,
@@ -789,31 +772,31 @@ public class Interactome3dDriverAnalyzer {
             double pvalue = 1.0;
             if (contactRatio < 1.0d) { // Otherwise, we cannot use binomial test
                 pvalue = MathUtilities.calculateBinomialPValue(contactRatio,
-                                                                  mutationsInChain.size(),
-                                                                  interfaceMutations.size());
+                        mutationsInChain.size(),
+                        interfaceMutations.size());
             }
             double singleAApValue = calculatePValueForPositionMutation(interfaceMutations,
-                                                                       mutationsInChain,
-                                                                       remappedSeqNumbers);
+                    mutationsInChain,
+                    remappedSeqNumbers);
             Double oldPValue = geneToSinglePValue.get(match.getGene());
             if (oldPValue == null || oldPValue > singleAApValue)
                 geneToSinglePValue.put(match.getGene(), singleAApValue);
-            System.out.println(chain.getChainID() + "\t" + 
-                               match.getGene() + "\t" + 
-                               match.getUniprot() + "\t" + 
-                               contactCoords.size() + "\t" + 
-                               chain.getAtomGroups().size() + "\t" + 
-                               contactRatio + "\t" + 
-                               mutations.size() + "\t" + 
-                               mutationsInChain.size() + "\t" +
-                               interfaceMutations.size() + "\t" + 
-                               mutationRatio + "\t" + 
-                               pvalue + "\t" + 
-                               singleAApValue);
+            System.out.println(chain.getChainID() + "\t" +
+                    match.getGene() + "\t" +
+                    match.getUniprot() + "\t" +
+                    contactCoords.size() + "\t" +
+                    chain.getAtomGroups().size() + "\t" +
+                    contactRatio + "\t" +
+                    mutations.size() + "\t" +
+                    mutationsInChain.size() + "\t" +
+                    interfaceMutations.size() + "\t" +
+                    mutationRatio + "\t" +
+                    pvalue + "\t" +
+                    singleAApValue);
 //            System.out.println(chain.getChainID() + ": ");
             // Get mutation in the interfaces for checking
             outputMutationsInInterface(interfaceMutations, match);
-            
+
             Set<Integer> geneContacts = geneToContacts.get(match.getGene());
             if (geneContacts == null) {
                 geneContacts = new HashSet<Integer>();
@@ -836,7 +819,7 @@ public class Interactome3dDriverAnalyzer {
         builder.deleteCharAt(builder.length() - 1);
         System.out.println(builder.toString());
     }
-    
+
     private double calculatePValueForPositionMutation(List<CosmicEntry> interfaceMutations,
                                                       List<CosmicEntry> chainMutations,
                                                       List<Integer> chainNumbers) {
@@ -849,12 +832,12 @@ public class Interactome3dDriverAnalyzer {
                 posToMutCount.put(entry.getCoordinate(), ++count);
         }
         double pvalue = 1.0d; // Largest p-value
-        double ratio = 1.0d / chainNumbers.size(); 
+        double ratio = 1.0d / chainNumbers.size();
         for (Integer pos : posToMutCount.keySet()) {
             Integer count = posToMutCount.get(pos);
-            double tmpPValue = MathUtilities.calculateBinomialPValue(ratio, 
-                                                                     chainMutations.size(), 
-                                                                     count);
+            double tmpPValue = MathUtilities.calculateBinomialPValue(ratio,
+                    chainMutations.size(),
+                    count);
             if (tmpPValue < pvalue)
                 pvalue = tmpPValue;
             if (needDetails)
@@ -865,8 +848,8 @@ public class Interactome3dDriverAnalyzer {
             rtn = 1.0d;
         return rtn;
     }
-                                                      
-    
+
+
     private void remapCoordinates(Map<Chain, PDBUniProtMatch> chainToMatch,
                                   Map<Chain, List<Integer>> chainToCoordinates) {
         for (Chain chain : chainToCoordinates.keySet()) {
@@ -879,7 +862,7 @@ public class Interactome3dDriverAnalyzer {
             }
         }
     }
-    
+
     private List<Integer> remapChainSeqNumbers(Chain chain,
                                                PDBUniProtMatch match) {
         List<Integer> list = new ArrayList<Integer>();
@@ -890,7 +873,7 @@ public class Interactome3dDriverAnalyzer {
         }
         return list;
     }
-    
+
     private Set<Integer> getSharedInterfaces(Map<String, List<Integer>> accToContacts,
                                              String[] acces) {
         if (acces.length == 1) {
@@ -905,9 +888,9 @@ public class Interactome3dDriverAnalyzer {
                 shared1.retainAll(contacts1);
                 Set<Integer> merged = new HashSet<Integer>(contacts2);
                 merged.addAll(contacts1);
-                System.out.println(acces[i] + "\t" + acces[j] + "\t" + 
-                                   contacts1.size() + "\t" + contacts2.size() + "\t" + 
-                                   shared1.size() + "\t" + merged.size());
+                System.out.println(acces[i] + "\t" + acces[j] + "\t" +
+                        contacts1.size() + "\t" + contacts2.size() + "\t" +
+                        shared1.size() + "\t" + merged.size());
                 if (shared == null)
                     shared = shared1;
                 else
@@ -916,7 +899,7 @@ public class Interactome3dDriverAnalyzer {
         }
         return shared;
     }
-    
+
     private Set<Integer> getMergedInterfaces(Map<String, List<Integer>> accToContacts,
                                              String[] acces) {
         Set<Integer> merged = new HashSet<Integer>();
@@ -924,9 +907,10 @@ public class Interactome3dDriverAnalyzer {
             merged.addAll(accToContacts.get(acc));
         return merged;
     }
-    
+
     /**
      * Use this method to generate interface residues.
+     *
      * @throws Exception
      */
     @Test
@@ -943,7 +927,7 @@ public class Interactome3dDriverAnalyzer {
         accToOffset.put("P42772", 3);
         String[] cdkn1 = new String[]{"P38936", "P46527"}; // CDKN1A, CDKN1B
         String[] cdkn2 = new String[]{"P42771", "P42772", "P42773", "P55273"}; // CDKN2A, B, C, D
-        
+
 //        focusProtein = "P38936"; // CDKN1A
 //        // Use P11802-P38936-MDL-1jsu.pdb1-A-0-C-0.pdb as the reference
 //        accToOffset.clear();
@@ -953,7 +937,7 @@ public class Interactome3dDriverAnalyzer {
 //        // Borrowed to avoid change the code
 //        cdkn1 = new String[] {"P11802", "Q00534"}; // CDK4, and CDK6
 //        cdkn2 = new String[] {"P24385"}; // CCND1
-        
+
         Map<String, List<Integer>> accToContacts = new HashMap<String, List<Integer>>();
         // Cache for quick performance
         AtomCache cache = new AtomCache();
@@ -965,7 +949,7 @@ public class Interactome3dDriverAnalyzer {
                 continue;
             if (fileName.equals("P11802-P42771-MDL-1bi7.pdb1-A-1-B-0.pdb"))
                 continue; // A wrong model chosen by interactome3d as representative. This has been fixed
-                          // See notes on September 9, 2016.
+            // See notes on September 9, 2016.
             System.out.println(fileName);
             String[] tokens = fileName.split("-");
             Integer offset = null;
@@ -973,8 +957,7 @@ public class Interactome3dDriverAnalyzer {
             if (tokens[0].equals(focusProtein)) {
                 offset = accToOffset.get(tokens[1]);
                 neededChain = "A";
-            }
-            else {
+            } else {
                 offset = accToOffset.get(tokens[0]);
                 neededChain = "B";
             }
@@ -1029,7 +1012,7 @@ public class Interactome3dDriverAnalyzer {
         System.out.println("All shared: " + allShared.size());
         outputInterfaces(allShared, "A");
     }
-    
+
     private void outputInterfaces(Collection<Integer> contacts, String chain) {
         StringBuilder builder = new StringBuilder();
         for (Integer c : contacts)
@@ -1037,5 +1020,5 @@ public class Interactome3dDriverAnalyzer {
         builder.deleteCharAt(builder.length() - 1);
         System.out.println(builder.toString());
     }
-    
+
 }
