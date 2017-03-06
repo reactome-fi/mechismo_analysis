@@ -16,6 +16,7 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.log4j.Logger;
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
 import org.junit.Test;
 import org.reactome.genome.Transcript;
@@ -36,9 +37,12 @@ public class MAFFileLoader {
     protected static final String Variant_Classification = "Variant_Classification";
     private static final String amino_acid_change = "amino_acid_change";
     private static final String Reference_Allele = "Reference_Allele";
+    private static final String Protein_Change = "Protein_Change";
+    private static final String Hugo_Symbol = "Hugo_Symbol";
     // Specify the length of sample name for parsing
     private Integer sampleNameLength = 12; // Default used for TCGA barcode. If this value is null, the whole barcode will be used.
-    
+    private final static Logger logger = Logger.getLogger(MAFFileLoader.class);
+
     public MAFFileLoader() {
     }
     
@@ -279,7 +283,80 @@ public class MAFFileLoader {
         fu.close();
         return sampleToGenes;
     }
-    
+
+    /**
+     * Yet another method used to load sample to genes.
+     * @param fileName
+     * @return
+     * @throws IOException
+     */
+    public Map<String, Set<String>> loadSampleToGenes(String fileName) throws IOException {
+        Pattern mafMetaPattern = Pattern.compile("^#+.*$");
+        Pattern aaXtrctPattern = Pattern.compile("^p\\.[a-zA-Z*-]*(?<aaCoord>[0-9_]+)[a-zA-Z*]+.*$");
+        String aaCoord = "aaCoord";
+        Map<String, Set<String>> sampleGeneMap = new HashMap<>();
+        Set<String> allowedTypes = getAllowedMutationTypes();
+        FileUtility fu = new FileUtility();
+        fu.setInput(fileName);
+
+        //Pass over meta lines
+        String line = fu.readLine();
+        while(mafMetaPattern.matcher(line).matches()){
+            line = fu.readLine();
+        }
+
+        //Consume header
+        List<String> headerTokens = new ArrayList<>(Arrays.asList(line.split("\t")));
+        int geneSymbolIndex = headerTokens.indexOf(Hugo_Symbol);
+        int tumorSampleIndex = headerTokens.indexOf(Tumor_Sample_Barcode);
+        int variantClassifierIndex = headerTokens.indexOf(Variant_Classification);
+        int proteinChangeIndex = headerTokens.indexOf(Protein_Change);
+
+        //Consume data
+        String[] tokens;
+        while ((line = fu.readLine()) != null) {
+            tokens = line.split("\t");
+            // If a sample is unknown, exclude this line
+            if (tokens[tumorSampleIndex].equals("Unknown"))
+                continue;
+            if (!allowedTypes.contains(tokens[variantClassifierIndex].toLowerCase()))
+                continue;
+            String geneSymbol = tokens[geneSymbolIndex];
+            String proteinChange = tokens[proteinChangeIndex];
+            Matcher matcher = aaXtrctPattern.matcher(proteinChange);
+            String proteinChangeCoord;
+            if(matcher.find()) {
+                proteinChangeCoord = matcher.group(aaCoord);
+                if(proteinChangeCoord.contains("_")){
+                    String c1 = proteinChangeCoord.split("_")[0];
+                    String c2 = proteinChangeCoord.split("_")[1];
+                    if (sampleGeneMap.containsKey(geneSymbol)) {
+                        sampleGeneMap.get(geneSymbol).add(c1);
+                        sampleGeneMap.get(geneSymbol).add(c2);
+                    } else {
+                        sampleGeneMap.put(geneSymbol,
+                                new HashSet<>(Arrays.asList(c1,c2)));
+                    }
+                }else {
+                    if (sampleGeneMap.containsKey(geneSymbol)) {
+                        sampleGeneMap.get(geneSymbol).add(proteinChangeCoord);
+                    } else {
+                        sampleGeneMap.put(geneSymbol,
+                                new HashSet<>(Arrays.asList(proteinChangeCoord)));
+                    }
+                }
+            }else{
+                //TODO: Investigate these
+                logger.warn(String.format("Can't find a protein change coord in proteinChange '%s', fileName = '%s', geneSymbol = '%s'",
+                        proteinChange,
+                        fileName,
+                        geneSymbol));
+            }
+        }
+        fu.close();
+        return sampleGeneMap;
+    }
+
     @Test
     public void checkMutationTypes() throws IOException {
         String mafFileName = "test_data/tcga_brca/brca.maf.txt";
@@ -355,7 +432,6 @@ public class MAFFileLoader {
     /**
      * Load the map from genes to mutation frequencies based on coding region nucleotide sequences.
      * @param fileName
-     * @param excludeSamples
      * @param geneToTranscript
      * @return
      * @throws IOException

@@ -23,10 +23,14 @@ public class ProcessDatasetsDriver {
             System.out.print("MySQL Password: ");
             String pw = new java.util.Scanner(System.in).next();
 
-            CancerDriverReactomeAnalyzer reactomeAnalyzer = new CancerDriverReactomeAnalyzer();
-            reactomeAnalyzer.SetMySqlCredentials(un,pw);
+            CancerDriverReactomeAnalyzer cancerDriverReactomeAnalyzer = new CancerDriverReactomeAnalyzer();
+            cancerDriverReactomeAnalyzer.SetMySqlCredentials(un,pw);
 
-            interactome3dDriverAnalyzer.checkAllHumanReactions(reactomeAnalyzer);
+            interactome3dDriverAnalyzer.findInteractionsWithMutatedInterfaces(cancerDriverReactomeAnalyzer,
+                    "datasets/gdac.broadinstitute.org_COAD.Mutation_Packager_Oncotated_Calls.Level_3.2016012800.0.0/",
+                    "results/interactions_with_mutated_interfaces.csv");
+
+
         } catch (Exception e) {
             e.printStackTrace();
         }

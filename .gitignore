@@ -2,7 +2,7 @@
 .Rapp.history
 .Rhistory
 .cvsignore
-*.log
+*.log*
 .idea/workspace.xml
 .idea/tasks.xml
 .idea/*.iws

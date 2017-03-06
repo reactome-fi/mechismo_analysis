@@ -29,6 +29,7 @@ import org.biojava.nbio.structure.contact.GroupContact;
 import org.biojava.nbio.structure.contact.GroupContactSet;
 import org.biojava.nbio.structure.contact.Pair;
 import org.gk.util.GKApplicationUtilities;
+import org.apache.log4j.Logger;
 import org.junit.Test;
 import org.reactome.px.util.InteractionUtilities;
 import org.reactome.r3.ProteinSequenceHandler.Sequence;
@@ -43,7 +44,8 @@ public class Interactome3dAnalyzer {
     
     private final double INTERFACE_THRESHOLD = 5.0d; // The unit is Angstrom (A)
     private FileUtility fu = new FileUtility();
-    
+    private final static Logger logger = Logger.getLogger(Interactome3dAnalyzer.class);
+
     /**
      * Default constructor.
      */
@@ -232,7 +234,12 @@ public class Interactome3dAnalyzer {
             // Do a simple parsing
             String fi = extractFIFromFileName(file);
             if (ppiToPDB.containsKey(fi))
-                throw new IllegalStateException("Duplicated PDB for " + fi);
+                // TODO: simple parsing isn't good enough
+                // we end up with a bunch of "MDL" and "EXP" entries that
+                // shouldn't exist... should only contain uniprot ID's
+                // we'll fix this later with a regex like FIOncoNet
+                //throw new IllegalStateException("Duplicated PDB for " + fi);
+                logger.warn(String.format("ppiToPDB already contains %s", fi));
             ppiToPDB.put(fi, file);
         }
         return ppiToPDB;
