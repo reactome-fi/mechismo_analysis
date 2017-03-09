@@ -423,8 +423,8 @@ public class Interactome3dDriverAnalyzer {
     }
 
     /**
-     * This method overloads
-     * void checkAllHumanReactions(CancerDriverReactomeAnalyzer reactomeAnalyzer)
+     * This method overloads {@link #checkAllHumanReactions(CancerDriverReactomeAnalyzer) 
+     * checkAllHumanReactions} method.
      * for testing
      *
      * @throws Exception
@@ -443,7 +443,7 @@ public class Interactome3dDriverAnalyzer {
      * @throws Exception
      */
     public void checkAllHumanReactions(CancerDriverReactomeAnalyzer cancerDriverReactomeAnalyzer) throws Exception {
-// To control output
+        // To control output
         boolean needReactionOutput = false;
 
         // Load all the non-disease reactions from Reactome
@@ -579,9 +579,8 @@ public class Interactome3dDriverAnalyzer {
     }
 
     /**
-     * This method overloads
-     * void findInteractionsWithMutatedInterfaces(CancerDriverReactomeAnalyzer reactomeAnalyzer)
-     * for testing
+     * This method overloads {@link #findInteractionsWithMutatedInterfaces(CancerDriverReactomeAnalyzer)
+     * findInteractionsWithMutatedInterfaces} method for actual running.
      *
      * @throws Exception
      */

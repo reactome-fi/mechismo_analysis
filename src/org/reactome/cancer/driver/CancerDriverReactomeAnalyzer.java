@@ -75,7 +75,7 @@ public class CancerDriverReactomeAnalyzer {
         return rtn;
     }
 
-    public void SetMySqlCredentials(String un,String pw){
+    public void setMySqlCredentials(String un,String pw){
         mySqlUsername = un;
         mySqlPassword = pw;
     }

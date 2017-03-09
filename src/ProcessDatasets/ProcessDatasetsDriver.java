@@ -1,10 +1,7 @@
 package ProcessDatasets;
 
-import org.reactome.cancer.MAFFileLoader;
 import org.reactome.cancer.driver.CancerDriverReactomeAnalyzer;
 import org.reactome.cancer.driver.Interactome3dDriverAnalyzer;
-
-import java.io.IOException;
 
 /**
  * Created by burkhart on 3/1/17.
@@ -24,7 +21,7 @@ public class ProcessDatasetsDriver {
             String pw = new java.util.Scanner(System.in).next();
 
             CancerDriverReactomeAnalyzer cancerDriverReactomeAnalyzer = new CancerDriverReactomeAnalyzer();
-            cancerDriverReactomeAnalyzer.SetMySqlCredentials(un,pw);
+            cancerDriverReactomeAnalyzer.setMySqlCredentials(un,pw);
 
             interactome3dDriverAnalyzer.findInteractionsWithMutatedInterfaces(cancerDriverReactomeAnalyzer,
                     "datasets/gdac.broadinstitute.org_COAD.Mutation_Packager_Oncotated_Calls.Level_3.2016012800.0.0/",
