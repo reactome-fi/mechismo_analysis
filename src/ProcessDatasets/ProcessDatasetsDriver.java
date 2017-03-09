@@ -25,6 +25,11 @@ public class ProcessDatasetsDriver {
 
             interactome3dDriverAnalyzer.findInteractionsWithMutatedInterfaces(cancerDriverReactomeAnalyzer,
                     "datasets/gdac.broadinstitute.org_COAD.Mutation_Packager_Oncotated_Calls.Level_3.2016012800.0.0/",
+                    // The MAF filenames look like:
+                    // TCGA-AY-4070-01.hg19.oncotator.hugo_entrez_remapped.maf.txt
+                    // TCGA-AY-4071-01.hg19.oncotator.hugo_entrez_remapped.maf.txt
+                    "^.+\\.maf\\.txt$",
+                    "datasets/interactome3d/2016_06/prebuilt/representative/",
                     "results/interactions_with_mutated_interfaces.csv");
 
 

@@ -579,23 +579,29 @@ public class Interactome3dDriverAnalyzer {
     }
 
     /**
-     * This method overloads {@link #findInteractionsWithMutatedInterfaces(CancerDriverReactomeAnalyzer,String,String)
+     * This method overloads {@link #findInteractionsWithMutatedInterfaces(CancerDriverReactomeAnalyzer,String,String,String,String)
      * findInteractionsWithMutatedInterfaces} method for actual running.
      *
      * @throws Exception
      */
     @Test
     public void findInteractionsWithMutatedInterfaces() throws Exception {
-        findInteractionsWithMutatedInterfaces(new CancerDriverReactomeAnalyzer(), null, null);
+        findInteractionsWithMutatedInterfaces(new CancerDriverReactomeAnalyzer(),
+                null,
+                null,
+                null,
+                null);
     }
 
     /**
-     * This method
+     * This method...
      *
      * @throws Exception
      */
     public void findInteractionsWithMutatedInterfaces(CancerDriverReactomeAnalyzer cancerDriverReactomeAnalyzer,
                                                       String mafDirectoryPath,
+                                                      String mafFileNamePattern,
+                                                      String pdbDirectoryPath,
                                                       String outFilePath) throws Exception {
 
         //Reactome FI's
@@ -606,6 +612,48 @@ public class Interactome3dDriverAnalyzer {
 
         // Store interactions in a set
         // "<uniprot ID>\t<uniprot ID>"
+        Set<String> totalFIs = interactionSet(reactions);
+        System.out.println(String.format("Total FIs: %d", totalFIs.size()));
+
+        // Map uniprot ID's to gene symbols (COSMIC uses gene symbols)
+        // "<uniprot ID>" -> "<gene symbol>"
+        UniProtAnalyzer uniprotAnalyzer = new UniProtAnalyzer();
+        Map<String, String> uniprotIdToGene = uniprotAnalyzer.getUniProtAccessionToGeneName();
+
+        // Extract and store unique proteins from interactions in a set
+        // "<uniprot ID>"
+        Set<String> totalProteins = InteractionUtilities.grepIDsFromInteractions(totalFIs);
+        System.out.println(String.format("Total proteins: %d", totalProteins.size()));
+
+        //Keep only Reactome FI's containing >= 1 gene mutated in MAF
+        // Lookup and store gene symbols for proteins in a set
+        // "<gene symbol>"
+        Set<String> totalGenes = mutatedFIs(totalProteins,uniprotIdToGene);
+        System.out.println(String.format("Total genes: %d", totalGenes.size()));
+
+        //MAF Mutations
+        Map<String,Map<String,Integer>> allSamplesGeneMap = mafGeneToMutation(mafFileNamePattern,mafDirectoryPath);
+
+        //TODO: ensure this works... caps? some genes have multiple names (Akt/PKB) etc.
+        allSamplesGeneMap.keySet().retainAll(totalGenes);
+
+        // Map all pdb files to gene names;
+        // "<gene symbol>\t<uniprot ID>" -> "path/to/complex.pdb"
+        Map<String,File>geneSymbolToPDB = geneSymbolPdbMap(pdbDirectoryPath,uniprotIdToGene);
+        System.out.println(String.format("Total PDB's: %d", geneSymbolToPDB.size()));
+
+        //Reactome FI's Interface Mutation Ratio
+        for(String mutatedGene : allSamplesGeneMap.keySet()){
+            //do something like checkInterfaces with allSamplesGeneMap.get(mutatedGene) and geneSymbolToPDB.get(mutatedGene)
+        }
+    }
+
+    /**
+     * This method...
+     *
+     * @throws Exception
+     */
+    private Set<String> interactionSet(List<GKInstance> reactions) throws Exception {
         ReactomeAnalyzer reactomeAnalyzer = new ReactomeAnalyzer();
         Set<String> totalFIs = new HashSet<>();
         Set<String> fis;
@@ -616,15 +664,18 @@ public class Interactome3dDriverAnalyzer {
                 continue;
             totalFIs.addAll(fis);
         }
-        System.out.println(String.format("Total FIs: %d", totalFIs.size()));
+        return totalFIs;
+    }
 
-        //MAF Mutations
+    /**
+     * This method...
+     *
+     * @throws Exception
+     */
+    private Map<String,Map<String,Integer>> mafGeneToMutation(String mafFileNamePattern,String mafDirectoryPath) throws IOException {
         MAFFileLoader mafFileLoader = new MAFFileLoader();
         Map<String,Map<String,Integer>> allSamplesGeneMap = new HashMap<>();
-        // The MAF filenames look like:
-        // TCGA-AY-4070-01.hg19.oncotator.hugo_entrez_remapped.maf.txt
-        // TCGA-AY-4071-01.hg19.oncotator.hugo_entrez_remapped.maf.txt
-        Pattern mafFnPattern = Pattern.compile("^.+\\.maf\\.txt$");
+        Pattern mafFnPattern = Pattern.compile(mafFileNamePattern);
         FilenameFilter filenameFilter = (dir, name) -> {
             if(mafFnPattern.matcher(name).matches()){
                 return true;
@@ -636,30 +687,66 @@ public class Interactome3dDriverAnalyzer {
         for (File mafFile : mafFiles) {
             sampleGeneMap = mafFileLoader.loadSampleToGenes(mafFile.getPath());
             //TODO: we can write our own data structure for hashed sets later
-            for(String geneKey : sampleGeneMap.keySet()){
-               if(allSamplesGeneMap.containsKey(geneKey)){
-                   for(String mutationKey : sampleGeneMap.get(geneKey).keySet()){
-                       if(allSamplesGeneMap.get(geneKey).containsKey(mutationKey)){
-                           Map<String,Integer> map = allSamplesGeneMap.get(geneKey);
-                           map.put(mutationKey,map.get(mutationKey) + 1);
-                           sampleGeneMap.put(geneKey,map);
-                       }else{
-                           Map<String,Integer> map = allSamplesGeneMap.get(geneKey);
-                           map.put(mutationKey,1);
-                           sampleGeneMap.put(geneKey,map);
-                       }
-                   }
-               }else{
-                   allSamplesGeneMap.put(geneKey,sampleGeneMap.get(geneKey));
-               }
+            for (String geneKey : sampleGeneMap.keySet()) {
+                if (allSamplesGeneMap.containsKey(geneKey)) {
+                    for (String mutationKey : sampleGeneMap.get(geneKey).keySet()) {
+                        if (allSamplesGeneMap.get(geneKey).containsKey(mutationKey)) {
+                            Map<String, Integer> map = allSamplesGeneMap.get(geneKey);
+                            map.put(mutationKey, map.get(mutationKey) + 1);
+                            sampleGeneMap.put(geneKey, map);
+                        } else {
+                            Map<String, Integer> map = allSamplesGeneMap.get(geneKey);
+                            map.put(mutationKey, 1);
+                            sampleGeneMap.put(geneKey, map);
+                        }
+                    }
+                } else {
+                    allSamplesGeneMap.put(geneKey, sampleGeneMap.get(geneKey));
+                }
             }
         }
+        return allSamplesGeneMap;
+    }
 
-        int x = 0;
+    /**
+     * This method...
+     *
+     * @throws Exception
+     */
+    private Set<String> mutatedFIs(Set<String> totalProteins,Map<String, String> uniprotIdToGene){
+        Set<String> totalGenes = new HashSet<>();
+        for (String protein : totalProteins) {
+            String gene = uniprotIdToGene.get(protein);
+            if (gene == null) {
+                //TODO: figure out which proteins don't map to genes and why
+//                System.err.println("Cannot find gene for " + protein);
+                continue;
+            } else
+                totalGenes.add(gene);
+        }
+        return totalGenes;
+    }
 
-        //Keep only Reactome FI's containing >= 1 gene mutated in MAF
-
-        //Reactome FI's Interface Mutation Ratio
+    /**
+     * This method...
+     *
+     * @throws Exception
+     */
+    private Map<String,File> geneSymbolPdbMap(String pdbDirectoryPath,Map<String, String> uniprotIdToGene) throws IOException {
+        Interactome3dAnalyzer interactomeAnalyser = new Interactome3dAnalyzer();
+        Map<String, File> fiToPDB = interactomeAnalyser.loadPPIToPDBFile(pdbDirectoryPath,
+                false);
+        Map<String, File> geneSymbolToPDB = new HashMap<>();
+        for (String uniprotID : fiToPDB.keySet()) {
+            String gene = uniprotIdToGene.get(uniprotID);
+            if (gene == null) {
+                //TODO: figure out which proteins don't map to genes and why
+//                System.err.println("Cannot find gene for " + uniprotID);
+                continue;
+            } else
+                geneSymbolToPDB.put(gene,fiToPDB.get(uniprotID));
+        }
+        return geneSymbolToPDB;
     }
 
     /**
