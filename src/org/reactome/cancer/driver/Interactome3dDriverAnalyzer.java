@@ -579,7 +579,7 @@ public class Interactome3dDriverAnalyzer {
     }
 
     /**
-     * This method overloads {@link #findInteractionsWithMutatedInterfaces(CancerDriverReactomeAnalyzer)
+     * This method overloads {@link #findInteractionsWithMutatedInterfaces(CancerDriverReactomeAnalyzer,String,String)
      * findInteractionsWithMutatedInterfaces} method for actual running.
      *
      * @throws Exception
@@ -620,7 +620,7 @@ public class Interactome3dDriverAnalyzer {
 
         //MAF Mutations
         MAFFileLoader mafFileLoader = new MAFFileLoader();
-        Map<String,Set<String>> allSamplesGeneMap = new HashMap<>();
+        Map<String,Map<String,Integer>> allSamplesGeneMap = new HashMap<>();
         // The MAF filenames look like:
         // TCGA-AY-4070-01.hg19.oncotator.hugo_entrez_remapped.maf.txt
         // TCGA-AY-4071-01.hg19.oncotator.hugo_entrez_remapped.maf.txt
@@ -632,18 +632,30 @@ public class Interactome3dDriverAnalyzer {
             return false;
         };
         File[] mafFiles = new File(mafDirectoryPath).listFiles(filenameFilter);
-        Map<String, Set<String>> sampleGeneMap;
+        Map<String, Map<String,Integer>> sampleGeneMap;
         for (File mafFile : mafFiles) {
             sampleGeneMap = mafFileLoader.loadSampleToGenes(mafFile.getPath());
             //TODO: we can write our own data structure for hashed sets later
-            for(String key : sampleGeneMap.keySet()){
-               if(allSamplesGeneMap.containsKey(key)){
-                   allSamplesGeneMap.get(key).addAll(sampleGeneMap.get(key));
+            for(String geneKey : sampleGeneMap.keySet()){
+               if(allSamplesGeneMap.containsKey(geneKey)){
+                   for(String mutationKey : sampleGeneMap.get(geneKey).keySet()){
+                       if(allSamplesGeneMap.get(geneKey).containsKey(mutationKey)){
+                           Map<String,Integer> map = allSamplesGeneMap.get(geneKey);
+                           map.put(mutationKey,map.get(mutationKey) + 1);
+                           sampleGeneMap.put(geneKey,map);
+                       }else{
+                           Map<String,Integer> map = allSamplesGeneMap.get(geneKey);
+                           map.put(mutationKey,1);
+                           sampleGeneMap.put(geneKey,map);
+                       }
+                   }
                }else{
-                   allSamplesGeneMap.put(key,sampleGeneMap.get(key));
+                   allSamplesGeneMap.put(geneKey,sampleGeneMap.get(geneKey));
                }
             }
         }
+
+        int x = 0;
 
         //Keep only Reactome FI's containing >= 1 gene mutated in MAF
 

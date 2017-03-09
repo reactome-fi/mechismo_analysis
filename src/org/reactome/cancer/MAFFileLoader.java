@@ -290,11 +290,11 @@ public class MAFFileLoader {
      * @return
      * @throws IOException
      */
-    public Map<String, Set<String>> loadSampleToGenes(String fileName) throws IOException {
+    public Map<String, Map<String,Integer>> loadSampleToGenes(String fileName) throws IOException {
         Pattern mafMetaPattern = Pattern.compile("^#+.*$");
         Pattern aaXtrctPattern = Pattern.compile("^p\\.[a-zA-Z*-]*(?<aaCoord>[0-9_]+)[a-zA-Z*]+.*$");
         String aaCoord = "aaCoord";
-        Map<String, Set<String>> sampleGeneMap = new HashMap<>();
+        Map<String, Map<String,Integer>> sampleGeneMap = new HashMap<>();
         Set<String> allowedTypes = getAllowedMutationTypes();
         FileUtility fu = new FileUtility();
         fu.setInput(fileName);
@@ -325,24 +325,38 @@ public class MAFFileLoader {
             String proteinChange = tokens[proteinChangeIndex];
             Matcher matcher = aaXtrctPattern.matcher(proteinChange);
             String proteinChangeCoord;
+            Map<String,Integer> mutationMap;
             if(matcher.find()) {
                 proteinChangeCoord = matcher.group(aaCoord);
                 if(proteinChangeCoord.contains("_")){
                     String c1 = proteinChangeCoord.split("_")[0];
                     String c2 = proteinChangeCoord.split("_")[1];
                     if (sampleGeneMap.containsKey(geneSymbol)) {
-                        sampleGeneMap.get(geneSymbol).add(c1);
-                        sampleGeneMap.get(geneSymbol).add(c2);
+                        mutationMap = sampleGeneMap.get(geneSymbol);
+                        mutationMap.put(c1,mutationMap.get(c1) == null?
+                                1 :
+                        mutationMap.get(c1) + 1);
+                        mutationMap.put(c2,mutationMap.get(c2) == null?
+                                1 :
+                                mutationMap.get(c2) + 1);
+                        sampleGeneMap.put(geneSymbol,mutationMap);
                     } else {
-                        sampleGeneMap.put(geneSymbol,
-                                new HashSet<>(Arrays.asList(c1,c2)));
+                        mutationMap = new HashMap<>();
+                        mutationMap.put(c1,1);
+                        mutationMap.put(c2,1);
+                        sampleGeneMap.put(geneSymbol,mutationMap);
                     }
                 }else {
                     if (sampleGeneMap.containsKey(geneSymbol)) {
-                        sampleGeneMap.get(geneSymbol).add(proteinChangeCoord);
+                        mutationMap = sampleGeneMap.get(geneSymbol);
+                        mutationMap.put(proteinChangeCoord,mutationMap.get(proteinChangeCoord) == null?
+                                1:
+                                mutationMap.get(proteinChangeCoord)+ 1);
+                        sampleGeneMap.put(geneSymbol,mutationMap);
                     } else {
-                        sampleGeneMap.put(geneSymbol,
-                                new HashSet<>(Arrays.asList(proteinChangeCoord)));
+                        mutationMap = new HashMap<>();
+                        mutationMap.put(proteinChangeCoord,1);
+                        sampleGeneMap.put(geneSymbol,mutationMap);
                     }
                 }
             }else{
