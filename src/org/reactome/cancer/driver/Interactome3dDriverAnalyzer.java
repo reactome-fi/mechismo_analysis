@@ -632,13 +632,14 @@ public class Interactome3dDriverAnalyzer {
         System.out.println(String.format("Total genes: %d", totalGenes.size()));
 
         //MAF Mutations
+        // "<gene symbol>" -> HashMap<"<AA Coord> -> <sample support>>
         Map<String,Map<String,Integer>> allSamplesGeneMap = mafGeneToMutation(mafFileNamePattern,mafDirectoryPath);
 
         //TODO: ensure this works... caps? some genes have multiple names (Akt/PKB) etc.
         allSamplesGeneMap.keySet().retainAll(totalGenes);
 
         // Map all pdb files to gene names;
-        // "<gene symbol>\t<uniprot ID>" -> "path/to/complex.pdb"
+        // "<gene symbol>\t<gene symbol>" -> "path/to/complex.pdb"
         Map<String,File>geneSymbolToPDB = geneSymbolPdbMap(pdbDirectoryPath,uniprotIdToGene);
         System.out.println(String.format("Total PDB's: %d", geneSymbolToPDB.size()));
 
@@ -729,22 +730,26 @@ public class Interactome3dDriverAnalyzer {
 
     /**
      * This method...
-     *
+     * TODO: This method doesn't work.. returns empty map
      * @throws Exception
      */
     private Map<String,File> geneSymbolPdbMap(String pdbDirectoryPath,Map<String, String> uniprotIdToGene) throws IOException {
         Interactome3dAnalyzer interactomeAnalyser = new Interactome3dAnalyzer();
+        //comes out like "<uniprot ID>\t<uniprot ID>"
         Map<String, File> fiToPDB = interactomeAnalyser.loadPPIToPDBFile(pdbDirectoryPath,
                 false);
         Map<String, File> geneSymbolToPDB = new HashMap<>();
-        for (String uniprotID : fiToPDB.keySet()) {
-            String gene = uniprotIdToGene.get(uniprotID);
-            if (gene == null) {
+        for (String uniprotInteraction : fiToPDB.keySet()) {
+            //TODO: figure out a cuter way to do this...
+            String gene1 = uniprotIdToGene.get(uniprotInteraction.split("\t")[0]);
+            String gene2 = uniprotIdToGene.get(uniprotInteraction.split("\t")[1]);
+            if (gene1 == null || gene2 == null) {
                 //TODO: figure out which proteins don't map to genes and why
 //                System.err.println("Cannot find gene for " + uniprotID);
                 continue;
             } else
-                geneSymbolToPDB.put(gene,fiToPDB.get(uniprotID));
+                geneSymbolToPDB.put(String.format("%s\t%s",gene1,gene2),
+                        fiToPDB.get(uniprotInteraction));
         }
         return geneSymbolToPDB;
     }
