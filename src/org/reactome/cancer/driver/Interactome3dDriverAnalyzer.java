@@ -633,7 +633,7 @@ public class Interactome3dDriverAnalyzer {
 
         //MAF Mutations
         // "<gene symbol>" -> HashMap<"<AA Coord> -> <sample support>>
-        Map<String,Map<String,Set<MutationObservation>>> allSamplesGeneMap = mafGeneToMutation(mafFileNamePattern,mafDirectoryPath);
+        Map<String,Map<Integer,Set<MutationObservation>>> allSamplesGeneMap = mafGeneToMutation(mafFileNamePattern,mafDirectoryPath);
 
         //TODO: ensure this works... caps? some genes have multiple names (Akt/PKB) etc.
         allSamplesGeneMap.keySet().retainAll(totalGenes);
@@ -690,17 +690,22 @@ public class Interactome3dDriverAnalyzer {
             //TODO: we can write our own data structure for hashed sets later
             for (String geneKey : sampleGeneMap.keySet()) {
                 if (allSamplesGeneMap.containsKey(geneKey)) {
-                    for (String mutationKey : sampleGeneMap.get(geneKey).keySet()) {
-                        if (allSamplesGeneMap.get(geneKey).containsKey(mutationKey)) {
-                            Map<String, Set<MutationObservation>> map = allSamplesGeneMap.get(geneKey);
-                            map.put(mutationKey, map.get(mutationKey).add());
-                            sampleGeneMap.put(geneKey, map);
+                    for (Integer coordKey : sampleGeneMap.get(geneKey).keySet()) {
+                        if (allSamplesGeneMap.get(geneKey).containsKey(coordKey)) {
+                            Map<Integer, Set<MutationObservation>> mutationMap = allSamplesGeneMap.get(geneKey);
+                            Set<MutationObservation> set = sampleGeneMap.get(geneKey).get(coordKey);
+                            if (mutationMap.get(coordKey) == null) {
+                                mutationMap.put(coordKey, set);
+                            }
+                            else{
+                                set.addAll(allSamplesGeneMap.get(geneKey).get(coordKey));
+                                mutationMap.put(coordKey,set);
+                            }
+                            sampleGeneMap.put(geneKey,mutationMap);
                         } else {
-                            Map<String, Set<MutationObservation>> map = allSamplesGeneMap.get(geneKey);
-                            Set<MutationObservation> set = new HashSet<>();
-                            set.add()
-                            map.put(mutationKey, set);
-                            sampleGeneMap.put(geneKey, map);
+                            Map<Integer, Set<MutationObservation>> mutationMap = allSamplesGeneMap.get(geneKey);
+                            mutationMap.put(coordKey, sampleGeneMap.get(geneKey).get(coordKey));
+                            sampleGeneMap.put(geneKey, mutationMap);
                         }
                     }
                 } else {
