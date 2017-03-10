@@ -16,6 +16,7 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import jdk.nashorn.internal.ir.SetSplitState;
 import org.apache.log4j.Logger;
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
 import org.junit.Test;
@@ -290,11 +291,11 @@ public class MAFFileLoader {
      * @return
      * @throws IOException
      */
-    public Map<String, Map<String,Integer>> loadSampleToGenes(String fileName) throws IOException {
+    public Map<String, Map<Integer, Set<MutationObservation>>> loadSampleToGenes(String fileName) throws IOException {
         Pattern mafMetaPattern = Pattern.compile("^#+.*$");
         Pattern aaXtrctPattern = Pattern.compile("^p\\.[a-zA-Z*-]*(?<aaCoord>[0-9_]+)[a-zA-Z*]+.*$");
         String aaCoord = "aaCoord";
-        Map<String, Map<String,Integer>> sampleGeneMap = new HashMap<>();
+        Map<String, Map<Integer, Set<MutationObservation>>> sampleGeneMap = new HashMap<>();
         Set<String> allowedTypes = getAllowedMutationTypes();
         FileUtility fu = new FileUtility();
         fu.setInput(fileName);
@@ -325,37 +326,69 @@ public class MAFFileLoader {
             String proteinChange = tokens[proteinChangeIndex];
             Matcher matcher = aaXtrctPattern.matcher(proteinChange);
             String proteinChangeCoord;
-            Map<String,Integer> mutationMap;
+            Map<Integer,Set<MutationObservation>> mutationMap;
             if(matcher.find()) {
                 proteinChangeCoord = matcher.group(aaCoord);
                 if(proteinChangeCoord.contains("_")){
-                    String c1 = proteinChangeCoord.split("_")[0];
-                    String c2 = proteinChangeCoord.split("_")[1];
+                    Integer coord1 = new Integer(proteinChangeCoord.split("_")[0]);
+                    Integer coord2 = new Integer(proteinChangeCoord.split("_")[1]);
+                    MutationObservation mut1 = new MutationObservation(geneSymbol,
+                            coord1,
+                            proteinChange,
+                            fileName
+                    );
+                    MutationObservation mut2 = new MutationObservation(geneSymbol,
+                            coord2,
+                            proteinChange,
+                            fileName
+                            );
                     if (sampleGeneMap.containsKey(geneSymbol)) {
                         mutationMap = sampleGeneMap.get(geneSymbol);
-                        mutationMap.put(c1,mutationMap.get(c1) == null?
-                                1 :
-                        mutationMap.get(c1) + 1);
-                        mutationMap.put(c2,mutationMap.get(c2) == null?
-                                1 :
-                                mutationMap.get(c2) + 1);
+                        HashSet<MutationObservation> mut1S = new HashSet<>(Arrays.asList(mut1));
+                        HashSet<MutationObservation> mut2S = new HashSet<>(Arrays.asList(mut2));
+                        if (mutationMap.get(coord1) == null) {
+                            mutationMap.put(coord1, mut1S);
+                        }
+                        else {
+                            mut1S.addAll(mutationMap.get(coord1));
+                            mutationMap.put(coord1, mut1S);
+                        }
+                        if (mutationMap.get(coord2) == null) {
+                            mutationMap.put(coord2, new HashSet<>(Arrays.asList(mut2)));
+                        }
+                        else{
+                            mut2S.addAll(mutationMap.get(coord2));
+                            mutationMap.put(coord2,mut2S);
+                        }
                         sampleGeneMap.put(geneSymbol,mutationMap);
                     } else {
                         mutationMap = new HashMap<>();
-                        mutationMap.put(c1,1);
-                        mutationMap.put(c2,1);
+                        mutationMap.put(coord1,new HashSet<>(Arrays.asList(mut1)));
+                        mutationMap.put(coord2,new HashSet<>(Arrays.asList(mut2)));
                         sampleGeneMap.put(geneSymbol,mutationMap);
                     }
-                }else {
+                }
+                else {
+                    Integer coord = new Integer(proteinChangeCoord);
+                    MutationObservation mut = new MutationObservation(geneSymbol,
+                            coord,
+                            proteinChange,
+                            fileName
+                    );
+                    HashSet<MutationObservation> mutS = new HashSet<>(Arrays.asList(mut));
                     if (sampleGeneMap.containsKey(geneSymbol)) {
                         mutationMap = sampleGeneMap.get(geneSymbol);
-                        mutationMap.put(proteinChangeCoord,mutationMap.get(proteinChangeCoord) == null?
-                                1:
-                                mutationMap.get(proteinChangeCoord)+ 1);
+                        if (mutationMap.get(coord) == null) {
+                            mutationMap.put(coord, new HashSet<>(Arrays.asList(mut)));
+                        }
+                        else{
+                            mutS.addAll(mutationMap.get(coord));
+                            mutationMap.put(coord,mutS);
+                        }
                         sampleGeneMap.put(geneSymbol,mutationMap);
                     } else {
                         mutationMap = new HashMap<>();
-                        mutationMap.put(proteinChangeCoord,1);
+                        mutationMap.put(coord,new HashSet<>(Arrays.asList(mut)));
                         sampleGeneMap.put(geneSymbol,mutationMap);
                     }
                 }
