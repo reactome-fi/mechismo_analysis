@@ -24,10 +24,6 @@ import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.util.*;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
@@ -640,13 +636,86 @@ public class Interactome3dDriverAnalyzer {
 
         // Map all pdb files to gene names;
         // "<gene symbol>\t<gene symbol>" -> "path/to/complex.pdb"
-        Map<String,File>geneSymbolToPDB = geneSymbolPdbMap(pdbDirectoryPath,uniprotIdToGene);
+        Map<String,File> geneSymbolToPDB = geneSymbolPdbMap(pdbDirectoryPath,uniprotIdToGene);
         System.out.println(String.format("Total PDB's: %d", geneSymbolToPDB.size()));
 
+        //Extract Interfaces
+        Map<String, Map<String,Set<Integer>>> interactionInterfaces = extractInterfaces(geneSymbolToPDB,uniprotIdToGene);
+
+        //Keep mutations in interfaces
+        Map<String,Map<Integer,Set<MutationObservation>>> allSamplesInterfaceMutations = keepMutationsInInterfaces(
+                allSamplesGeneMap,
+                interactionInterfaces);
+
         //Reactome FI's Interface Mutation Ratio
-        for(String mutatedGene : allSamplesGeneMap.keySet()){
-            //do something like checkInterfaces with allSamplesGeneMap.get(mutatedGene) and geneSymbolToPDB.get(mutatedGene)
+        for(String mutatedInterfaceGene : allSamplesInterfaceMutations.keySet()){
+            //TODO: compare interface with mutations.. sample support vs # muts?
         }
+    }
+
+    private Map<String, Map<String,Set<Integer>>> extractInterfaces(Map<String,File> geneSymbolToPDB,
+                                                              Map<String, String> accessionToGene) throws IOException, StructureException {
+        Interactome3dAnalyzer interactome3dAnalyzer = new Interactome3dAnalyzer();
+        Map<String, Map<String,Set<Integer>>> interactionInterfaces = new HashMap<>();
+        Map<Chain, List<Integer>> chainToContactCoordinates;
+        Map<Chain, PDBUniProtMatch> chainToMatch;
+        Map<String,Set<Integer>> interactionInterface;
+        Structure structure;
+        File pdbFile;
+
+        //sort of hate doing stuff like this...
+        //TODO: make sure to clean code with refactoring recommendations later
+        if (accToSeq == null) {
+            ProteinSequenceHandler sequenceHandler = new ProteinSequenceHandler();
+            accToSeq = sequenceHandler.loadSwissProtSequences();
+        }
+
+        String[] proteinIDs,proteinIDs2;
+        for (String interaction : geneSymbolToPDB.keySet()) {
+            pdbFile = geneSymbolToPDB.get(interaction);
+            structure = StructureIO.getStructure(pdbFile.getAbsolutePath());
+            chainToContactCoordinates = interactome3dAnalyzer.extractContacts(structure);
+            proteinIDs = pdbFile.getName().split("-");
+            proteinIDs2 = new String[]{proteinIDs[0], proteinIDs[1]};
+            assert !proteinIDs.equals(proteinIDs2);
+            if (!proteinIDs[2].equals("EXP")) {
+                chainToMatch = interactome3dAnalyzer.mapCoordinatesToUniProtInPDB(
+                        structure,
+                        proteinIDs2,
+                        accToSeq,
+                        accessionToGene,
+                        false);
+            } else {
+                chainToMatch = interactome3dAnalyzer.getMatchForExpStructure(
+                        structure,
+                        proteinIDs2,
+                        accessionToGene);
+            }
+            //this changes chainToContactCoordinates sometimes?
+            //we should return a value rather than rely on side effects
+            remapCoordinates(chainToMatch, chainToContactCoordinates);
+
+            //TODO: kindof sloppy.. are we sure chains always map correctly to
+            //genes in other methods? if so, this works
+            //see Interactome3dAnalyzer.mapCoordinatesToUniProtInPDB() and
+            //Interactome3dAnalyzer.getMatchForExpStructure()
+            assert chainToContactCoordinates.size() == 2;
+            interactionInterface = new HashMap<>();
+            for(Chain chainID : chainToMatch.keySet()){
+                //map geneID to set of contact coordinates for this interaction
+                interactionInterface.put(chainToMatch.get(chainID).getGene(),
+                        new HashSet<>(chainToContactCoordinates.get(chainID)));
+            }
+            interactionInterfaces.put(interaction,interactionInterface);
+        }
+        return interactionInterfaces;
+    }
+
+    private Map<String,Map<Integer,Set<MutationObservation>>> keepMutationsInInterfaces(
+            Map<String,Map<Integer,Set<MutationObservation>>> allSamplesGeneMap,
+            Map<String, Map<String,Set<Integer>>> interactionInterfaces
+    ){
+        return null;
     }
 
     /**
@@ -737,7 +806,6 @@ public class Interactome3dDriverAnalyzer {
 
     /**
      * This method...
-     * TODO: This method doesn't work.. returns empty map
      * @throws Exception
      */
     private Map<String,File> geneSymbolPdbMap(String pdbDirectoryPath,Map<String, String> uniprotIdToGene) throws IOException {

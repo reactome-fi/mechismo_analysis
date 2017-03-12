@@ -450,16 +450,32 @@ public class Interactome3dAnalyzer {
             System.out.println(chain.getChainID() + ": " + match.offset);
         }
     }
-    
+
+    //overload
     public Map<Chain, PDBUniProtMatch> mapCoordinatesToUniProtInPDB(Structure structure,
                                                                     String[] acces,
                                                                     Map<String, Sequence> accToSeq,
                                                                     Map<String, String> accToGene) throws IOException {
+        return mapCoordinatesToUniProtInPDB(
+                structure,
+                acces,
+                accToSeq,
+                accToGene,
+        true);
+    }
+
+    public Map<Chain, PDBUniProtMatch> mapCoordinatesToUniProtInPDB(Structure structure,
+                                                                    String[] acces,
+                                                                    Map<String, Sequence> accToSeq,
+                                                                    Map<String, String> accToGene,
+                                                                    boolean printLines) throws IOException {
         List<Chain> chains = structure.getChains();
         
         Map<Chain, PDBUniProtMatch> chainToMatch = new HashMap<Chain, PDBUniProtMatch>();
         for (Chain chain : chains) {
-            System.out.println(chain.getChainID() + ": " + chain.getAtomSequence());
+            if(printLines) {
+                System.out.println(chain.getChainID() + ": " + chain.getAtomSequence());
+            }
             for (String acc : acces) {
                 Sequence seq = accToSeq.get("UniProt:" + acc);
 //                System.out.println(acc + ": " + seq.getSequence());
