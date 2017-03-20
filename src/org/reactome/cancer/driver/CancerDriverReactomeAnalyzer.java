@@ -4,7 +4,6 @@
  */
 package org.reactome.cancer.driver;
 
-import java.io.Console;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -16,7 +15,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import com.sun.java_cup.internal.runtime.Scanner;
 import org.apache.commons.math.stat.correlation.PearsonsCorrelation;
 import org.gk.model.GKInstance;
 import org.gk.model.InstanceUtilities;
@@ -29,6 +27,7 @@ import org.reactome.annotate.AnnotationType;
 import org.reactome.annotate.GeneSetAnnotation;
 import org.reactome.annotate.PathwayBasedAnnotator;
 import org.reactome.r3.ReactionMapGenerator;
+import org.reactome.r3.ReactomeAnalyzer;
 import org.reactome.r3.util.FileUtility;
 import org.reactome.r3.util.FisherExact;
 import org.reactome.r3.util.InteractionUtilities;
@@ -53,26 +52,7 @@ public class CancerDriverReactomeAnalyzer {
     
     public List<GKInstance> loadHumanReactions() throws Exception {
         MySQLAdaptor dba = getDBA();
-        Collection<GKInstance> reactions = dba.fetchInstanceByAttribute(ReactomeJavaConstants.ReactionlikeEvent,
-                                                                        ReactomeJavaConstants.dataSource,
-                                                                        "IS NULL",
-                                                                        null);
-        dba.loadInstanceAttributeValues(reactions, new String[]{
-                ReactomeJavaConstants.species,
-                ReactomeJavaConstants.disease
-        });
-        List<GKInstance> rtn = new ArrayList<>();
-        for (GKInstance reaction : reactions) {
-            GKInstance species = (GKInstance) reaction.getAttributeValue(ReactomeJavaConstants.species);
-            if (species == null || !species.getDBID().equals(48887L))
-                continue;
-            // Don't want to have disease reactions
-            GKInstance disease = (GKInstance) reaction.getAttributeValue(ReactomeJavaConstants.disease);
-            if (disease != null)
-                continue;
-            rtn.add(reaction);
-        }
-        return rtn;
+        return new ReactomeAnalyzer().loadHumanReactions(dba);
     }
 
     public void setMySqlCredentials(String un,String pw){

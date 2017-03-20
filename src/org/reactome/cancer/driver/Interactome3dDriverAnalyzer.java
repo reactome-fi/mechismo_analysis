@@ -475,7 +475,7 @@ public class Interactome3dDriverAnalyzer {
         if (needReactionOutput)
             System.out.println("DB_ID\tName\tTotal_FIs\tHasStrucute");
         for (GKInstance reaction : reactions) {
-            Set<String> fis = reactomeDataAnalyzer.generateAttentativePPIsForReaction(reaction,
+            Set<String> fis = reactomeDataAnalyzer.generateTentativePPIsForReaction(reaction,
                     false);
             if (fis.size() == 0)
                 continue;
@@ -535,7 +535,7 @@ public class Interactome3dDriverAnalyzer {
         for (GKInstance reaction : reactions) {
             // Store interactions in a set
             // "<uniprot ID>\t<uniprot ID>"
-            Set<String> fis = reactomeDataAnalyzer.generateAttentativePPIsForReaction(reaction,
+            Set<String> fis = reactomeDataAnalyzer.generateTentativePPIsForReaction(reaction,
                     false);
             if (fis.size() == 0)
                 continue;
@@ -758,7 +758,7 @@ public class Interactome3dDriverAnalyzer {
         Set<String> totalFIs = new HashSet<>();
         Set<String> fis;
         for (GKInstance reaction : reactions) {
-            fis = reactomeAnalyzer.generateAttentativePPIsForReaction(reaction,
+            fis = reactomeAnalyzer.generateTentativePPIsForReaction(reaction,
                     false);
             if (fis.size() == 0)
                 continue;
