@@ -20,7 +20,6 @@ import org.apache.log4j.Logger;
 import org.junit.Test;
 import org.reactome.annotate.AnnotationHelper;
 import org.reactome.cancer.MAFFileLoader;
-import org.reactome.factorgraph.common.DataType;
 import org.reactome.genome.Transcript;
 import org.reactome.r3.UCSCDataAnalyzer;
 import org.reactome.r3.UniProtAnalyzer;
@@ -56,7 +55,6 @@ public class CancerDriverInstancesGenerator {
     private boolean useRandomGenesForNegative; // Use a similar size of random genes as a negative data set.
     // Cache loaded data 
     private boolean cacheData = false;
-    private Map<String, Map<DataType, String>> geneToTypeToValue;
     // A flag to turn off mutation normalization based on protein lengths
     private boolean noMutationNormalization;
     // For aa change position

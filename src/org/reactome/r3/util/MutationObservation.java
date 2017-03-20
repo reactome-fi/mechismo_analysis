@@ -1,4 +1,4 @@
-package org.reactome.cancer;
+package org.reactome.r3.util;
 
 /**
  * Created by burkhart on 3/10/17.
