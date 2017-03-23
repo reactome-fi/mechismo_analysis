@@ -9,14 +9,17 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
+import java.util.*;
+import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
+import org.biojava.nbio.alignment.Alignments;
+import org.biojava.nbio.alignment.SimpleGapPenalty;
+import org.biojava.nbio.core.alignment.matrices.SubstitutionMatrixHelper;
+import org.biojava.nbio.core.alignment.template.SubstitutionMatrix;
+import org.biojava.nbio.core.exceptions.CompoundNotFoundException;
+import org.biojava.nbio.core.sequence.ProteinSequence;
+import org.biojava.nbio.core.sequence.compound.AminoAcidCompound;
 import org.biojava.nbio.structure.Chain;
 import org.biojava.nbio.structure.Group;
 import org.biojava.nbio.structure.Structure;
@@ -465,38 +468,69 @@ public class Interactome3dAnalyzer {
     }
 
     public Map<Chain, PDBUniProtMatch> mapCoordinatesToUniProtInPDB(Structure structure,
-                                                                    String[] acces,
-                                                                    Map<String, Sequence> accToSeq,
-                                                                    Map<String, String> accToGene,
+                                                                    String[] uniprotIDs,
+                                                                    Map<String, Sequence> uniprotToSeq,
+                                                                    Map<String, String> uniprotToGene,
                                                                     boolean printLines) throws IOException {
         List<Chain> chains = structure.getChains();
-        
-        Map<Chain, PDBUniProtMatch> chainToMatch = new HashMap<Chain, PDBUniProtMatch>();
-        for (Chain chain : chains) {
+        Iterator<Chain> chainIterator = chains.iterator();
+        List<String> uniprotIDsList = new ArrayList<>(Arrays.asList(uniprotIDs));
+        Iterator<String> uniprotIDiterator = uniprotIDsList.iterator();
+        Map<Chain, PDBUniProtMatch> chainToMatch = new HashMap<>();
+        while (chainIterator.hasNext()) {
+            Chain chain = chainIterator.next();
             if(printLines) {
                 System.out.println(chain.getChainID() + ": " + chain.getAtomSequence());
             }
-            for (String acc : acces) {
-                Sequence seq = accToSeq.get("UniProt:" + acc);
+            while (uniprotIDiterator.hasNext()) {
+                String uniprotID = uniprotIDiterator.next();
+                Sequence seq = uniprotToSeq.get("UniProt:" + uniprotID);
 //                System.out.println(acc + ": " + seq.getSequence());
                 int index = seq.getSequence().indexOf(chain.getAtomSequence());
+
                 if (index >= 0) {
+                    //try {
+                    //    calculateGlobalAlignmentScore(chain.getAtomSequence(), seq.getSequence());
+                    //}catch(CompoundNotFoundException cnfe){
+                        //do nothing
+                    //}
 //                    System.out.println(seq.getSequence());
 //                    System.out.println(chain.getAtomSequence());
                     PDBUniProtMatch match = new PDBUniProtMatch();
                     match.chain = chain.getChainID();
-                    match.gene = accToGene.get(acc);
-                    match.uniprot = acc;
+                    match.gene = uniprotToGene.get(uniprotID);
+                    match.uniprot = uniprotID;
                     match.pdbStart = chain.getAtomGroup(0).getResidueNumber().getSeqNum();
                     match.uniprotStart = index + 1;
                     match.offset = match.uniprotStart - match.pdbStart;
                     chainToMatch.put(chain, match);
+
+                    //no duplicates
+                    uniprotIDiterator.remove();
+                    break;
                 }
             }
         }
         return chainToMatch;
     }
-    
+
+    private double calculateGlobalAlignmentScore(String s1, String s2) throws CompoundNotFoundException {
+        List<ProteinSequence> psl = new ArrayList<>();
+        psl.add(new ProteinSequence(s1));
+        psl.add(new ProteinSequence(s2));
+        SubstitutionMatrix<AminoAcidCompound> matrix = SubstitutionMatrixHelper.getBlosum62();
+        double[] pair =
+                Alignments.getAllPairsScores(
+                        psl,
+                        Alignments.PairwiseSequenceScorerType.GLOBAL,
+                        new SimpleGapPenalty(),
+                        matrix);
+        for(int i = 0; i < pair.length; i++) {
+            System.out.println(String.format("%s vs %s: %f", s1, s2, pair[i]));
+        }
+        return -1.0;
+    }
+
     public static class PDBUniProtMatch {
         
         private String chain;

@@ -651,20 +651,8 @@ public class Interactome3dDriverAnalyzer {
             String gene1Name = interactionInterface.split("\t")[0];
             String gene2Name = interactionInterface.split("\t")[1];
 
-            int interface1Size = interactionInterfaces.get(interactionInterface).get(gene1Name).size();
-            int interface2Size = interactionInterfaces.get(interactionInterface).get(gene2Name).size();
-
-            int mutation1Count = 0;
-            for (Integer interfaceCoord : interactionInterfaces.get(interactionInterface).get(gene1Name)) {
-                mutation1Count += allSamplesGeneMap.get(gene1Name).get(interfaceCoord).size();
-            }
-            int mutation2Count = 0;
-            for (Integer interfaceCoord : interactionInterfaces.get(interactionInterface).get(gene2Name)) {
-                mutation2Count += allSamplesGeneMap.get(gene2Name).get(interfaceCoord).size();
-            }
-
-            double mutation1Ratio = (double) mutation1Count / (double) interface1Size;
-            double mutation2Ratio = (double) mutation2Count / (double) interface2Size;
+            double mutation1Ratio = getInterfaceMutations(allSamplesGeneMap, interactionInterfaces, interactionInterface, gene1Name);
+            double mutation2Ratio = getInterfaceMutations(allSamplesGeneMap, interactionInterfaces, interactionInterface, gene2Name);
 
             Map<String, Double> interactionMutationRatios = new HashMap<>();
             interactionMutationRatios.put(gene1Name, mutation1Ratio);
@@ -674,6 +662,25 @@ public class Interactome3dDriverAnalyzer {
 
         // Serialize our new datastruct...
         new ObjectOutputStream(new FileOutputStream(outFilePath)).writeObject(interfaceMutationRatios);
+    }
+
+    private double getInterfaceMutations(Map<String, Map<Integer, Set<MutationObservation>>> allSamplesGeneMap,
+                                         Map<String, Map<String, Set<Integer>>> interactionInterfaces,
+                                         String interactionInterface,
+                                         String geneName) {
+        int interfaceSize = -1;
+        int mutationCount = 0;
+        try {
+            interfaceSize = interactionInterfaces.get(interactionInterface).get(geneName).size();
+            for (Integer interfaceCoord : interactionInterfaces.get(interactionInterface).get(geneName)) {
+                if (allSamplesGeneMap.get(geneName) != null && allSamplesGeneMap.get(geneName).get(interfaceCoord) != null) {
+                    mutationCount += allSamplesGeneMap.get(geneName).get(interfaceCoord).size();
+                }
+            }
+        } catch (NullPointerException npe) {
+            logger.warn(String.format("Interaction '%s' gene '%s' has no interface coordinates", interactionInterface, geneName));
+        }
+        return (interfaceSize > 0 ? (double) mutationCount / (double) interfaceSize : 0.0);
     }
 
     private Map<String, Map<String, Set<Integer>>> extractInterfaces(Map<String, File> geneSymbolToPDB,
@@ -695,6 +702,9 @@ public class Interactome3dDriverAnalyzer {
 
         String[] proteinIDs, proteinIDs2;
         for (String interaction : geneSymbolToPDB.keySet()) {
+            //if (interaction.equals("ZNF417\tZNF587")) {
+            //    int startDebugging = 1;
+            //}
             pdbFile = geneSymbolToPDB.get(interaction);
             structure = StructureIO.getStructure(pdbFile.getAbsolutePath());
             chainToContactCoordinates = interactome3dAnalyzer.extractContacts(structure);
@@ -716,6 +726,7 @@ public class Interactome3dDriverAnalyzer {
             }
             //this changes chainToContactCoordinates sometimes?
             //we should return a value rather than rely on side effects
+            assert chainToMatch.size() == 2;
             remapCoordinates(chainToMatch, chainToContactCoordinates);
 
             //TODO: kindof sloppy.. are we sure chains always map correctly to
