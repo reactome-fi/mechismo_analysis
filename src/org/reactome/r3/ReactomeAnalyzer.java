@@ -23,7 +23,9 @@ import org.gk.persistence.MySQLAdaptor;
 import org.gk.schema.InvalidAttributeException;
 import org.gk.schema.SchemaAttribute;
 import org.gk.schema.SchemaClass;
+import org.gk.util.StringUtils;
 import org.junit.Test;
+import org.reactome.r3.util.FileUtility;
 import org.reactome.r3.util.InteractionUtilities;
 
 @SuppressWarnings("unchecked")
@@ -226,13 +228,42 @@ public class ReactomeAnalyzer {
     }
     
     /**
+     * Load all human non-disease reactions for analysis.
+     * @param dba
+     * @return
+     * @throws Exception
+     */
+    public List<GKInstance> loadHumanReactions(MySQLAdaptor dba) throws Exception {
+        Collection<GKInstance> reactions = dba.fetchInstanceByAttribute(ReactomeJavaConstants.ReactionlikeEvent,
+                                                                        ReactomeJavaConstants.dataSource,
+                                                                        "IS NULL",
+                                                                        null);
+        dba.loadInstanceAttributeValues(reactions, new String[]{
+                ReactomeJavaConstants.species,
+                ReactomeJavaConstants.disease
+        });
+        List<GKInstance> rtn = new ArrayList<>();
+        for (GKInstance reaction : reactions) {
+            GKInstance species = (GKInstance) reaction.getAttributeValue(ReactomeJavaConstants.species);
+            if (species == null || !species.getDBID().equals(48887L))
+                continue;
+            // Don't want to have disease reactions
+            GKInstance disease = (GKInstance) reaction.getAttributeValue(ReactomeJavaConstants.disease);
+            if (disease != null)
+                continue;
+            rtn.add(reaction);
+        }
+        return rtn;
+    }
+    
+    /**
      * Extract a set of FIs in gene names from the passed reaction.
      * @param reaction
      * @return
      * @throws Exception
      */
-    public Set<String> generateAttentativePPIsForReaction(GKInstance rxn,
-                                                          boolean useGeneName) throws Exception {
+    public Set<String> generateTentativePPIsForReaction(GKInstance rxn,
+                                                        boolean useGeneName) throws Exception {
         Set<String> rxtFIs = new HashSet<String>();
         Set<GKInstance> interactors = new HashSet<GKInstance>();
         // We will have two steps to generate FIs that most likely interact physically.
@@ -295,10 +326,84 @@ public class ReactomeAnalyzer {
         Long dbId = 5617454L;
         dbId = 2730888L;
         GKInstance reaction = dba.fetchInstance(dbId);
-        Set<String> fis = generateAttentativePPIsForReaction(reaction, false);
+        Set<String> fis = generateTentativePPIsForReaction(reaction, false);
         System.out.println("Total fis in reaction " + reaction + ": " + fis.size());
         for (String fi : fis)
             System.out.println(fi);
+    }
+    
+    /**
+     * Use this method to generate a simple text file for FIs extracted from all human reactions 
+     * in the following format: \tUnitProt1\tUnitProt2\tGene1\tGene2\tReactionIDs\thasPPIEvidence.
+     * A FI may be extracted from a set of reactions, whose ids are listed in a common delimited
+     * string. hasPPIEvidence is logic OR from HumanPPI, mousePPI, flyPPI, celPPI, yeastPPI, and
+     * domainInteraction.
+     * @throws Exception
+     */
+    @Test
+    public void generateFIsForAllHumanReactions() throws Exception {
+        MySQLAdaptor dba = new MySQLAdaptor("localhost",
+                                            "reactome_59_plus_i",
+                                            "root",
+                                            "macmysql01");
+        List<GKInstance> reactions = loadHumanReactions(dba);
+        System.out.println("Total human reactions: " + reactions.size());
+        Map<String, String> uniProtToGene = getUniProtToGeneMap(dba);
+        System.out.println("Total uniprot to gene map: " + uniProtToGene.size());
+        Map<String, Set<Long>> fiToRxts = new HashMap<>();
+        for (GKInstance rxt : reactions) {
+            Set<String> fis = generateTentativePPIsForReaction(rxt, 
+                                                               false);
+            for (String fi : fis) {
+                InteractionUtilities.addElementToSet(fiToRxts, fi, rxt.getDBID());
+            }
+        }
+        System.out.println("Total FIs: " + fiToRxts.size());
+        
+        String output = "results/ProteinFIsInReactions_032017.txt";
+        FileUtility fu = new FileUtility();
+        fu.setOutput(output);
+        fu.printLine("UniProt1\tUniProt2\tGene1\tGene2\tReactionIds");
+        for (String fi : fiToRxts.keySet()) {
+            String[] proteins = fi.split("\t");
+            String gene1 = uniProtToGene.get(proteins[0]);
+            String gene2 = uniProtToGene.get(proteins[1]);
+            fu.printLine(proteins[0] + "\t" + 
+                         proteins[1] + "\t" + 
+                         gene1 + "\t" + 
+                         gene2 + "\t" + 
+                         StringUtils.join(",", new ArrayList<>(fiToRxts.get(fi))));
+        }
+        fu.close();
+        // Note: The last column hasPPIEvidence will be added via the project FINetworkBuild's class
+        // org.reactome.fi.FIFileAnalyzer, method addHasPPIEvidenceFeature(). 
+    }
+    
+    private Map<String, String> getUniProtToGeneMap(MySQLAdaptor dba) throws Exception {
+        Collection<GKInstance> refGeneProduct = dba.fetchInstanceByAttribute(ReactomeJavaConstants.ReferenceGeneProduct,
+                                                                             ReactomeJavaConstants.species,
+                                                                             "=",
+                                                                             48887L);
+        dba.loadInstanceAttributeValues(refGeneProduct, new String[] {
+                ReactomeJavaConstants.geneName,
+                ReactomeJavaConstants.identifier,
+                ReactomeJavaConstants.dataSource
+        });
+        Map<String, String> uniProtToGene = new HashMap<>();
+        for (GKInstance inst : refGeneProduct) {
+            GKInstance dataSource = (GKInstance) inst.getAttributeValue(ReactomeJavaConstants.dataSource);
+            // We want to use reactome only
+            if (dataSource != null)
+                continue;
+            String identifier = (String) inst.getAttributeValue(ReactomeJavaConstants.identifier);
+            String geneName = (String) inst.getAttributeValue(ReactomeJavaConstants.geneName);
+            if (identifier == null || geneName == null) {
+                System.err.println(inst + " doesn't have a gene name!");
+                continue;
+            }
+            uniProtToGene.put(identifier, geneName);
+        }
+        return uniProtToGene;
     }
     
     public void generateFIsForReactionsWithFeatures(MySQLAdaptor dba,
@@ -678,23 +783,5 @@ public class ReactomeAnalyzer {
         att = reactionCls.getAttribute(ReactomeJavaConstants.referenceEntity);
         dba.loadInstanceAttributeValues(entities, att);
         return reactions;
-    }
-    
-    private Map<String, String> getUniProtToGeneMap(MySQLAdaptor dba) throws Exception {
-        Collection<GKInstance> refSeqs = dba.fetchInstanceByAttribute(ReactomeJavaConstants.ReferenceGeneProduct,
-                                                                      ReactomeJavaConstants.species,
-                                                                      "=",
-                                                                      48887L);
-        dba.loadInstanceAttributeValues(refSeqs, new String[]{
-                ReactomeJavaConstants.identifier,
-                ReactomeJavaConstants.geneName
-        });
-        Map<String, String> idToGene = new HashMap<String, String>();
-        for (GKInstance inst : refSeqs) {
-            String id = (String) inst.getAttributeValue(ReactomeJavaConstants.identifier);
-            String gene = (String) inst.getAttributeValue(ReactomeJavaConstants.geneName);
-            idToGene.put(id, gene);
-        }
-        return idToGene;
     }
 }

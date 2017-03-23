@@ -20,6 +20,7 @@ import org.biojava.nbio.core.alignment.template.SubstitutionMatrix;
 import org.biojava.nbio.core.exceptions.CompoundNotFoundException;
 import org.biojava.nbio.core.sequence.ProteinSequence;
 import org.biojava.nbio.core.sequence.compound.AminoAcidCompound;
+import org.apache.log4j.Logger;
 import org.biojava.nbio.structure.Chain;
 import org.biojava.nbio.structure.Group;
 import org.biojava.nbio.structure.Structure;
@@ -32,7 +33,6 @@ import org.biojava.nbio.structure.contact.GroupContact;
 import org.biojava.nbio.structure.contact.GroupContactSet;
 import org.biojava.nbio.structure.contact.Pair;
 import org.gk.util.GKApplicationUtilities;
-import org.apache.log4j.Logger;
 import org.junit.Test;
 import org.reactome.px.util.InteractionUtilities;
 import org.reactome.r3.ProteinSequenceHandler.Sequence;
@@ -454,7 +454,15 @@ public class Interactome3dAnalyzer {
         }
     }
 
-    //overload
+    /**
+     * Overloaded method.
+     * @param structure
+     * @param acces
+     * @param accToSeq
+     * @param accToGene
+     * @return
+     * @throws IOException
+     */
     public Map<Chain, PDBUniProtMatch> mapCoordinatesToUniProtInPDB(Structure structure,
                                                                     String[] acces,
                                                                     Map<String, Sequence> accToSeq,

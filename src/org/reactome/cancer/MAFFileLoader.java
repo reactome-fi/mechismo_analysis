@@ -25,6 +25,7 @@ import org.reactome.r3.UCSCDataAnalyzer;
 import org.reactome.r3.UniProtAnalyzer;
 import org.reactome.r3.util.FileUtility;
 import org.reactome.r3.util.InteractionUtilities;
+import org.reactome.r3.util.MutationObservation;
 
 /**
  * This file is used to load MAF (mutation annotation format) based on this URL: 

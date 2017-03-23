@@ -12,13 +12,13 @@ import org.gk.persistence.MySQLAdaptor;
 import org.gk.util.StringUtils;
 import org.junit.Test;
 import org.reactome.cancer.MAFFileLoader;
-import org.reactome.cancer.MutationObservation;
 import org.reactome.px.util.InteractionUtilities;
 import org.reactome.r3.*;
 import org.reactome.r3.Interactome3dAnalyzer.PDBUniProtMatch;
 import org.reactome.r3.ProteinSequenceHandler.Sequence;
 import org.reactome.r3.util.FileUtility;
 import org.reactome.r3.util.MathUtilities;
+import org.reactome.r3.util.MutationObservation;
 
 import java.io.*;
 import java.util.*;
@@ -415,6 +415,20 @@ public class Interactome3dDriverAnalyzer {
         }
         return genes;
     }
+    
+    /**
+     * This method implements a gene-central analysis by first loading mutation profiles annotated
+     * in COSMIC or other places, find Reactome reactions having annotated genes involved, expand
+     * reactions into a set of FIs, and check enrichment of mutations for FIs based on interactome3d
+     * structures.
+     * @throws Exception
+     */
+    @Test
+    public void checkAllHumanGenes() throws Exception {
+        CancerDriverAnalyzer cancerDriverAnalyzer = new CancerDriverAnalyzer();
+        Set<String> knownCancerGenes = cancerDriverAnalyzer.getDriverGenes(null);
+        logger.info("Total known cancer driver genes: " + knownCancerGenes.size());
+    }
 
     /**
      * This method overloads {@link #checkAllHumanReactions(CancerDriverReactomeAnalyzer)
@@ -461,7 +475,7 @@ public class Interactome3dDriverAnalyzer {
         if (needReactionOutput)
             System.out.println("DB_ID\tName\tTotal_FIs\tHasStrucute");
         for (GKInstance reaction : reactions) {
-            Set<String> fis = reactomeDataAnalyzer.generateAttentativePPIsForReaction(reaction,
+            Set<String> fis = reactomeDataAnalyzer.generateTentativePPIsForReaction(reaction,
                     false);
             if (fis.size() == 0)
                 continue;
@@ -521,7 +535,7 @@ public class Interactome3dDriverAnalyzer {
         for (GKInstance reaction : reactions) {
             // Store interactions in a set
             // "<uniprot ID>\t<uniprot ID>"
-            Set<String> fis = reactomeDataAnalyzer.generateAttentativePPIsForReaction(reaction,
+            Set<String> fis = reactomeDataAnalyzer.generateTentativePPIsForReaction(reaction,
                     false);
             if (fis.size() == 0)
                 continue;
@@ -755,7 +769,7 @@ public class Interactome3dDriverAnalyzer {
         Set<String> totalFIs = new HashSet<>();
         Set<String> fis;
         for (GKInstance reaction : reactions) {
-            fis = reactomeAnalyzer.generateAttentativePPIsForReaction(reaction,
+            fis = reactomeAnalyzer.generateTentativePPIsForReaction(reaction,
                     false);
             if (fis.size() == 0)
                 continue;
