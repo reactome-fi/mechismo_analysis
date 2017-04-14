@@ -4,12 +4,15 @@
  */
 package org.reactome.cancer.driver;
 
+import cern.colt.*;
+import org.apache.commons.httpclient.util.ExceptionUtil;
 import org.apache.log4j.Logger;
 import org.biojava.nbio.structure.*;
 import org.biojava.nbio.structure.align.util.AtomCache;
 import org.gk.model.GKInstance;
 import org.gk.persistence.MySQLAdaptor;
 import org.gk.util.StringUtils;
+import org.hibernate.exception.ExceptionUtils;
 import org.junit.Test;
 import org.reactome.cancer.MAFFileLoader;
 import org.reactome.px.util.InteractionUtilities;
@@ -20,8 +23,12 @@ import org.reactome.r3.util.FileUtility;
 import org.reactome.r3.util.MathUtilities;
 import org.reactome.r3.util.MutationObservation;
 
-import java.io.*;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.FilenameFilter;
+import java.io.IOException;
 import java.util.*;
+import java.util.Arrays;
 import java.util.regex.Pattern;
 
 /**
@@ -650,60 +657,234 @@ public class Interactome3dDriverAnalyzer {
 
         // Map all pdb files matching uniprot ID's to gene names;
         // "<gene symbol>\t<gene symbol>" -> "path/to/complex.pdb"
-        Map<String, File> geneSymbolToPDB = geneSymbolPdbMap(pdbDirectoryPath, uniprotIdToGene);
-        System.out.println(String.format("Total PDB's: %d", geneSymbolToPDB.size()));
+        Map<String, File> interaction2PDBMap = getInteraction2PDBMap(pdbDirectoryPath, uniprotIdToGene);
+        System.out.println(String.format("Total PDB's: %d", interaction2PDBMap.size()));
 
         //Extract Interfaces
         // "<gene symbol\tgene symbol>" -> HashMap<"<gene symbol>", Set<interface coordinate>>
-        Map<String, Map<String, Set<Integer>>> interactionInterfaces = extractInterfaces(geneSymbolToPDB, uniprotIdToGene);
+        Map<String, Map<String, ProteinChainSummary>> interactionsWithInterfaces = extractInterfaces(interaction2PDBMap, uniprotIdToGene);
 
         //Reactome FI's Interface Mutation Ratio
         // "<gene symbol\tgene symbol>" -> HashMap<<"gene symbol">,<Mutation Ratio>>
-        Map<String, Map<String, Double>> interfaceMutationRatios = new HashMap<>();
-        for (String interactionInterface : interactionInterfaces.keySet()) {
+        Map<String, InteractionMutationProfile> interfaceMutationRatios = new HashMap<>();
 
-            String gene1Name = interactionInterface.split("\t")[0];
-            String gene2Name = interactionInterface.split("\t")[1];
+        FileOutputStream fop = null;
+        try {
+            File file = new File(outFilePath);
+            file.createNewFile();
+            fop = new FileOutputStream(outFilePath);
 
-            double mutation1Ratio = getInterfaceMutations(allSamplesGeneMap, interactionInterfaces, interactionInterface, gene1Name);
-            double mutation2Ratio = getInterfaceMutations(allSamplesGeneMap, interactionInterfaces, interactionInterface, gene2Name);
+            fop.write(("Interaction," +
+                    "Gene1 Name,Gene1 Interface Length,Gene1 Length,Gene1 Interface Mutation Count,Gene1 Mutation Count," +
+                    "Gene2 Name,Gene2 Interface Length,Gene2 Length,Gene2 Interface Mutation Count,Gene2 Mutation Count," +
+                    "P Value\n").getBytes());
 
-            Map<String, Double> interactionMutationRatios = new HashMap<>();
-            interactionMutationRatios.put(gene1Name, mutation1Ratio);
-            interactionMutationRatios.put(gene2Name, mutation2Ratio);
-            interfaceMutationRatios.put(interactionInterface, interactionMutationRatios);
+            for (String interactionWithInterface : interactionsWithInterfaces.keySet()) {
+
+                String gene1Name = interactionWithInterface.split("\t")[0];
+                String gene2Name = interactionWithInterface.split("\t")[1];
+
+                GeneMutationProfile gene1MutationProfile = getGeneMutationProfile(allSamplesGeneMap, interactionsWithInterfaces, interactionWithInterface, gene1Name);
+                GeneMutationProfile gene2MutationProfile = getGeneMutationProfile(allSamplesGeneMap, interactionsWithInterfaces, interactionWithInterface, gene2Name);
+
+                if (gene1MutationProfile.isValid() && gene2MutationProfile.isValid()) {
+
+                    int interactionInterfaceMutationCount = gene1MutationProfile.interfaceMutationCount
+                            + gene2MutationProfile.interfaceMutationCount;
+
+                    if (interactionInterfaceMutationCount > 0) {
+                        double interactionInterfaceLengthRatio = ((double) gene1MutationProfile.interfaceLength
+                                + (double) gene2MutationProfile.interfaceLength)
+                                / ((double) gene1MutationProfile.geneLength
+                                + (double) gene2MutationProfile.geneLength);
+
+                        int interactionMutationCount = gene1MutationProfile.geneMutationCount
+                                + gene2MutationProfile.geneMutationCount;
+
+                        double p_value = 1.0;
+                        try {
+                            p_value = MathUtilities.calculateBinomialPValue(interactionInterfaceLengthRatio,
+                                    interactionMutationCount,
+                                    interactionInterfaceMutationCount);
+                        } catch (Exception e) {
+                            logger.error(String.format("Could not compute p-value for mutation profile pair: %s - %s: %s: %s",
+                                    gene1MutationProfile.toString(),
+                                    gene2MutationProfile.toString(),
+                                    e.getMessage(),
+                                    Arrays.toString(e.getStackTrace())));
+                        }
+
+                        interfaceMutationRatios.put(interactionWithInterface, new InteractionMutationProfile(
+                                gene1MutationProfile,
+                                gene2MutationProfile,
+                                p_value
+                        ));
+
+                        fop.write(String.format("%s,%s,%s,%f\n",
+                                interactionWithInterface,
+                                gene1MutationProfile.toString(),
+                                gene2MutationProfile.toString(),
+                                p_value).getBytes());
+                    } else {
+                        logger.warn(String.format("No interface mutations in mutation profile pair: %s - %s",
+                                gene1MutationProfile.toString(),
+                                gene2MutationProfile.toString()));
+                    }
+                } else {
+                    logger.warn(String.format("Invalid gene mutation profile pair: %s - %s",
+                            gene1MutationProfile.toString(),
+                            gene2MutationProfile.toString()));
+                }
+            }
+            logger.info(String.format("Output written to %s", outFilePath));
+        }catch(Exception e){
+            logger.error(String.format("%s: %s",
+                    e.getMessage(),
+                    Arrays.toString(e.getStackTrace())));
+        }finally {
+            if(fop != null) {
+                fop.flush();
+                fop.close();
+            }
         }
-
-        // Serialize our new datastruct...
-        new ObjectOutputStream(new FileOutputStream(outFilePath)).writeObject(interfaceMutationRatios);
     }
 
-    private double getInterfaceMutations(Map<String, Map<Integer, Set<MutationObservation>>> allSamplesGeneMap,
-                                         Map<String, Map<String, Set<Integer>>> interactionInterfaces,
-                                         String interactionInterface,
-                                         String geneName) {
-        int interfaceSize = -1;
-        int mutationCount = 0;
+    private class ProteinChainSummary {
+        private Set<Integer> interfaceCoordinates;
+        private int chainLength;
+        ProteinChainSummary(Set<Integer> interfaceCoordinates,
+                            int chainLength){
+            this.interfaceCoordinates = interfaceCoordinates;
+            this.chainLength = chainLength;
+            if(this.chainLength <= 0){
+                logger.error("Invalid chain length detected...");
+            }
+        }
+
+        public Set<Integer> getInterfaceCoordinates(){
+            return this.interfaceCoordinates;
+        }
+        public int getChainLength(){
+            return this.chainLength;
+        }
+    }
+
+    private class InteractionMutationProfile{
+        private GeneMutationProfile gene1MutationProfile;
+        private GeneMutationProfile gene2MutationProfile;
+        private double p_value;
+        InteractionMutationProfile(GeneMutationProfile gene1MutationProfile,
+                                   GeneMutationProfile gene2MutationProfile,
+                                   double p_value){
+            this.gene1MutationProfile = gene1MutationProfile;
+            this.gene2MutationProfile = gene2MutationProfile;
+            this.p_value = p_value;
+        }
+        public GeneMutationProfile getGene1MutationProfile(){
+            return this.gene1MutationProfile;
+        }
+        public GeneMutationProfile getGene2MutationProfile(){
+            return this.gene2MutationProfile;
+        }
+        public double getP_value(){
+            return this.p_value;
+        }
+    }
+
+    private class GeneMutationProfile {
+        private String geneName;
+        private int interfaceLength;
+        private int geneLength;
+        private int interfaceMutationCount;
+        private int geneMutationCount;
+        GeneMutationProfile(String geneName,
+                            int interfaceLength,
+                                   int geneLength,
+                                   int interfaceMutationCount,
+                                   int geneMutationCount){
+            this.geneName = geneName;
+            this.interfaceLength = interfaceLength;
+            this.geneLength = geneLength;
+            this.interfaceMutationCount = interfaceMutationCount;
+            this.geneMutationCount = geneMutationCount;
+        }
+        public String getGeneName(){
+            return this.geneName;
+        }
+        public int getInterfaceLength(){
+            return this.interfaceLength;
+        }
+        public int getGeneLength(){
+            return this.geneLength;
+        }
+        public int getInterfaceMutationCount(){
+            return this.interfaceMutationCount;
+        }
+        public int getGeneMutationCount(){
+            return this.geneMutationCount;
+        }
+
+        public boolean isValid(){
+            return this.geneName != null
+                    && !this.geneName.equals("")
+                    && this.geneLength > 0
+                    && this.interfaceLength <= this.geneLength;
+        }
+        public String toString(){
+            return String.format("%s,%d,%d,%d,%d",
+                                    this.geneName,
+                                    this.interfaceLength,
+                                    this.geneLength,
+                                    this.interfaceMutationCount,
+                                    this.geneMutationCount);
+        }
+    }
+
+    private GeneMutationProfile getGeneMutationProfile(Map<String, Map<Integer, Set<MutationObservation>>> allSamplesGeneMap,
+                                                       Map<String, Map<String, ProteinChainSummary>> interactionInterfaces,
+                                                       String interactionInterface,
+                                                       String geneName) {
+        int interfaceLength = -1;
+        int geneLength = 0;
+        int interfaceMutationCount = 0;
+        int geneMutationCount = 0;
         try {
-            interfaceSize = interactionInterfaces.get(interactionInterface).get(geneName).size();
-            for (Integer interfaceCoord : interactionInterfaces.get(interactionInterface).get(geneName)) {
-                if (allSamplesGeneMap.get(geneName) != null && allSamplesGeneMap.get(geneName).get(interfaceCoord) != null) {
-                    mutationCount += allSamplesGeneMap.get(geneName).get(interfaceCoord).size();
+            interfaceLength = interactionInterfaces.get(interactionInterface).get(geneName).getInterfaceCoordinates().size();
+            geneLength = interactionInterfaces.get(interactionInterface).get(geneName).getChainLength();
+            if (allSamplesGeneMap.get(geneName) != null){
+                for (Integer aaCoord : allSamplesGeneMap.get(geneName).keySet()) {
+                    if(aaCoord != null) {
+                        geneMutationCount += allSamplesGeneMap.get(geneName).get(aaCoord).size();
+                        if (interactionInterfaces.get(interactionInterface).get(geneName).getInterfaceCoordinates().contains(aaCoord)) {
+                            interfaceMutationCount += allSamplesGeneMap.get(geneName).get(aaCoord).size();
+                        }
+                    }
                 }
             }
         } catch (NullPointerException npe) {
             logger.warn(String.format("Interaction '%s' gene '%s' has no interface coordinates", interactionInterface, geneName));
         }
-        return (interfaceSize > 0 ? (double) mutationCount / (double) interfaceSize : 0.0);
+
+        GeneMutationProfile geneMutationProfile = new GeneMutationProfile(geneName,
+                interfaceLength,
+                geneLength,
+                interfaceMutationCount,
+                geneMutationCount);
+
+        if(!geneMutationProfile.isValid()){
+            logger.warn(String.format("Invalid gene mutation profile created: %s",geneMutationProfile.toString()));
+        }
+
+        return geneMutationProfile;
     }
 
-    private Map<String, Map<String, Set<Integer>>> extractInterfaces(Map<String, File> geneSymbolToPDB,
-                                                                     Map<String, String> accessionToGene) throws IOException, StructureException {
+    private Map<String, Map<String, ProteinChainSummary>> extractInterfaces(Map<String, File> interaction2PDBMap,
+                                                                Map<String, String> accessionToGene) throws IOException, StructureException {
         Interactome3dAnalyzer interactome3dAnalyzer = new Interactome3dAnalyzer();
-        Map<String, Map<String, Set<Integer>>> interactionInterfaces = new HashMap<>();
+        Map<String, Map<String, ProteinChainSummary>> interactionInterfaces = new HashMap<>();
         Map<Chain, List<Integer>> chainToContactCoordinates;
         Map<Chain, PDBUniProtMatch> chainToMatch;
-        Map<String, Set<Integer>> interactionInterface;
+        Map<String, ProteinChainSummary> interactionInterface;
         Structure structure;
         File pdbFile;
 
@@ -715,11 +896,11 @@ public class Interactome3dDriverAnalyzer {
         }
 
         String[] proteinIDs, proteinIDs2;
-        for (String interaction : geneSymbolToPDB.keySet()) {
+        for (String interaction : interaction2PDBMap.keySet()) {
             //if (interaction.equals("ZNF417\tZNF587")) {
             //    int startDebugging = 1;
             //}
-            pdbFile = geneSymbolToPDB.get(interaction);
+            pdbFile = interaction2PDBMap.get(interaction);
             structure = StructureIO.getStructure(pdbFile.getAbsolutePath());
             chainToContactCoordinates = interactome3dAnalyzer.extractContacts(structure);
             proteinIDs = pdbFile.getName().split("-");
@@ -752,7 +933,9 @@ public class Interactome3dDriverAnalyzer {
             for (Chain chainID : chainToMatch.keySet()) {
                 //map geneID to set of contact coordinates for this interaction
                 interactionInterface.put(chainToMatch.get(chainID).getGene(),
-                        new HashSet<>(chainToContactCoordinates.get(chainID)));
+                        new ProteinChainSummary(
+                                new HashSet<>(chainToContactCoordinates.get(chainID)),
+                                chainToMatch.get(chainID).getChainSequence().length()));
             }
             interactionInterfaces.put(interaction, interactionInterface);
         }
@@ -849,7 +1032,7 @@ public class Interactome3dDriverAnalyzer {
      *
      * @throws Exception
      */
-    private Map<String, File> geneSymbolPdbMap(String pdbDirectoryPath, Map<String, String> uniprotIdToGene) throws IOException {
+    private Map<String, File> getInteraction2PDBMap(String pdbDirectoryPath, Map<String, String> uniprotIdToGene) throws IOException {
         Interactome3dAnalyzer interactomeAnalyser = new Interactome3dAnalyzer();
         //comes out like "<uniprot ID>\t<uniprot ID>"
         Map<String, File> fiToPDB = interactomeAnalyser.loadPPIToPDBFile(pdbDirectoryPath,

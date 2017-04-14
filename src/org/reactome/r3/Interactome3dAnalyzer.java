@@ -425,7 +425,8 @@ public class Interactome3dAnalyzer {
             String chainId = (i == 0 ? "A" : "B");
             Chain chain = structure.getChainByPDB(chainId);
             PDBUniProtMatch match = new PDBUniProtMatch();
-            match.chain = chainId;
+            match.chainID = chainId;
+            match.chainSequence = chain.getAtomSequence();
             match.uniprot = accessions[i];
             match.gene = accToGene.get(match.uniprot);
             match.offset = 0;
@@ -498,14 +499,15 @@ public class Interactome3dAnalyzer {
 
                 if (index >= 0) {
                     //try {
-                    //    calculateGlobalAlignmentScore(chain.getAtomSequence(), seq.getSequence());
+                    //    calculateGlobalAlignmentScore(chainID.getAtomSequence(), seq.getSequence());
                     //}catch(CompoundNotFoundException cnfe){
                         //do nothing
                     //}
 //                    System.out.println(seq.getSequence());
-//                    System.out.println(chain.getAtomSequence());
+//                    System.out.println(chainID.getAtomSequence());
                     PDBUniProtMatch match = new PDBUniProtMatch();
-                    match.chain = chain.getChainID();
+                    match.chainID = chain.getChainID();
+                    match.chainSequence = chain.getAtomSequence();
                     match.gene = uniprotToGene.get(uniprotID);
                     match.uniprot = uniprotID;
                     match.pdbStart = chain.getAtomGroup(0).getResidueNumber().getSeqNum();
@@ -540,8 +542,9 @@ public class Interactome3dAnalyzer {
     }
 
     public static class PDBUniProtMatch {
-        
-        private String chain;
+
+        private String chainID;
+        private String chainSequence;
         private String uniprot;
         private String gene;
         private int pdbStart;
@@ -552,8 +555,12 @@ public class Interactome3dAnalyzer {
             
         }
 
-        public String getChain() {
-            return chain;
+        public String getChainID() {
+            return chainID;
+        }
+
+        public String getChainSequence(){
+            return chainSequence;
         }
 
         public String getUniprot() {
