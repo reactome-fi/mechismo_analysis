@@ -4,15 +4,13 @@
  */
 package org.reactome.cancer.driver;
 
-import cern.colt.*;
-import org.apache.commons.httpclient.util.ExceptionUtil;
 import org.apache.log4j.Logger;
 import org.biojava.nbio.structure.*;
 import org.biojava.nbio.structure.align.util.AtomCache;
 import org.gk.model.GKInstance;
 import org.gk.persistence.MySQLAdaptor;
 import org.gk.util.StringUtils;
-import org.hibernate.exception.ExceptionUtils;
+import org.hibernate.mapping.*;
 import org.junit.Test;
 import org.reactome.cancer.MAFFileLoader;
 import org.reactome.px.util.InteractionUtilities;
@@ -28,7 +26,10 @@ import java.io.FileOutputStream;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.util.*;
-import java.util.Arrays;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
@@ -608,6 +609,41 @@ public class Interactome3dDriverAnalyzer {
                 null);
     }
 
+    public void findInteractionsWithMechismoEnrichment(CancerDriverReactomeAnalyzer cancerDriverReactomeAnalyzer,
+                                                       String mechismoOutputDirectoryPath,
+                                                       String cancerTypeDirectoryPath,
+                                                       String outFilePath) throws Exception {
+        //Reactome FI's
+        // Load all the non-disease reactions from Reactome
+        // dbID + string description + other stuff
+        List<GKInstance> reactions = cancerDriverReactomeAnalyzer.loadHumanReactions();
+        System.out.println(String.format("Total reactions: %d", reactions.size()));
+
+        // Store Reactome interactions in a set
+        // "<uniprot ID>\t<uniprot ID>"
+        Set<String> reactomeFIs = interactionSet(reactions);
+        System.out.println(String.format("Reactome FIs: %d", reactomeFIs.size()));
+
+        // Store Mechismo interactions in a map
+        // "<uniprot ID>\t<uniprot ID> => <mechismo score>"
+        Map<String,Integer> mechismoInteractions = mechismoInteractionMap();
+        System.out.println(String.format("Mechismo FIs: %d", mechismoInteractions.size()));
+
+        // Report Coverage
+        Set<String> mechismoInteractionsInReactomeFIs = findMechismoReactomeIntersection(reactomeFIs, mechismoInteractions);
+        System.out.println(String.format("%d of %d (%f %) interactions in Mechismo covered by Reactome FIs",
+                mechismoInteractionsInReactomeFIs.size(),
+                mechismoInteractions.keySet().size(),
+                (double) mechismoInteractionsInReactomeFIs.size() / (double) mechismoInteractions.keySet().size()));
+
+        //TODO: manual check -- write map to .csv and compare with interface enrichment (below)
+        //TODO: correlate interface enrichment (below) with mechismo score
+        //TODO: Heatmaps for interactions (Reactome vs Mechismo) per patient
+        //TODO: Heatmaps for reactions per patient
+        //TODO: Heatmaps for pathways per patient
+        //TODO: Rerun analysis for all cancer types (along with interface enrichment comparison)
+    }
+
     /**
      * This method...
      *
@@ -645,7 +681,7 @@ public class Interactome3dDriverAnalyzer {
         //Keep only Reactome FI's containing >= 1 gene mutated in MAF
         // Lookup and store gene symbols for proteins in a set
         // "<gene symbol>"
-        Set<String> totalGenes = mutatedFIs(totalProteins, uniprotIdToGene);
+        Set<String> totalGenes = keepGenesWithMappedProteins(totalProteins, uniprotIdToGene);
         System.out.println(String.format("Total genes: %d", totalGenes.size()));
 
         //MAF Mutations
@@ -1013,7 +1049,7 @@ public class Interactome3dDriverAnalyzer {
      *
      * @throws Exception
      */
-    private Set<String> mutatedFIs(Set<String> totalProteins, Map<String, String> uniprotIdToGene) {
+    private Set<String> keepGenesWithMappedProteins(Set<String> totalProteins, Map<String, String> uniprotIdToGene) {
         Set<String> totalGenes = new HashSet<>();
         for (String protein : totalProteins) {
             String gene = uniprotIdToGene.get(protein);
