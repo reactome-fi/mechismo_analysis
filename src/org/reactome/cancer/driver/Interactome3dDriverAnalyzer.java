@@ -4,6 +4,7 @@
  */
 package org.reactome.cancer.driver;
 
+import cern.colt.*;
 import org.apache.log4j.Logger;
 import org.biojava.nbio.structure.*;
 import org.biojava.nbio.structure.align.util.AtomCache;
@@ -21,15 +22,18 @@ import org.reactome.r3.util.FileUtility;
 import org.reactome.r3.util.MathUtilities;
 import org.reactome.r3.util.MutationObservation;
 
+import java.awt.geom.Arc2D;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.util.*;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -610,8 +614,10 @@ public class Interactome3dDriverAnalyzer {
     }
 
     public void findInteractionsWithMechismoEnrichment(CancerDriverReactomeAnalyzer cancerDriverReactomeAnalyzer,
-                                                       String mechismoOutputDirectoryPath,
-                                                       String cancerTypeDirectoryPath,
+                                                       String mechismoOutputFilePath,
+                                                       String mechismoInteractionScorePattern,
+                                                       String cancerTypeFilePath,
+                                                       String cancerTypeInteractionPattern,
                                                        String outFilePath) throws Exception {
         //Reactome FI's
         // Load all the non-disease reactions from Reactome
@@ -626,15 +632,15 @@ public class Interactome3dDriverAnalyzer {
 
         // Store Mechismo interactions in a map
         // "<uniprot ID>\t<uniprot ID> => <mechismo score>"
-        Map<String,Integer> mechismoInteractions = mechismoInteractionMap();
-        System.out.println(String.format("Mechismo FIs: %d", mechismoInteractions.size()));
+        Map<String,Double> mechismoInteractions = mechismoInteractionMap(mechismoOutputFilePath, mechismoInteractionScorePattern);
+        System.out.println(String.format("Mechismo PPIs: %d", mechismoInteractions.size()));
 
         // Report Coverage
-        Set<String> mechismoInteractionsInReactomeFIs = findMechismoReactomeIntersection(reactomeFIs, mechismoInteractions);
-        System.out.println(String.format("%d of %d (%f %) interactions in Mechismo covered by Reactome FIs",
-                mechismoInteractionsInReactomeFIs.size(),
+        Map<String,Double> mechismoInteractionsInReactomeFIs = findMechismoReactomeIntersection(reactomeFIs, mechismoInteractions);
+        System.out.println(String.format("%d of %d (%.3f %%) PPIs in Mechismo covered by Reactome FIs",
+                mechismoInteractionsInReactomeFIs.keySet().size(),
                 mechismoInteractions.keySet().size(),
-                (double) mechismoInteractionsInReactomeFIs.size() / (double) mechismoInteractions.keySet().size()));
+                100.0 * ((double) mechismoInteractionsInReactomeFIs.keySet().size() / (double) mechismoInteractions.keySet().size())));
 
         //TODO: manual check -- write map to .csv and compare with interface enrichment (below)
         //TODO: correlate interface enrichment (below) with mechismo score
@@ -642,6 +648,48 @@ public class Interactome3dDriverAnalyzer {
         //TODO: Heatmaps for reactions per patient
         //TODO: Heatmaps for pathways per patient
         //TODO: Rerun analysis for all cancer types (along with interface enrichment comparison)
+    }
+
+    private Map<String,Double> findMechismoReactomeIntersection(Set<String> reactomeFIs, Map<String,Double> mechismoInteractions){
+        Set<String> sortedFIs = new HashSet<>();
+        for (String fi:reactomeFIs){
+            String[] fiArray = fi.split("\t");
+            Arrays.sort(fiArray);
+            sortedFIs.add(String.format("%s\t%s",fiArray[0],fiArray[1]));
+        }
+
+        Map<String,Double> mechismoInteractionsInReactomeFIs = new HashMap<>();
+        for( String interaction:mechismoInteractions.keySet()){
+            String[] interactionArray = interaction.split("\t");
+            Arrays.sort(interactionArray);
+            String sortedInteraction = String.format("%s\t%s",interactionArray[0],interactionArray[1]);
+            if(sortedFIs.contains(sortedInteraction)){
+                mechismoInteractionsInReactomeFIs.put(sortedInteraction,mechismoInteractions.get(interaction));
+            }
+        }
+        return mechismoInteractionsInReactomeFIs;
+    }
+
+    private Map<String,Double> mechismoInteractionMap(String mechismoOutputFilePath,
+                                                       String mechismoInteractionScorePattern) throws IOException{
+        Pattern mechIntScorePattern = Pattern.compile(mechismoInteractionScorePattern);
+        String prot1 = "prot1";
+        String prot2 = "prot2";
+        String mech = "mech";
+
+        Map<String,Double> mechismoInteractions = new HashMap<>();
+
+        FileUtility fu = new FileUtility();
+        fu.setInput(mechismoOutputFilePath);
+        String line;
+        while ((line = fu.readLine()) != null) {
+            Matcher matcher = mechIntScorePattern.matcher(line);
+            if(matcher.find()) {
+                mechismoInteractions.put(String.format("%s\t%s",matcher.group(prot1),matcher.group(prot2)), Double.parseDouble(matcher.group(mech)));
+            }
+        }
+        fu.close();
+        return mechismoInteractions;
     }
 
     /**
