@@ -613,12 +613,91 @@ public class Interactome3dDriverAnalyzer {
                 null);
     }
 
-    public void findInteractionsWithMechismoEnrichment(CancerDriverReactomeAnalyzer cancerDriverReactomeAnalyzer,
-                                                       String mechismoOutputFilePath,
-                                                       String mechismoInteractionScorePattern,
-                                                       String cancerTypeFilePath,
-                                                       String cancerTypeInteractionPattern,
-                                                       String outFilePath) throws Exception {
+    public void calculateMechismoInteractionCorrelationWithInterfaceMutationEnrichment(CancerDriverReactomeAnalyzer cancerDriverReactomeAnalyzer,
+                                                                                       String mechismoOutputFilePath,
+                                                                                       String mechismoInteractionScorePattern,
+                                                                                       String cancerTypeFilePath,
+                                                                                       String cancerTypeInteractionPattern,
+                                                                                       String mechismoOutFilePath,
+                                                                                       String mafDirectoryPath,
+                                                                                       String mafFileNamePattern,
+                                                                                       String pdbDirectoryPath,
+                                                                                       String reactomeOutFilePath,
+                                                                                       String intersectionOutFilePath) throws Exception {
+
+        //TODO: manual check -- write map to .csv and compare with interface enrichment (below)
+
+        Map <String, InteractionMutationProfile> interfaceMutationRatios = findInteractionsWithMutatedInterfaces(cancerDriverReactomeAnalyzer,
+                mafDirectoryPath,
+                mafFileNamePattern,
+                pdbDirectoryPath,
+                reactomeOutFilePath);
+
+        Map <String, Double> mechismoInteractionsInReactomeFIs = findMechismoInteractionsInReactome(cancerDriverReactomeAnalyzer,
+                mechismoOutputFilePath,
+                mechismoInteractionScorePattern,
+                cancerTypeFilePath,
+                cancerTypeInteractionPattern,
+                mechismoOutFilePath);
+
+        FileOutputStream fop = null;
+        try {
+            File file = new File(intersectionOutFilePath);
+            file.createNewFile();
+            fop = new FileOutputStream(intersectionOutFilePath);
+
+            fop.write(("PPI," +
+                    "Gene 1 Name, Gene1 Interface Length,Gene1 Length,Gene1 Interface Mutation Count,Gene1 Mutation Count," +
+                    "Gene 2 Name, Gene2 Interface Length,Gene2 Length,Gene2 Interface Mutation Count,Gene2 Mutation Count," +
+                    "P Value," +
+                    "Mechismo Score\n").getBytes());
+
+            for(String interactionWithInterface:interfaceMutationRatios.keySet()){
+                String[] interactionArray = interactionWithInterface.split("\t");
+                String q1 = String.format("%s\t%s",interactionArray[0],interactionArray[1]);
+                String q2 = String.format("%s\t%s",interactionArray[1],interactionArray[2]);
+                double mechismoScore;
+                if(mechismoInteractionsInReactomeFIs.containsKey(q1)){
+                    mechismoScore = mechismoInteractionsInReactomeFIs.get(q1);
+                }else if(mechismoInteractionsInReactomeFIs.containsKey(q2)){
+                    mechismoScore = mechismoInteractionsInReactomeFIs.get(q2);
+                }else{
+                    logger.warn(String.format("Mechismo Interactions in ReactomeFIs missing: %s",
+                            interactionWithInterface));
+                    continue;
+                }
+
+                fop.write(String.format("%s,%s,%s,%f,%f\n",
+                        interactionWithInterface,
+                        interfaceMutationRatios.get(interactionWithInterface).gene1MutationProfile.toString(),
+                        interfaceMutationRatios.get(interactionWithInterface).gene2MutationProfile.toString(),
+                        interfaceMutationRatios.get(interactionWithInterface).p_value,
+                        mechismoScore).getBytes());
+            }
+        }catch(Exception e){
+            logger.error(String.format("%s: %s",
+                    e.getMessage(),
+                    Arrays.toString(e.getStackTrace())));
+        }finally {
+            if(fop != null) {
+                fop.flush();
+                fop.close();
+            }
+        }
+
+        //TODO: correlate interface enrichment (below) with mechismo score
+        //TODO: Heatmaps for interactions (Reactome vs Mechismo) per patient
+        //TODO: Heatmaps for reactions per patient
+        //TODO: Heatmaps for pathways per patient
+        //TODO: Rerun analysis for all cancer types (along with interface enrichment comparison)
+    }
+
+    public Map<String,Double> findMechismoInteractionsInReactome(CancerDriverReactomeAnalyzer cancerDriverReactomeAnalyzer,
+                                                                 String mechismoOutputFilePath,
+                                                                 String mechismoInteractionScorePattern,
+                                                                 String cancerTypeFilePath,
+                                                                 String cancerTypeInteractionPattern,
+                                                                 String outFilePath) throws Exception {
         //Reactome FI's
         // Load all the non-disease reactions from Reactome
         // dbID + string description + other stuff
@@ -642,12 +721,40 @@ public class Interactome3dDriverAnalyzer {
                 mechismoInteractions.keySet().size(),
                 100.0 * ((double) mechismoInteractionsInReactomeFIs.keySet().size() / (double) mechismoInteractions.keySet().size())));
 
-        //TODO: manual check -- write map to .csv and compare with interface enrichment (below)
-        //TODO: correlate interface enrichment (below) with mechismo score
-        //TODO: Heatmaps for interactions (Reactome vs Mechismo) per patient
-        //TODO: Heatmaps for reactions per patient
-        //TODO: Heatmaps for pathways per patient
-        //TODO: Rerun analysis for all cancer types (along with interface enrichment comparison)
+        // Map uniprot ID's to gene symbols (COSMIC uses gene symbols)
+        // "<uniprot ID>" -> "<gene symbol>"
+        Map<String, String> uniprotIdToGene = new UniProtAnalyzer().getUniProtAccessionToGeneName();
+        FileOutputStream fop = null;
+        try {
+            File file = new File(outFilePath);
+            file.createNewFile();
+            fop = new FileOutputStream(outFilePath);
+
+            fop.write(("Interaction,Gene 1, Gene 2,Mechismo Score\n").getBytes());
+            for(String interaction:mechismoInteractionsInReactomeFIs.keySet()){
+                String[] interactionArray = interaction.split("\t");
+                String gene1 = uniprotIdToGene.get(interactionArray[0]);
+                String gene2 = uniprotIdToGene.get(interactionArray[1]);
+                fop.write((String.format("%s\t%s,%s,%s,%f\n",
+                        gene1,
+                        gene2,
+                        gene1,
+                        gene2,
+                        mechismoInteractionsInReactomeFIs.get(interaction)).getBytes()));
+            }
+        }catch(Exception e){
+            logger.error(String.format("%s: %s",
+                    e.getMessage(),
+                    Arrays.toString(e.getStackTrace())));
+        }finally {
+            if(fop != null) {
+                fop.flush();
+                fop.close();
+            }
+        }
+
+
+        return mechismoInteractionsInReactomeFIs;
     }
 
     private Map<String,Double> findMechismoReactomeIntersection(Set<String> reactomeFIs, Map<String,Double> mechismoInteractions){
@@ -697,7 +804,7 @@ public class Interactome3dDriverAnalyzer {
      *
      * @throws Exception
      */
-    public void findInteractionsWithMutatedInterfaces(CancerDriverReactomeAnalyzer cancerDriverReactomeAnalyzer,
+    public Map<String, InteractionMutationProfile> findInteractionsWithMutatedInterfaces(CancerDriverReactomeAnalyzer cancerDriverReactomeAnalyzer,
                                                       String mafDirectoryPath,
                                                       String mafFileNamePattern,
                                                       String pdbDirectoryPath,
@@ -831,6 +938,8 @@ public class Interactome3dDriverAnalyzer {
                 fop.close();
             }
         }
+
+        return interfaceMutationRatios;
     }
 
     private class ProteinChainSummary {
