@@ -655,7 +655,7 @@ public class Interactome3dDriverAnalyzer {
             for(String interactionWithInterface:interfaceMutationRatios.keySet()){
                 String[] interactionArray = interactionWithInterface.split("\t");
                 String q1 = String.format("%s\t%s",interactionArray[0],interactionArray[1]);
-                String q2 = String.format("%s\t%s",interactionArray[1],interactionArray[2]);
+                String q2 = String.format("%s\t%s",interactionArray[1],interactionArray[0]);
                 double mechismoScore;
                 if(mechismoInteractionsInReactomeFIs.containsKey(q1)){
                     mechismoScore = mechismoInteractionsInReactomeFIs.get(q1);
@@ -752,8 +752,6 @@ public class Interactome3dDriverAnalyzer {
                 fop.close();
             }
         }
-
-
         return mechismoInteractionsInReactomeFIs;
     }
 
