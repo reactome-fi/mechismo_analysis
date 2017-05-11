@@ -4,37 +4,37 @@
  */
 package org.reactome.cancer.driver;
 
-import cern.colt.*;
-import org.apache.log4j.Logger;
-import org.biojava.nbio.structure.*;
-import org.biojava.nbio.structure.align.util.AtomCache;
-import org.gk.model.GKInstance;
-import org.gk.persistence.MySQLAdaptor;
-import org.gk.util.StringUtils;
-import org.hibernate.mapping.*;
-import org.junit.Test;
-import org.reactome.cancer.MAFFileLoader;
-import org.reactome.px.util.InteractionUtilities;
-import org.reactome.r3.*;
-import org.reactome.r3.Interactome3dAnalyzer.PDBUniProtMatch;
-import org.reactome.r3.ProteinSequenceHandler.Sequence;
-import org.reactome.r3.util.FileUtility;
-import org.reactome.r3.util.MathUtilities;
-import org.reactome.r3.util.MutationObservation;
-
-import java.awt.geom.Arc2D;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.util.*;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import org.apache.log4j.Logger;
+import org.biojava.nbio.structure.Chain;
+import org.biojava.nbio.structure.Group;
+import org.biojava.nbio.structure.GroupType;
+import org.biojava.nbio.structure.Structure;
+import org.biojava.nbio.structure.StructureException;
+import org.biojava.nbio.structure.StructureIO;
+import org.biojava.nbio.structure.align.util.AtomCache;
+import org.gk.model.GKInstance;
+import org.gk.persistence.MySQLAdaptor;
+import org.gk.util.StringUtils;
+import org.junit.Test;
+import org.reactome.cancer.MAFFileLoader;
+import org.reactome.px.util.InteractionUtilities;
+import org.reactome.r3.CosmicAnalyzer;
+import org.reactome.r3.Interactome3dAnalyzer;
+import org.reactome.r3.Interactome3dAnalyzer.PDBUniProtMatch;
+import org.reactome.r3.ProteinSequenceHandler;
+import org.reactome.r3.ProteinSequenceHandler.Sequence;
+import org.reactome.r3.ReactomeAnalyzer;
+import org.reactome.r3.UniProtAnalyzer;
+import org.reactome.r3.util.FileUtility;
+import org.reactome.r3.util.MathUtilities;
+import org.reactome.r3.util.MutationObservation;
 
 /**
  * This class is used to handle protein 3D structures based on PDB using biojava APIs.
@@ -787,11 +787,20 @@ public class Interactome3dDriverAnalyzer {
         FileUtility fu = new FileUtility();
         fu.setInput(mechismoOutputFilePath);
         String line;
+//        while ((line = fu.readLine()) != null) {
+//            Matcher matcher = mechIntScorePattern.matcher(line);
+//            if(matcher.find()) {
+//                mechismoInteractions.put(String.format("%s\t%s",matcher.group(prot1),matcher.group(prot2)), Double.parseDouble(matcher.group(mech)));
+//            }
+//        }
         while ((line = fu.readLine()) != null) {
-            Matcher matcher = mechIntScorePattern.matcher(line);
-            if(matcher.find()) {
-                mechismoInteractions.put(String.format("%s\t%s",matcher.group(prot1),matcher.group(prot2)), Double.parseDouble(matcher.group(mech)));
-            }
+            String[] tokens = line.split("\t");
+            if (tokens.length < 20)
+                continue;
+            if (tokens[19].trim().length() == 0)
+                continue;
+            mechismoInteractions.put(tokens[1].trim() + "\t" + tokens[19].trim(),
+                                     new Double(tokens[17]));
         }
         fu.close();
         return mechismoInteractions;

@@ -8,4 +8,4 @@
 .idea/*.iws
 /classes/
 /datasets/
-*.~lock*
+/results/
