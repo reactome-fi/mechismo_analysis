@@ -8,6 +8,12 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.FilenameFilter;
 import java.io.IOException;
+import java.nio.file.FileVisitResult;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
 import java.util.regex.Pattern;
 
@@ -1160,6 +1166,15 @@ public class Interactome3dDriverAnalyzer {
         }
         return totalFIs;
     }
+    
+    @Test
+    public void testMafGenesToMutations() throws IOException {
+        String mafDir = "datasets/firehose_all/";
+        String mafPattern = "^.+\\.maf\\.txt$";
+        Map<String, Map<Integer, Set<MutationObservation>>> rtn = mafGeneToMutation(mafPattern,
+                                                                                    mafDir);
+        System.out.println(rtn.size());
+    }
 
     /**
      * This method...
@@ -1177,7 +1192,24 @@ public class Interactome3dDriverAnalyzer {
             }
             return false;
         };
-        File[] mafFiles = new File(mafDirectoryPath).listFiles(filenameFilter);
+        
+        Path path = Paths.get(mafDirectoryPath);
+        List<File> mafFiles = new ArrayList<>();
+        Files.walkFileTree(path, new SimpleFileVisitor<Path>() {
+
+            @Override
+            public FileVisitResult visitFile(Path file, 
+                                             BasicFileAttributes attrs) throws IOException {
+                if (attrs.isRegularFile() && mafFnPattern.matcher(file.toFile().getName()).matches())
+                    mafFiles.add(file.toFile());
+                return super.visitFile(file, attrs);
+            }
+            
+        });
+//        System.out.println("Total maf files: " + mafFiles.size());
+//        mafFiles.forEach(System.out::println);
+        
+//        File[] mafFiles = new File(mafDirectoryPath).listFiles(filenameFilter);
         Map<String, Map<Integer, Set<MutationObservation>>> sampleGeneMap;
         for (File mafFile : mafFiles) {
             sampleGeneMap = mafFileLoader.loadSampleToGenes(mafFile.getPath());

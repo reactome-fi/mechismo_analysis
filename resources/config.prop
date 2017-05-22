@@ -1,0 +1,5 @@
+reactome.dbHost=localhost
+reactome.dbName=reactome_59_plus_i
+reactome.dbUser={DB_USER}
+reactome.dbPwd={DB_PWD}
+reactome.dbPort=3306

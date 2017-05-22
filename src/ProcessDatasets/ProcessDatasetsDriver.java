@@ -3,6 +3,7 @@ package ProcessDatasets;
 import java.util.Scanner;
 
 import org.gk.persistence.MySQLAdaptor;
+import org.junit.Test;
 import org.reactome.cancer.driver.CancerDriverReactomeAnalyzer;
 import org.reactome.cancer.driver.Interactome3dDriverAnalyzer;
 import org.reactome.r3.util.Configuration;
@@ -12,7 +13,10 @@ import org.reactome.r3.util.Configuration;
  */
 public class ProcessDatasetsDriver {
     
-    public ProcessDatasetsDriver(String[] args){
+//    public ProcessDatasetsDriver(String[] args){
+//    }
+    
+    public ProcessDatasetsDriver() {
     }
     
     private MySQLAdaptor getReactomeDBA() throws Exception {
@@ -35,23 +39,31 @@ public class ProcessDatasetsDriver {
                                pw);
         return dba;
     }
-
-    public void run(){
+    
+    @Test
+    public void testFindInteractionsWithMutatedInterfaces() {
+        run("1");
+    }
+    
+   
+    public void run() {
+        System.out.print("Interface Enrichment 0\n" +
+                "Mechismo/Reactome Overlay 1\n" +
+                "Mechismo/Reactome Interface Enrichment 2\n" +
+                "Cancel <enter>\n");
+        Scanner scanner = new Scanner(System.in);
+        String ex = scanner.next();
+        scanner.close();
+        run(ex);
+    }
+    
+    public void run(String ex){
         Interactome3dDriverAnalyzer interactome3dDriverAnalyzer = new Interactome3dDriverAnalyzer();
         try {
             MySQLAdaptor dba = getReactomeDBA();
 
             CancerDriverReactomeAnalyzer cancerDriverReactomeAnalyzer = new CancerDriverReactomeAnalyzer();
             cancerDriverReactomeAnalyzer.setDBA(dba);
-
-            System.out.print("Interface Enrichment 0\n" +
-                    "Mechismo/Reactome Overlay 1\n" +
-                    "Mechismo/Reactome Interface Enrichment 2\n" +
-                    "Cancel <enter>\n");
-            
-            Scanner scanner = new Scanner(System.in);
-            String ex = scanner.next();
-            scanner.close();
 
             if(Integer.parseInt(ex) == 0){
                 interactome3dDriverAnalyzer.findInteractionsWithMutatedInterfaces(cancerDriverReactomeAnalyzer,
