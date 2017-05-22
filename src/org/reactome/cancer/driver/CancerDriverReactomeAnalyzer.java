@@ -28,6 +28,7 @@ import org.reactome.annotate.GeneSetAnnotation;
 import org.reactome.annotate.PathwayBasedAnnotator;
 import org.reactome.r3.ReactionMapGenerator;
 import org.reactome.r3.ReactomeAnalyzer;
+import org.reactome.r3.util.Configuration;
 import org.reactome.r3.util.FileUtility;
 import org.reactome.r3.util.FisherExact;
 import org.reactome.r3.util.InteractionUtilities;
@@ -41,8 +42,7 @@ import org.reactome.r3.util.MathUtilities;
 @SuppressWarnings("unchecked")
 public class CancerDriverReactomeAnalyzer {
     private FileUtility fu = new FileUtility();
-    private String mySqlUsername = "root";
-    private String mySqlPassword = "macmysql01";
+    private MySQLAdaptor dba;
 
     /**
      * Default constructor.
@@ -53,11 +53,6 @@ public class CancerDriverReactomeAnalyzer {
     public List<GKInstance> loadHumanReactions() throws Exception {
         MySQLAdaptor dba = getDBA();
         return new ReactomeAnalyzer().loadHumanReactions(dba);
-    }
-
-    public void setMySqlCredentials(String un,String pw){
-        mySqlUsername = un;
-        mySqlPassword = pw;
     }
 
     @Test
@@ -526,13 +521,13 @@ public class CancerDriverReactomeAnalyzer {
     }
     
     public MySQLAdaptor getDBA() throws Exception {
-
-
-        MySQLAdaptor dba = new MySQLAdaptor("localhost",
-                                            "reactome_59_plus_i",
-                                            mySqlUsername,
-                                            mySqlPassword);
+        if (dba == null)
+            dba = Configuration.getConfiguration().getReactomeDBA();
         return dba;
+    }
+    
+    public void setDBA(MySQLAdaptor dba) {
+        this.dba = dba;
     }
     
     @Test

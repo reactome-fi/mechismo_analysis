@@ -1,33 +1,57 @@
 package ProcessDatasets;
 
+import java.util.Scanner;
+
+import org.gk.persistence.MySQLAdaptor;
 import org.reactome.cancer.driver.CancerDriverReactomeAnalyzer;
 import org.reactome.cancer.driver.Interactome3dDriverAnalyzer;
+import org.reactome.r3.util.Configuration;
 
 /**
  * Created by burkhart on 3/1/17.
  */
 public class ProcessDatasetsDriver {
+    
     public ProcessDatasetsDriver(String[] args){
-
+    }
+    
+    private MySQLAdaptor getReactomeDBA() throws Exception {
+        Configuration configuration = Configuration.getConfiguration();
+        MySQLAdaptor dba = configuration.getReactomeDBA();
+        if (dba != null)
+            return dba;
+        // Try to use information from System.in if we cannot get a pre-configured one
+        System.out.print("MySQL Username: ");
+        Scanner scanner = new Scanner(System.in);
+        String un = scanner.next();
+        
+        System.out.print("MySQL Password: ");
+        String pw = scanner.next();
+        scanner.close();
+        
+        dba = new MySQLAdaptor("localhost", 
+                               "reactome_59_plus_i",
+                               un,
+                               pw);
+        return dba;
     }
 
     public void run(){
         Interactome3dDriverAnalyzer interactome3dDriverAnalyzer = new Interactome3dDriverAnalyzer();
         try {
-            System.out.print("MySQL Username: ");
-            String un = new java.util.Scanner(System.in).next();
-
-            System.out.print("MySQL Password: ");
-            String pw = new java.util.Scanner(System.in).next();
+            MySQLAdaptor dba = getReactomeDBA();
 
             CancerDriverReactomeAnalyzer cancerDriverReactomeAnalyzer = new CancerDriverReactomeAnalyzer();
-            cancerDriverReactomeAnalyzer.setMySqlCredentials(un,pw);
+            cancerDriverReactomeAnalyzer.setDBA(dba);
 
             System.out.print("Interface Enrichment 0\n" +
                     "Mechismo/Reactome Overlay 1\n" +
                     "Mechismo/Reactome Interface Enrichment 2\n" +
                     "Cancel <enter>\n");
-            String ex = new java.util.Scanner(System.in).next();
+            
+            Scanner scanner = new Scanner(System.in);
+            String ex = scanner.next();
+            scanner.close();
 
             if(Integer.parseInt(ex) == 0){
                 interactome3dDriverAnalyzer.findInteractionsWithMutatedInterfaces(cancerDriverReactomeAnalyzer,

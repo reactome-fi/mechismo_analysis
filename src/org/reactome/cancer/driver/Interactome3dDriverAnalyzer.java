@@ -1166,7 +1166,8 @@ public class Interactome3dDriverAnalyzer {
      *
      * @throws Exception
      */
-    private Map<String, Map<Integer, Set<MutationObservation>>> mafGeneToMutation(String mafFileNamePattern, String mafDirectoryPath) throws IOException {
+    private Map<String, Map<Integer, Set<MutationObservation>>> mafGeneToMutation(String mafFileNamePattern, 
+                                                                                  String mafDirectoryPath) throws IOException {
         MAFFileLoader mafFileLoader = new MAFFileLoader();
         Map<String, Map<Integer, Set<MutationObservation>>> allSamplesGeneMap = new HashMap<>();
         Pattern mafFnPattern = Pattern.compile(mafFileNamePattern);

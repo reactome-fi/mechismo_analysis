@@ -162,6 +162,14 @@ public class MechismoAnalyzer {
         // The above output should be: Total PPIs: 13323
     }
     
+    @Test
+    public void checkKnownCancerDriverGenes() throws IOException {
+        CancerDriverAnalyzer driverAnalyzer = new CancerDriverAnalyzer();
+        Set<String> knownCancerGenes = driverAnalyzer.getDriverGenes(null);
+        System.out.println("Total known driver genes: " + knownCancerGenes.size());
+        
+    }
+    
     /**
      * Load the largest functional impact scores for mutations listed in cosmic between two proteins
      * interacting each other. The functional impact scores for mutations are reported in column 27
@@ -216,10 +224,10 @@ public class MechismoAnalyzer {
         Set<String> shared = InteractionUtilities.getShared(mechismoPPIs, fiToPDB.keySet());
         System.out.println("Shared: " + shared.size());
         // Output:
-        //        Total PPIs in mechismo output: 13323
-        //        Total PPIs in interactome3d: 9875
+        //        Total PPIs in mechismo output: 13,323
+        //        Total PPIs in interactome3d: 9,875
         //        Shared: 4011
-        // TODO: The 50% coverage of interactome3d by mechimo may result from no cosmic mutations are found in other
+        // TODO: The 50% coverage of interactome3d by mechismo may result from no cosmic mutations are found in other
         // PPIs. We should check the original cosmic mutation data and then compare the outputs.
     }
     
