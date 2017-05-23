@@ -6,12 +6,19 @@ package org.reactome.cancer.driver;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.function.BiFunction;
+import java.util.stream.Collectors;
 
 import org.gk.model.GKInstance;
 import org.junit.Test;
@@ -22,6 +29,7 @@ import org.reactome.px.util.InteractionUtilities;
 import org.reactome.r3.Interactome3dAnalyzer;
 import org.reactome.r3.ReactomeAnalyzer;
 import org.reactome.r3.util.FileUtility;
+import org.reactome.r3.util.Plotter;
 
 /**
  * @author gwu
@@ -36,6 +44,71 @@ public class MechismoAnalyzer {
      * Default constructor.
      */
     public MechismoAnalyzer() {
+    }
+    
+    public static void main(String[] args) throws Exception {
+        MechismoAnalyzer analyzer = new MechismoAnalyzer();
+        analyzer.analyzeDistribution();
+    }
+    
+    @Test
+    public void analyzeDistribution() throws IOException {
+        // Get scores involved known cancer genes only
+        Set<String> cancerGenes = new CancerDriverAnalyzer().getDriverGenes(null);
+        System.out.println("Total cancer genes: " + cancerGenes.size());
+        
+        Path filePath = Paths.get(outputFileName);
+        
+        List<Double> values = new ArrayList<>();
+        List<Double> cancerGeneValues = new ArrayList<>();
+        Map<String, Double> geneToMaxValue = new HashMap<>();
+        
+        // Get scores
+        Files.lines(filePath)
+        .map(line -> line.split("\t"))
+        .filter(tokens -> tokens.length >= 28)
+        .filter(tokens -> tokens[19].trim().length() > 0)
+        .forEach(tokens -> {
+            Double value = new Double(tokens[27]);
+            values.add(value);
+            if (cancerGenes.contains(tokens[0]))
+                cancerGeneValues.add(value);
+            BiFunction<String, Double, Double> func = (k, v) -> 
+                                    (v == null || Math.abs(v) < Math.abs(value)) ? value : v;
+            geneToMaxValue.compute(tokens[0], func);
+        });
+        
+        System.out.println("Total values: " + values.size());
+        System.out.println("\tMinium value: " + values.stream().mapToDouble(Double::doubleValue).min());
+        System.out.println("Total cancer gene values: " + cancerGeneValues.size());
+        System.out.println("\tMinium value: " + cancerGeneValues.stream().mapToDouble(Double::doubleValue).min());
+        System.out.println("Max values: " + geneToMaxValue.size());
+        System.out.println("\tMinium value: " + geneToMaxValue.values().stream().mapToDouble(Double::doubleValue).min());
+        
+        // Two plots
+        // All values
+        Plotter plotter = new Plotter("Plot");
+        Map<String, List<Double>> datasetToName = new HashMap<>();
+        datasetToName.put("All Scores", values);
+        datasetToName.put("Cancer Gene Scores", cancerGeneValues);
+        plotter.plotHistograpm(datasetToName, 
+                               11,
+                               "Histogram of Mechismo Score",
+                               "Mechismo Score",
+                               "Frequency");
+        // Maximum values
+        plotter = new Plotter("Plot");
+        datasetToName = new HashMap<>();
+        datasetToName.put("All Genes", new ArrayList<Double>(geneToMaxValue.values()));
+        Map<String, Double> cancerGeneToMax = new HashMap<>();
+        cancerGeneToMax.putAll(geneToMaxValue);
+        cancerGeneToMax.keySet().retainAll(cancerGenes);
+        datasetToName.put("Cancer Genes", new ArrayList<Double>(cancerGeneToMax.values()));
+        plotter.plotHistograpm(datasetToName, 
+                               11,
+                               "Histogram of Maximum Mechismo Score",
+                               "Mechismo Maximum Score",
+                               "Frequency");
     }
     
     @Test
@@ -97,6 +170,7 @@ public class MechismoAnalyzer {
     @Test
     public void checkAllHumanReactions() throws Exception {
         String output = "results/ReactionsInMechisom_051017.txt";
+        output = "results/ReactionsInMechisom_052217.txt";
         CancerDriverReactomeAnalyzer reactomeAnalyzer = new CancerDriverReactomeAnalyzer();
         
         checkAllHumanReactions(reactomeAnalyzer, output);
@@ -179,26 +253,37 @@ public class MechismoAnalyzer {
      * @return
      * @throws IOException
      */
-    public Map<String, Double> loadPPIToMaxScore(String mechismoFileName) throws IOException{
-        fu.setInput(mechismoFileName);
-        String line = null;
-        Map<String, Double> ppiToScore = new HashMap<>();
-        while ((line = fu.readLine()) != null) {
-            String[] tokens = line.split("\t");
-            if (tokens.length < 28)
-                continue;
-            // If no second protein is reported, escape it.
-            if (tokens[19].trim().length() == 0)
-                continue;
-            String ppi = InteractionUtilities.generateFIFromGene(tokens[1], 
-                                                                 tokens[19]);
-            Double score = ppiToScore.get(ppi);
-            Double currentScore = new Double(tokens[27]);
-            if (score == null || Math.abs(currentScore) > Math.abs(score))
-                ppiToScore.put(ppi, currentScore);
-        }
-        fu.close();
-        return ppiToScore;
+    public Map<String, Double> loadPPIToMaxScore(String mechismoFileName) throws IOException {
+        Path path = Paths.get(mechismoFileName);
+        Comparator<Double> comparator = (v1, v2) -> Double.compare(Math.abs(v1), Math.abs(v2));
+        // Use new Java 8 stream API
+        Map<String, Optional<Double>> ppiToScore = Files.lines(path)
+                                                        .map(line -> line.split("\t"))
+                                                        .filter(tokens -> tokens.length >= 28)
+                                                        .filter(tokens -> tokens[19].trim().length() > 0)
+                                                        .collect(Collectors.groupingBy(tokens -> InteractionUtilities.generateFIFromGene(tokens[1], tokens[19]), // Key by PPI
+                                                                                       Collectors.mapping(tokens -> new Double(tokens[27]), Collectors.maxBy(comparator)))); // Value should be maximum
+        Map<String, Double> rtn = new HashMap<>();
+        ppiToScore.forEach((ppi, score) -> {
+            if (score.isPresent())
+                rtn.put(ppi, score.get());
+        });
+        return rtn;
+        
+//        while ((line = fu.readLine()) != null) {
+//            String[] tokens = line.split("\t");
+//            if (tokens.length < 28)
+//                continue;
+//            // If no second protein is reported, escape it.
+//            if (tokens[19].trim().length() == 0)
+//                continue;
+//            String ppi = InteractionUtilities.generateFIFromGene(tokens[1], 
+//                                                                 tokens[19]);
+//            Double score = ppiToScore.get(ppi);
+//            Double currentScore = new Double(tokens[27]);
+//            if (score == null || Math.abs(currentScore) > Math.abs(score))
+//                ppiToScore.put(ppi, currentScore);
+//        }
     }
     
     @Test
