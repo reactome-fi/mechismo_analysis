@@ -1,4 +1,4 @@
-package ProcessDatasets;
+package org.reactome.main;
 
 import java.util.Scanner;
 

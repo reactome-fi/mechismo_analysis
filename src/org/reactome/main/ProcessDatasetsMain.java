@@ -1,4 +1,4 @@
-package ProcessDatasets;
+package org.reactome.main;
 
 /**
  * Created by burkhart on 3/1/17.
