@@ -1,0 +1,131 @@
+# libs
+```{r}
+library(magrittr)
+library(dplyr)
+library(reshape2)
+library(ggplot2)
+library(ggdendro)
+library(Heatplus)
+library(gtable)
+library(grid)
+library(plotly)
+```
+
+# load large_intestine+colon+carcinoma+adenocarcinoma samples
+```{r}
+sample_df <- read.csv("sample_id.txt",header = FALSE, sep="\t")
+```
+# filter low mechismo scores
+```{r}
+processed_ppi_sample_df <- sample_df %>%
+  dplyr::filter(V6 != "") %>% 
+  dplyr::transmute(sample = V1, interaction = paste(V3,"-",V6,sep="" ),mechismo = V7, effect = V8)
+
+for(i in 1:nrow(processed_ppi_sample_df)){
+  if(processed_ppi_sample_df[i,]$effect == "disabling" ||
+     processed_ppi_sample_df[i,]$effect == "disablingWeak"){
+     processed_ppi_sample_df[i,]$mechismo <- (processed_ppi_sample_df[i,]$mechismo * -1)
+     }
+}
+
+processed_ppi_sample_df_filtered <- processed_ppi_sample_df %>%
+  dplyr::select(sample,interaction,mechismo) %>%
+  dplyr::filter(abs(mechismo) > 3)
+```
+
+# ggplot2 tile heatmap
+```{r}
+processed_ppi_sample_df_filtered %>%
+  ggplot2::ggplot(aes(x=as.character(sample),y=interaction,fill=mechismo)) +
+  geom_tile() +
+  ylim(rev(sort(unique(as.character(processed_ppi_sample_df_filtered$interaction))))) +
+  xlim(sort(unique(as.character(processed_ppi_sample_df_filtered$sample)))) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.background = element_blank()) +
+  labs(title="Sample/Interaction Mechismo",
+       x="Sample",
+       y="Interaction") +
+  scale_fill_gradient2(name = "Mechismo Score",
+                       midpoint = processed_ppi_sample_df_filtered$mechismo %>% mean(na.rm=TRUE),
+                       low="blue",
+                       mid="green",
+                       high="red")
+```
+# custom heatmap with dendrogram
+```{r}
+ppi_dendro <- processed_ppi_sample_df_filtered %>%
+  reshape(idvar = "sample", timevar = "interaction", direction = "wide")
+
+rownames(ppi_dendro) <- ppi_dendro[,1]
+ppi_dendro <- ppi_dendro[,-1]
+ppi_dendro[is.na(ppi_dendro)] <- 0
+
+#dendogram data
+x <- as.matrix(ppi_dendro)
+
+dd.col <- as.dendrogram(hclust(dist(x)))
+dd.row <- as.dendrogram(hclust(dist(t(x))))
+
+dx <- dendro_data(dd.row)
+dy <- dendro_data(dd.col)
+
+# helper function for creating dendograms
+ggdend <- function(df) {
+  ggplot() +
+    geom_segment(data = df, aes(x=x, y=y, xend=xend, yend=yend)) +
+    labs(x = "", y = "") + theme_minimal() +
+    theme(axis.text = element_blank(), axis.ticks = element_blank(),
+          panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(),
+          panel.background = element_blank(),            
+          panel.grid = element_blank())
+}
+
+# x/y dendograms
+px <- ggdend(dx$segments)
+py <- ggdend(dy$segments) + coord_flip()
+
+# heatmap
+col.ord <- order.dendrogram(dd.col)
+row.ord <- order.dendrogram(dd.row)
+xx <- ppi_dendro[col.ord, row.ord]
+xx$sample <- rownames(xx)
+xx$sample <- with(xx, factor(sample, levels=sample))
+
+map <- reshape2::melt(xx, id.vars="sample") %>%
+           ggplot2::ggplot(aes(x=variable,y=sample,fill=value)) +
+           geom_tile() +
+           theme(axis.text.x = element_text(angle = 90, hjust = 1),
+                 panel.grid.major = element_blank(),
+                 panel.grid.minor = element_blank(),
+                 panel.background = element_blank(),
+                 legend.position="none") +
+           labs(x="interaction",
+                y=paste("sample (default)",sep="")) +
+           scale_fill_gradient2(name = "mechismo",
+                                midpoint = processed_ppi_sample_df_filtered$mechismo %>% median(na.rm=TRUE),
+                                low="blue",
+                                mid="green",
+                                high="red")
+
+# from http://stackoverflow.com/questions/6673162/reproducing-lattice-dendrogram-graph-with-ggplot2
+### Draw graphic ###
+grid.newpage()
+print(map, vp=viewport(width=heatmap[1], height=heatmap[2], x=heatmap[3], y=heatmap[4]))
+print(px, vp=viewport(width=xdendro[1], height=xdendro[2], x=xdendro[3], y=xdendro[4]))
+print(py, vp=viewport(width=ydendro[1], height=ydendro[2], x=ydendro[3], y=ydendro[4]))
+```
+
+# built-in heatmap libraries
+```{r}
+m <- ppi_dendro %>%
+  as.matrix()
+
+rownames(m) <- m[,1]
+m <- m[,-1]
+m[is.na(m)] <- 0
+Heatplus::heatmap_plus(m)
+pheatmap::pheatmap(m)
+```
