@@ -5,6 +5,8 @@
 package org.reactome.cancer.driver;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -14,6 +16,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.apache.commons.math.stat.correlation.PearsonsCorrelation;
 import org.gk.model.GKInstance;
@@ -367,37 +370,40 @@ public class CancerDriverReactomeAnalyzer {
     
     @Test
     public void checkCancerDriversInReactions() throws Exception {
-        String dir = "../FINetworkBuild/results/2015/";
-//        Set<String> driverGenes = new CancerDriverAnalyzer().getDriverGenes(null);
+//        String dir = "../FINetworkBuild/results/2015/";
+        Set<String> driverGenes = new CancerDriverAnalyzer().getDriverGenes(null);
+        System.out.println("Total cancer driver genes: " + driverGenes.size());
         
         // For IL1 pathway
-        String ilGenes = "/Users/gwu/git/PGM-IL1/PGM_IL1_workspace/results/GeneListInIL1.txt";
-        Set<String> driverGenes = fu.loadInteractions(ilGenes);
-        System.out.println("Total driver genes: " + driverGenes.size());
+//        String ilGenes = "/Users/gwu/git/PGM-IL1/PGM_IL1_workspace/results/GeneListInIL1.txt";
+//        Set<String> driverGenes = fu.loadInteractions(ilGenes);
+//        System.out.println("Total driver genes: " + driverGenes.size());
         
         //String fiFile = dir + "ReactomeFIsToReactions_082216.txt";
-        String fiFile = dir + "ReactomeGenesToReactions_082316.txt";
-        fu.setInput(fiFile);
+//        String fiFile = dir + "ReactomeGenesToReactions_082316.txt";
+        
         Map<String, Integer> reactionToGeneCount = new HashMap<String, Integer>();
         Set<String> allGenes = new HashSet<String>();
         Map<String, Integer> reactionToCancerGeneCount = new HashMap<String, Integer>();
         Set<String> cancerGenes = new HashSet<String>();
-        String line = null;
-        while ((line = fu.readLine()) != null) {
-            String[] tokens = line.split("\t");
-            if (driverGenes.contains(tokens[0])) {
-                addCount(reactionToCancerGeneCount, tokens[1]);
-                cancerGenes.add(tokens[0]);
-            }
-            addCount(reactionToGeneCount, tokens[1]);
-            allGenes.add(tokens[0]);
-        }
-        fu.close();
-        
+
+        String fiFile = "resources/ReactomeGenesToReactions022717.txt";
+        Files.lines(Paths.get(fiFile))
+             .map(line -> line.split("\t"))
+             .forEach(tokens -> {
+                 if (driverGenes.contains(tokens[0])) {
+                     addCount(reactionToCancerGeneCount, tokens[1]);
+                     cancerGenes.add(tokens[0]);
+                 }
+                 addCount(reactionToGeneCount, tokens[1]);
+                 allGenes.add(tokens[0]);
+             });
+
         performEnrichmentAnalysis(reactionToGeneCount,
                                   allGenes,
                                   reactionToCancerGeneCount,
-                                  cancerGenes);
+                                  cancerGenes,
+                                  "Genes");
     }
     
     @Test
@@ -430,19 +436,32 @@ public class CancerDriverReactomeAnalyzer {
         performEnrichmentAnalysis(reactionToFICount,
                                   fis,
                                   reactionToCancerFICount,
-                                  cancerFIs);
+                                  cancerFIs,
+                                  "FIs");
+    }
+    
+    public Map<String, Double> loadReactionToCancerGeneEnrichment() throws IOException {
+        String driverEnrichmentFile = "results/CancerDriversReactionEnrichment_052317.txt";
+        Map<String, Double> reactionToDriverEnrichment = Files.lines(Paths.get(driverEnrichmentFile))
+                .skip(1) // Skip the first header line
+                .map(line -> line.split("\t"))
+                .collect(Collectors.toMap(tokens -> tokens[0],
+                                          tokens -> -Math.log10(new Double(tokens[6]))));
+        System.out.println("Total reactions in cancer driver enrichment analysis: " + reactionToDriverEnrichment.size());
+        return reactionToDriverEnrichment;
     }
 
     private void performEnrichmentAnalysis(Map<String, Integer> reactionToCount,
                                            Set<String> allEntities,
                                            Map<String, Integer> reactionToCancerCount,
-                                           Set<String> cancerEntities) {
-        System.out.println("Total FIs: " + allEntities.size());
-        System.out.println("Cancer FIs: " + cancerEntities.size());
+                                           Set<String> cancerEntities,
+                                           String type) {
+        System.out.println("Total " + type + ": " + allEntities.size());
+        System.out.println("Cancer " + type + ": " + cancerEntities.size());
         double allRatio = (double) cancerEntities.size() / allEntities.size();
         System.out.println("Ratio: " + allRatio);
         FisherExact fisher = new FisherExact(allEntities.size());
-        System.out.println("\nReaction\tTotalFIs\tDriverFIs\tRatio\tpValue(binomial)\tpValue(Fisher)\tFDR");
+        System.out.println("\nReaction\tTotal" + type + "\tDriver" + type + "\tRatio\tpValue(binomial)\tpValue(Fisher)\tFDR");
         List<String> lines = new ArrayList<String>();
         for (String reaction : reactionToCount.keySet()) {
             Integer totalFIs = reactionToCount.get(reaction);

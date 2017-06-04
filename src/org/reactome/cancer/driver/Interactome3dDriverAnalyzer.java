@@ -16,6 +16,7 @@ import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import org.apache.log4j.Logger;
 import org.biojava.nbio.structure.Chain;
@@ -62,6 +63,23 @@ public class Interactome3dDriverAnalyzer {
      * Default constructor.
      */
     public Interactome3dDriverAnalyzer() {
+    }
+    
+    /**
+     * Load a map from reaction to minimum p-value as -log10.
+     * @return
+     * @throws IOException
+     */
+    public Map<String, Double> loadReactionTo3dScore() throws IOException {
+        String fileName = "results/checkAllHumanReactions_summary_052417.txt";
+        Map<String, Double> reactionToScore = Files.lines(Paths.get(fileName))
+                .skip(1) // Skip the first header line
+                .map(line -> line.split("\t"))
+                .collect(Collectors.toMap(tokens -> tokens[1],
+                                          tokens -> -Math.log10(Double.parseDouble(tokens[2])),
+                                          (v1, v2) -> Math.max(v1, v2))); // In case of two reactions having the same name
+        System.out.println("Total reactions in reaction to 3d score: " + reactionToScore.size());
+        return reactionToScore;
     }
 
     /**
@@ -461,8 +479,8 @@ public class Interactome3dDriverAnalyzer {
     }
 
     /**
-     * This method takes a reaction directly from the Reactome database, expand is into a set
-     * of interactions in genes, load structures using interactome3d data, and then perform mutation
+     * This method takes a reaction directly from the Reactome database, expands it into a set
+     * of interactions in genes, loads structures using interactome3d data, and then performs mutation
      * interface analysis based on the cosmic annotation. The actual running is performed for all
      * human reactions in the database.
      *

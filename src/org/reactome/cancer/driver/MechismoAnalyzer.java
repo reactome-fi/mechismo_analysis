@@ -20,6 +20,9 @@ import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 
+import org.apache.commons.math.MathException;
+import org.apache.commons.math.stat.correlation.PearsonsCorrelation;
+import org.apache.commons.math.stat.correlation.SpearmansCorrelation;
 import org.gk.model.GKInstance;
 import org.junit.Test;
 import org.reactome.annotate.AnnotationHelper;
@@ -29,6 +32,8 @@ import org.reactome.px.util.InteractionUtilities;
 import org.reactome.r3.Interactome3dAnalyzer;
 import org.reactome.r3.ReactomeAnalyzer;
 import org.reactome.r3.util.FileUtility;
+import org.reactome.r3.util.FisherExact;
+import org.reactome.r3.util.MathUtilities;
 import org.reactome.r3.util.Plotter;
 
 /**
@@ -51,6 +56,111 @@ public class MechismoAnalyzer {
         analyzer.analyzeDistribution();
     }
     
+    public Map<String, Double> loadReactionToMaxMechismoScore() throws IOException {
+        String mechismoFile = "results/ReactionsInMechismo_051017.txt";
+        Map<String, Double> reactionToMechismo = Files.lines(Paths.get(mechismoFile))
+                .skip(1)
+                .map(line -> line.split("\t"))
+                .filter(tokens -> tokens[tokens.length - 1].length() > 0)
+                .collect(Collectors.toMap(tokens -> tokens[1],
+                                          tokens -> new Double(tokens[tokens.length - 1]),
+                                          (v1, v2) -> (Math.abs(v1) > Math.abs(v2) ? v1 : v2)));
+        System.out.println("Total reactions in mechismo scores: " + reactionToMechismo.size());
+        return reactionToMechismo;
+    }
+    
+    /**
+     * Analyze correlations between different measurements for Reactome reactions.
+     * @throws IOException
+     */
+    @Test
+    public void analyzeCorrelations() throws Exception {
+        String resultDir = "results/";
+        
+        // Check correlation between cancer driver gene enrichment scores and maximum Mechismo scores
+        Map<String, Double> reactionToDriverEnrichment = new CancerDriverReactomeAnalyzer().loadReactionToCancerGeneEnrichment();
+        Map<String, Double> reactionToMechismo = loadReactionToMaxMechismoScore();
+        Map<String, Double> reactionToInteractome3dScore = new Interactome3dDriverAnalyzer().loadReactionTo3dScore();
+        
+        System.out.println("\nCorrelation between driver enrichment and mechismo score:");
+        analyzeCorrelation(reactionToDriverEnrichment, reactionToMechismo);
+        
+        System.out.println("\nCorrelation between driver enrichment and interaction3d score:");
+        analyzeCorrelation(reactionToDriverEnrichment, reactionToInteractome3dScore);
+        
+        System.out.println("\nCorrelation between interaction3d score and driver enrichment:");
+        analyzeCorrelation(reactionToInteractome3dScore, reactionToDriverEnrichment);
+        
+        System.out.println("\nCorrelation between interaction3d and mechismo score:");
+        analyzeCorrelation(reactionToInteractome3dScore, reactionToMechismo);
+    }
+
+    protected void analyzeCorrelation(Map<String, Double> reactionToScore1,
+                                      Map<String, Double> reactionToScore2) throws MathException {
+        List<Double> values1 = new ArrayList<>();
+        List<Double> values2 = new ArrayList<>();
+//        double scoreCutoff = 1.3d;
+        double scoreCutoff = 2.0d;
+        reactionToScore1.forEach((reaction, enrichment) -> {
+           if (enrichment < scoreCutoff) // Choose cutoff < 0.01
+               return;
+           if (reactionToScore2.containsKey(reaction)) { 
+               values1.add(enrichment);
+               values2.add(Math.abs(reactionToScore2.get(reaction)));
+           }
+        });
+        System.out.println("Score cutoff: " + scoreCutoff);
+        System.out.println("Total selected reactions for correlation: " + values1.size());
+        
+        PearsonsCorrelation correlation = MathUtilities.constructPearsonCorrelation(values1, values2);
+        System.out.println(correlation.getCorrelationMatrix().getEntry(0, 1) + ", " + 
+                           correlation.getCorrelationPValues().getEntry(0, 1));
+        
+        SpearmansCorrelation spearman = MathUtilities.constructSpearmansCorrelation(values1, values2);
+        correlation = spearman.getRankCorrelation();
+        System.out.printf("Correlation (rank): %f, correlation (via Pearson): %f, p-value: %f\n", 
+                          spearman.getCorrelationMatrix().getEntry(0, 1),
+                          correlation.getCorrelationMatrix().getEntry(0, 1),
+                          correlation.getCorrelationPValues().getEntry(0, 1));
+        
+        performFisherTest(reactionToScore1, 
+                          reactionToScore2);
+    }
+
+    protected void performFisherTest(Map<String, Double> reactionToScore1, 
+                                     Map<String, Double> reactionToScore2) {
+        // Perform a Fisher exact test for sharing top reactions
+        List<String> list1 = new ArrayList<>(reactionToScore1.keySet());
+        List<String> list2 = new ArrayList<>(reactionToScore2.keySet());
+        // Keep only shared reactions
+        list1.retainAll(list2);
+        list2.retainAll(list1);
+        System.out.println("Total shared reactions: " + list1.size() + ", " + list2.size());
+        // Sort these two lists
+        list1.sort((r1, r2) -> {
+            Double s1 = reactionToScore1.get(r1);
+            Double s2 = reactionToScore1.get(r2);
+            return s2.compareTo(s1);
+        });
+        list2.sort((r1, r2) -> {
+            Double s1 = reactionToScore2.get(r1);
+            Double s2 = reactionToScore2.get(r2);
+            return s2.compareTo(s1);
+        });
+        // Take top 100
+        int top = 100;
+        Set<String> topShared = InteractionUtilities.getShared(list1.subList(0, top),
+                                                               list2.subList(0, top));
+        System.out.println("Chosen top reactions: " + top);
+        System.out.println("Top shared: " + topShared.size());
+        FisherExact fisherExact = new FisherExact(list1.size());
+        double pvalue = fisherExact.getRightTailedP(topShared.size(),
+                                                    top - topShared.size(), 
+                                                    top - topShared.size(),
+                                                    list1.size() - 2 * top + topShared.size());
+        System.out.println("p-value from Fisher Exact test: " + pvalue);
+    }
+    
     @Test
     public void analyzeDistribution() throws IOException {
         // Get scores involved known cancer genes only
@@ -67,8 +177,10 @@ public class MechismoAnalyzer {
         Files.lines(filePath)
         .map(line -> line.split("\t"))
         .filter(tokens -> tokens.length >= 28)
-        .filter(tokens -> tokens[19].trim().length() > 0)
+//        .filter(tokens -> tokens[19].trim().length() > 0)
         .forEach(tokens -> {
+            if (tokens[27].trim().length() == 0)
+                return;
             Double value = new Double(tokens[27]);
             values.add(value);
             if (cancerGenes.contains(tokens[0]))
@@ -79,11 +191,11 @@ public class MechismoAnalyzer {
         });
         
         System.out.println("Total values: " + values.size());
-        System.out.println("\tMinium value: " + values.stream().mapToDouble(Double::doubleValue).min());
+        System.out.println("\tMinimum value: " + values.stream().mapToDouble(Double::doubleValue).min());
         System.out.println("Total cancer gene values: " + cancerGeneValues.size());
-        System.out.println("\tMinium value: " + cancerGeneValues.stream().mapToDouble(Double::doubleValue).min());
+        System.out.println("\tMinimum value: " + cancerGeneValues.stream().mapToDouble(Double::doubleValue).min());
         System.out.println("Max values: " + geneToMaxValue.size());
-        System.out.println("\tMinium value: " + geneToMaxValue.values().stream().mapToDouble(Double::doubleValue).min());
+        System.out.println("\tMinimum value: " + geneToMaxValue.values().stream().mapToDouble(Double::doubleValue).min());
         
         // Two plots
         // All values
