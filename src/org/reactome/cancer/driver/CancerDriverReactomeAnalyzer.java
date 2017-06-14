@@ -7,7 +7,15 @@ package org.reactome.cancer.driver;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -23,9 +31,9 @@ import org.reactome.annotate.AnnotationHelper;
 import org.reactome.annotate.AnnotationType;
 import org.reactome.annotate.GeneSetAnnotation;
 import org.reactome.annotate.PathwayBasedAnnotator;
+import org.reactome.data.ReactomeAnalyzer;
 import org.reactome.data.ReactomeReactionExpander;
 import org.reactome.r3.ReactionMapGenerator;
-import org.reactome.r3.ReactomeAnalyzer;
 import org.reactome.r3.util.Configuration;
 import org.reactome.r3.util.FileUtility;
 import org.reactome.r3.util.FisherExact;
@@ -50,7 +58,7 @@ public class CancerDriverReactomeAnalyzer {
     
     public List<GKInstance> loadHumanReactions() throws Exception {
         MySQLAdaptor dba = getDBA();
-        return new ReactomeAnalyzer().loadHumanReactions(dba);
+        return new org.reactome.r3.ReactomeAnalyzer().loadHumanReactions(dba);
     }
 
     @Test
@@ -366,22 +374,34 @@ public class CancerDriverReactomeAnalyzer {
     @Test
     public void checkPathwaysForEnrichedReactions() throws Exception {
         // Reaction to enrichment scores
-        Map<String, Double> reactionNameToScore = loadReactionToCancerGeneEnrichment();
-        double cutoff = 1.30d; // fdr <= 0.05
-        for (Iterator<String> it = reactionNameToScore.keySet().iterator(); it.hasNext();) {
-            String name = it.next();
-            Double score = reactionNameToScore.get(name);
-            if (score < cutoff)
-                it.remove();
-        }
+//        Map<String, Double> reactionNameToScore = loadReactionToCancerGeneEnrichment();
+//        double cutoff = 1.30d; // fdr <= 0.05
+        
+        // Choose FDRs with expansion
+        int index = 7;
+        index = 11; // FDRs without expanding reactions
+        Map<String, Double> reactionIdToFDR = loadReactionIdToCancerGeneEnrichment(index);
+        Set<String> selectedReactionIds = new HashSet<>();
+        
+        double fdrCutff = 0.05d;
+        
+        reactionIdToFDR.forEach((id, fdr) -> {
+            if (fdr <= fdrCutff)
+                selectedReactionIds.add(id);
+        });
         
         // Use to map from name to id since ids are used for reaction to pathway map
-        Map<String, String> reactionIdToName = loadReactionDBIDToName();
-        Map<String, String> reactionNameToId = new HashMap<>();
-        reactionIdToName.forEach((id, name) -> reactionNameToId.put(name, id));
+//        Map<String, String> reactionIdToName = loadReactionDBIDToName();
+//        Map<String, String> reactionNameToId = new HashMap<>();
+//        reactionIdToName.forEach((id, name) -> reactionNameToId.put(name, id));
+//        Set<String> selectedReactionIds =  reactionNameToScore.keySet().stream().map(name -> reactionNameToId.get(name)).collect(Collectors.toSet());
         
-        Set<String> selectedReactionIds =  reactionNameToScore.keySet().stream().map(name -> reactionNameToId.get(name)).collect(Collectors.toSet());
+        // Use reactions having single genes that are cancer driver genes too
+        Set<String> oneHitReactions = loadReactionIdForOneHitGene();
+        System.out.println("One hit gene reactions: " + oneHitReactions.size());
+        
         System.out.println("Total selected reactions: " + selectedReactionIds.size());
+        selectedReactionIds.addAll(oneHitReactions);
         
         PathwayBasedAnnotator annotator = new PathwayBasedAnnotator();
         AnnotationHelper helper = new AnnotationHelper();
@@ -424,7 +444,8 @@ public class CancerDriverReactomeAnalyzer {
         System.out.println("Total human reactions: " + reactions.size());
         // helper
         ReactomeReactionExpander expander = new ReactomeReactionExpander();
-        int c = 0;
+        ReactomeAnalyzer reactomeAnalyzer = new ReactomeAnalyzer();
+         int c = 0;
         SummaryStatistics genesStat = new SummaryStatistics();
         SummaryStatistics sharedStat = new SummaryStatistics();
         List<Double> pvalues = new ArrayList<>();
@@ -444,6 +465,8 @@ public class CancerDriverReactomeAnalyzer {
             System.out.println(c + ": " + reaction);
 //            if (toBeExcluded.contains(reaction.getDBID()))
 //                continue; 
+            
+            // Enrichment analysis using expanding reactions
             Set<Set<String>> setOfGenes = expander.extractGenesFromReaction(reaction);
             if (setOfGenes == null || setOfGenes.size() == 0)
                 continue; // In case there is no input! (e.g. [BlackBoxEvent:191072] Synthesis of Cx43)
@@ -462,39 +485,80 @@ public class CancerDriverReactomeAnalyzer {
             }
             double combinedPValue = MathUtilities.combinePValuesWithFisherMethod(pvalues);
             double minPValue = pvalues.stream().min(Comparator.naturalOrder()).get();
+            
+            // Enrichment analysis using all invovled genes in the reaction.
+            Set<String> allReactionGenes = reactomeAnalyzer.grepGenesFromReaction(reaction);
+            Set<String> allShared = InteractionUtilities.getShared(allReactionGenes, driverGenes);
+            double allPValue = fisher.getRightTailedP(allShared.size(),
+                                                      allReactionGenes.size() - allShared.size(),
+                                                      driverGenes.size() - allShared.size(), 
+                                                      allGenes.size() - allReactionGenes.size() - driverGenes.size() + allShared.size());
+                    
             String line = (reaction.getDBID() + "\t" +
                     reaction.getDisplayName() + "\t" + 
                     setOfGenes.size() + "\t" + 
                     (int)(genesStat.getMean() + 0.5d) + "\t" + // Force to be an integer after rounding
                     (int)(sharedStat.getMean() + 0.5d) + "\t" + 
                     minPValue + "\t" + 
-                    combinedPValue);
+                    combinedPValue + "\t" + 
+                    allReactionGenes.size() + "\t" + 
+                    allShared.size() + "\t" + 
+                    allPValue);
             lines.add(line);
             c ++;
 //            if (c == 10)
 //                break;
         }
-        lines.sort((line1, line2) -> {
-            String[] tokens1 = line1.split("\t");
-            String[] tokens2 = line2.split("\t");
-            // Use min-P
-            Double minP1 = new Double(tokens1[5]);
-            Double minP2 = new Double(tokens2[5]);
-            return minP1.compareTo(minP2);
-        });
-        // P values in the list should have been sorted already. Don't sort them again!
-        List<Double> sortedPValue = lines.stream()
-                                         .map(line -> new Double(line.split("\t")[5]))
-                                         .collect(Collectors.toList());
-        List<Double> fdrs = MathUtilities.calculateFDRWithBenjaminiHochberg(sortedPValue);                                
+        
+        Map<String, Double> lineToExpFDR = calculateFDRsForLines(lines, 5);
+        Map<String, Double> lineToAllFDR = calculateFDRsForLines(lines, 9);
         
         // Output into a file
         String resultFileName = "results/CancerDriversReactionEnrichmentWithExpand_060917.txt";
         fu.setOutput(resultFileName);
-        fu.printLine("DB_ID\tName\tTotalSets\tTotalGenes\tShared\tMin_PValue\tFisher_PValue\tFDR");
-        for (int i = 0; i < lines.size(); i++)
-            fu.printLine(lines.get(i) + "\t" + fdrs.get(i));
+        fu.printLine("DB_ID\tName\tTotalSets\tExp_TotalGenes\tExp_Shared\tMin_PValue\tFisher_PValue\tExp_FDR\tTotalGenes\tShared\tPValue\tFDR");
+        StringBuilder builder = new StringBuilder();
+        lineToExpFDR.forEach((line, expFDR) -> {
+            String[] tokens = line.split("\t");
+            builder.setLength(0);
+            for (int i = 0; i < 7; i++)
+                builder.append(tokens[i]).append("\t");
+            builder.append(expFDR);
+            for (int i = 7; i < tokens.length; i++)
+                builder.append("\t").append(tokens[i]);
+            builder.append("\t").append(lineToAllFDR.get(line));
+            try {
+                fu.printLine(builder.toString());
+            }
+            catch(IOException e) {
+                e.printStackTrace();
+            }
+        });
         fu.close();
+    }
+
+    private Map<String, Double> calculateFDRsForLines(List<String> lines,
+                                                      int pvalueIndex) {
+        // Calculate FDRs for min-P 
+        lines.sort((line1, line2) -> {
+            String[] tokens1 = line1.split("\t");
+            String[] tokens2 = line2.split("\t");
+            // Use min-pvalues to calculate FDRs
+            Double minP1 = new Double(tokens1[pvalueIndex]);
+            Double minP2 = new Double(tokens2[pvalueIndex]);
+            return minP1.compareTo(minP2);
+        });
+        // P values in the list should have been sorted already. Don't sort them again!
+        List<Double> sortedPValue = lines.stream()
+                                         .map(line -> new Double(line.split("\t")[pvalueIndex]))
+                                         .collect(Collectors.toList());
+        List<Double> fdrs = MathUtilities.calculateFDRWithBenjaminiHochberg(sortedPValue);   
+        // Lines -> expanded fdrs
+        Map<String, Double> lineToFDR = new HashMap<>();
+        for (int i = 0; i < lines.size(); i++) {
+            lineToFDR.put(lines.get(i), fdrs.get(i));
+        }
+        return lineToFDR;
     }
     
     private Set<String> loadAllReactionGenes() throws IOException {
@@ -575,6 +639,35 @@ public class CancerDriverReactomeAnalyzer {
                                   reactionToCancerFICount,
                                   cancerFIs,
                                   "FIs");
+    }
+    
+    private Map<String, Double> loadReactionIdToCancerGeneEnrichment(int index) throws IOException {
+        String fileName = "results/CancerDriversReactionEnrichmentWithExpand_060917.txt";
+        try (Stream<String> stream = Files.lines(Paths.get(fileName))) {
+            Map<String, Double> idToFDR = stream.skip(1) // Skip the first header line
+                                                .map(line -> line.split("\t"))
+                                                .collect(Collectors.toMap(tokens -> tokens[0],
+                                                                          tokens -> new Double(tokens[index])));
+            return idToFDR;
+        }
+    }
+    
+    /**
+     * Select reactions that have one gene only and this one gene is a cancer driver gene. Such a reaction
+     * should be regarded as important cancer genes.
+     * @return
+     * @throws IOException
+     */
+    private Set<String> loadReactionIdForOneHitGene() throws IOException {
+        String fileName = "results/CancerDriversReactionEnrichmentWithExpand_060917.txt";
+        try (Stream<String> stream = Files.lines(Paths.get(fileName))) {
+            Set<String> selected = stream.skip(1)
+                                         .map(line -> line.split("\t"))
+                                         .filter(tokens -> tokens[8].equals("1") && tokens[9].equals("1"))
+                                         .map(tokens -> tokens[0])
+                                         .collect(Collectors.toSet());
+            return selected;
+        }
     }
     
     public Map<String, Double> loadReactionToCancerGeneEnrichment() throws IOException {
