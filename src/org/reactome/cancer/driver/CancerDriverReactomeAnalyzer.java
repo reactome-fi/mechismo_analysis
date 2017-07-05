@@ -60,6 +60,13 @@ public class CancerDriverReactomeAnalyzer {
         MySQLAdaptor dba = getDBA();
         return new org.reactome.r3.ReactomeAnalyzer().loadHumanReactions(dba);
     }
+    
+    @Test
+    public void dumpReactionIdToName() throws Exception {
+        List<GKInstance> humanReactions = loadHumanReactions();
+        System.out.println("DB_ID\tDisplay_Name");
+        humanReactions.stream().forEach(reaction -> System.out.println(reaction.getDBID() + "\t" + reaction.getDisplayName()));
+    }
 
     @Test
     public void testLoadReactionIdToFIsWithFeatures() throws Exception {
