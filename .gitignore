@@ -3,6 +3,7 @@
 .Rhistory
 .cvsignore
 *.log*
+src/*/*.pdf
 .idea/workspace.xml
 .idea/tasks.xml
 .idea/*.iws

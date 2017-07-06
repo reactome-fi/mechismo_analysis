@@ -50,9 +50,10 @@ public class ProcessDatasetsDriver {
         System.out.print("Interface Enrichment 0\n" +
                 "Mechismo/Reactome Overlay 1\n" +
                 "Mechismo/Reactome Interface Enrichment 2\n" +
+                "Prepare Heatmap Data 3\n" +
                 "Cancel <enter>\n");
         Scanner scanner = new Scanner(System.in);
-        String ex = scanner.next();
+        String ex = scanner.nextLine();
         scanner.close();
         run(ex);
     }
@@ -96,7 +97,14 @@ public class ProcessDatasetsDriver {
                         "datasets/interactome3d/2016_06/prebuilt/representative/",
                         "results/interactions_with_mutated_interfaces.csv",
                         "results/interactions_with_mechismo_enrichment_and_mutated_interfaces.csv");
-            } else{
+            }else if(Integer.parseInt(ex) == 3){
+                interactome3dDriverAnalyzer.prepareHeatmapData(cancerDriverReactomeAnalyzer,
+                        "datasets/interactome3d/2016_06/prebuilt/representative/",
+                        "results/heatmapData/",
+                        "datasets/firehose_data/all_oncotated_calls",
+                        "datasets/Mechismo/cancer_types/");
+            }
+            else{
                 System.out.println("Execution Cancelled.");
             }
         } catch (Exception e) {

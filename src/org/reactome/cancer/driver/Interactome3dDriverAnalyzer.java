@@ -4,27 +4,8 @@
  */
 package org.reactome.cancer.driver;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.FilenameFilter;
-import java.io.IOException;
-import java.nio.file.FileVisitResult;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.SimpleFileVisitor;
-import java.nio.file.attribute.BasicFileAttributes;
-import java.util.*;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
-
 import org.apache.log4j.Logger;
-import org.biojava.nbio.structure.Chain;
-import org.biojava.nbio.structure.Group;
-import org.biojava.nbio.structure.GroupType;
-import org.biojava.nbio.structure.Structure;
-import org.biojava.nbio.structure.StructureException;
-import org.biojava.nbio.structure.StructureIO;
+import org.biojava.nbio.structure.*;
 import org.biojava.nbio.structure.align.util.AtomCache;
 import org.gk.model.GKInstance;
 import org.gk.persistence.MySQLAdaptor;
@@ -32,16 +13,22 @@ import org.gk.util.StringUtils;
 import org.junit.Test;
 import org.reactome.cancer.MAFFileLoader;
 import org.reactome.px.util.InteractionUtilities;
-import org.reactome.r3.CosmicAnalyzer;
-import org.reactome.r3.Interactome3dAnalyzer;
+import org.reactome.r3.*;
 import org.reactome.r3.Interactome3dAnalyzer.PDBUniProtMatch;
-import org.reactome.r3.ProteinSequenceHandler;
 import org.reactome.r3.ProteinSequenceHandler.Sequence;
-import org.reactome.r3.ReactomeAnalyzer;
-import org.reactome.r3.UniProtAnalyzer;
 import org.reactome.r3.util.FileUtility;
 import org.reactome.r3.util.MathUtilities;
 import org.reactome.r3.util.MutationObservation;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.FilenameFilter;
+import java.io.IOException;
+import java.nio.file.*;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.util.*;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * This class is used to handle protein 3D structures based on PDB using biojava APIs.
@@ -64,9 +51,10 @@ public class Interactome3dDriverAnalyzer {
      */
     public Interactome3dDriverAnalyzer() {
     }
-    
+
     /**
      * Load a map from reaction to minimum p-value as -log10.
+     *
      * @return
      * @throws IOException
      */
@@ -76,8 +64,8 @@ public class Interactome3dDriverAnalyzer {
                 .skip(1) // Skip the first header line
                 .map(line -> line.split("\t"))
                 .collect(Collectors.toMap(tokens -> tokens[1],
-                                          tokens -> -Math.log10(Double.parseDouble(tokens[2])),
-                                          (v1, v2) -> Math.max(v1, v2))); // In case of two reactions having the same name
+                        tokens -> -Math.log10(Double.parseDouble(tokens[2])),
+                        (v1, v2) -> Math.max(v1, v2))); // In case of two reactions having the same name
         System.out.println("Total reactions in reaction to 3d score: " + reactionToScore.size());
         return reactionToScore;
     }
@@ -451,12 +439,13 @@ public class Interactome3dDriverAnalyzer {
         }
         return genes;
     }
-    
+
     /**
      * This method implements a gene-central analysis by first loading mutation profiles annotated
      * in COSMIC or other places, find Reactome reactions having annotated genes involved, expand
      * reactions into a set of FIs, and check enrichment of mutations for FIs based on interactome3d
      * structures.
+     *
      * @throws Exception
      */
     @Test
@@ -651,13 +640,13 @@ public class Interactome3dDriverAnalyzer {
 
         //TODO: manual check -- write map to .csv and compare with interface enrichment (below)
 
-        Map <String, InteractionMutationProfile> interfaceMutationRatios = findInteractionsWithMutatedInterfaces(cancerDriverReactomeAnalyzer,
+        Map<String, InteractionMutationProfile> interfaceMutationRatios = findInteractionsWithMutatedInterfaces(cancerDriverReactomeAnalyzer,
                 mafDirectoryPath,
                 mafFileNamePattern,
                 pdbDirectoryPath,
                 reactomeOutFilePath);
 
-        Map <String, Double> mechismoInteractionsInReactomeFIs = findMechismoInteractionsInReactome(cancerDriverReactomeAnalyzer,
+        Map<String, Double> mechismoInteractionsInReactomeFIs = findMechismoInteractionsInReactome(cancerDriverReactomeAnalyzer,
                 mechismoOutputFilePath,
                 mechismoInteractionScorePattern,
                 cancerTypeFilePath,
@@ -676,16 +665,16 @@ public class Interactome3dDriverAnalyzer {
                     "P Value," +
                     "Mechismo Score\n").getBytes());
 
-            for(String interactionWithInterface:interfaceMutationRatios.keySet()){
+            for (String interactionWithInterface : interfaceMutationRatios.keySet()) {
                 String[] interactionArray = interactionWithInterface.split("\t");
-                String q1 = String.format("%s\t%s",interactionArray[0],interactionArray[1]);
-                String q2 = String.format("%s\t%s",interactionArray[1],interactionArray[0]);
+                String q1 = String.format("%s\t%s", interactionArray[0], interactionArray[1]);
+                String q2 = String.format("%s\t%s", interactionArray[1], interactionArray[0]);
                 double mechismoScore;
-                if(mechismoInteractionsInReactomeFIs.containsKey(q1)){
+                if (mechismoInteractionsInReactomeFIs.containsKey(q1)) {
                     mechismoScore = mechismoInteractionsInReactomeFIs.get(q1);
-                }else if(mechismoInteractionsInReactomeFIs.containsKey(q2)){
+                } else if (mechismoInteractionsInReactomeFIs.containsKey(q2)) {
                     mechismoScore = mechismoInteractionsInReactomeFIs.get(q2);
-                }else{
+                } else {
                     logger.warn(String.format("Mechismo Interactions in ReactomeFIs missing: %s",
                             interactionWithInterface));
                     continue;
@@ -698,12 +687,12 @@ public class Interactome3dDriverAnalyzer {
                         interfaceMutationRatios.get(interactionWithInterface).p_value,
                         mechismoScore).getBytes());
             }
-        }catch(Exception e){
+        } catch (Exception e) {
             logger.error(String.format("%s: %s",
                     e.getMessage(),
                     Arrays.toString(e.getStackTrace())));
-        }finally {
-            if(fop != null) {
+        } finally {
+            if (fop != null) {
                 fop.flush();
                 fop.close();
             }
@@ -716,12 +705,106 @@ public class Interactome3dDriverAnalyzer {
         //TODO: Rerun analysis for all cancer types (along with interface enrichment comparison)
     }
 
-    public Map<String,Double> findMechismoInteractionsInReactome(CancerDriverReactomeAnalyzer cancerDriverReactomeAnalyzer,
-                                                                 String mechismoOutputFilePath,
-                                                                 String mechismoInteractionScorePattern,
-                                                                 String cancerTypeFilePath,
-                                                                 String cancerTypeInteractionPattern,
-                                                                 String outFilePath) throws Exception {
+    public void prepareHeatmapData(CancerDriverReactomeAnalyzer cancerDriverReactomeAnalyzer,
+                                   String pdbDirectoryPath,
+                                   String outputDir,
+                                   String firehoseCancerTypesDir,
+                                   String mechismoCancerTypesDir) throws Exception {
+
+        //Reactome FI's
+        // Load all the non-disease reactions from Reactome
+        // dbID + string description + other stuff
+        List<GKInstance> reactions = cancerDriverReactomeAnalyzer.loadHumanReactions();
+        System.out.println(String.format("Total reactions: %d", reactions.size()));
+
+        // Store interactions in a set
+        // "<uniprot ID>\t<uniprot ID>"
+        Set<String> totalFIs = extractInteractionsFromReactions(reactions);
+        System.out.println(String.format("Total FIs: %d", totalFIs.size()));
+
+        // Map uniprot ID's to gene symbols (COSMIC uses gene symbols)
+        // "<uniprot ID>" -> "<gene symbol>"
+        Map<String, String> uniprotIdToGene = new UniProtAnalyzer().getUniProtAccessionToGeneName();
+
+        // Extract and store unique proteins from interactions in a set
+        // "<uniprot ID>"
+        Set<String> totalProteins = InteractionUtilities.grepIDsFromInteractions(totalFIs);
+        System.out.println(String.format("Total proteins: %d", totalProteins.size()));
+
+        // Keep only uniprot ID's from interactions in uniprotIdToGene map
+        uniprotIdToGene.keySet().retainAll(totalProteins);
+
+        //Keep only Reactome FI's containing >= 1 gene mutated in MAF
+        // Lookup and store gene symbols for proteins in a set
+        // "<gene symbol>"
+        Set<String> totalGenes = keepGenesWithMappedProteins(totalProteins, uniprotIdToGene);
+        System.out.println(String.format("Total genes: %d", totalGenes.size()));
+
+        // Map all pdb files matching uniprot ID's to gene names;
+        // "<gene symbol>\t<gene symbol>" -> "path/to/complex.pdb"
+        Map<String, File> interaction2PDBMap = getInteraction2PDBMap(pdbDirectoryPath, uniprotIdToGene);
+        System.out.println(String.format("Total PDB's: %d", interaction2PDBMap.size()));
+
+        //Extract Interfaces
+        // "<gene symbol\tgene symbol>" -> HashMap<"<gene symbol>", Set<interface coordinate>>
+        Map<String, Map<String, ProteinChainSummary>> interactionsWithInterfaces = extractInterfaces(interaction2PDBMap, uniprotIdToGene);
+
+        //Map Interactions to sets of Reactions
+        Map<String, Set<GKInstance>> interactionReactionSetMap = generateInteractionReactionSetMap(uniprotIdToGene,reactions);
+
+        //For each cancer type in firehose
+        File firehoseCancerTypes = new File(firehoseCancerTypesDir);
+        String[] firehoseCancerTypeDirs =
+                firehoseCancerTypes.list((current, name) -> new File(current, name).isDirectory());
+        Map<String, Map<String, InteractionMutationProfile>> cancerTypeSampleInterfaceMutationRatios;
+        for (String firehoseCancerTypeDir : firehoseCancerTypeDirs) {
+            //heatmap of cancer type with each sample using p-value as value
+
+            //ppi
+            String ppiOutFilePath = String.format("%s/firehose_%s_interactions_with_mutated_interfaces.csv",
+                    outputDir,
+                    firehoseCancerTypeDir);
+            cancerTypeSampleInterfaceMutationRatios =
+                    findSamplesInteractionsWithMutatedInterfaces(totalGenes,
+                            interactionsWithInterfaces,
+                            String.format("%s/%s",
+                                    firehoseCancerTypesDir,
+                                    firehoseCancerTypeDir),
+                            // The MAF filenames look like:
+                            // TCGA-AY-4070-01.hg19.oncotator.hugo_entrez_remapped.maf.txt
+                            // TCGA-AY-4071-01.hg19.oncotator.hugo_entrez_remapped.maf.txt
+                            "^.+\\.maf\\.txt$",
+                            ppiOutFilePath);
+            //reaction
+            String reactionOutFilePath = String.format("%s/firehose_%s_reactions_with_mutated_interfaces.csv",
+                    outputDir,
+                    firehoseCancerTypeDir);
+            findSampleReactionsWithMutatedInteractionInterfaces(
+                    cancerTypeSampleInterfaceMutationRatios,
+                    interactionReactionSetMap,
+                    reactionOutFilePath);
+
+            //pathway
+            //List<GeneSetAnnotation> annotateGenesWithReactomePathways(Collection<String> genes...);
+        }
+        //heatmap of firehose data with cancer type using p-value as value
+
+        //For each cancer type in mechismo
+        //heatmap of cancer type with each sample using p-value as value
+        //heatmap of cancer type with each sample using mechismo score as value
+
+        //heatmap of mechismo data with cancer type using p-value as value
+        //heatmap of mechismo data with cancer type using mechismo score as value
+
+
+    }
+
+    public Map<String, Double> findMechismoInteractionsInReactome(CancerDriverReactomeAnalyzer cancerDriverReactomeAnalyzer,
+                                                                  String mechismoOutputFilePath,
+                                                                  String mechismoInteractionScorePattern,
+                                                                  String cancerTypeFilePath,
+                                                                  String cancerTypeInteractionPattern,
+                                                                  String outFilePath) throws Exception {
         //Reactome FI's
         // Load all the non-disease reactions from Reactome
         // dbID + string description + other stuff
@@ -730,16 +813,16 @@ public class Interactome3dDriverAnalyzer {
 
         // Store Reactome interactions in a set
         // "<uniprot ID>\t<uniprot ID>"
-        Set<String> reactomeFIs = interactionSet(reactions);
+        Set<String> reactomeFIs = extractInteractionsFromReactions(reactions);
         System.out.println(String.format("Reactome FIs: %d", reactomeFIs.size()));
 
         // Store Mechismo interactions in a map
         // "<uniprot ID>\t<uniprot ID> => <mechismo score>"
-        Map<String,Double> mechismoInteractions = mechismoInteractionMap(mechismoOutputFilePath, mechismoInteractionScorePattern);
+        Map<String, Double> mechismoInteractions = mechismoInteractionMap(mechismoOutputFilePath, mechismoInteractionScorePattern);
         System.out.println(String.format("Mechismo PPIs: %d", mechismoInteractions.size()));
 
         // Report Coverage
-        Map<String,Double> mechismoInteractionsInReactomeFIs = findMechismoReactomeIntersection(reactomeFIs, mechismoInteractions);
+        Map<String, Double> mechismoInteractionsInReactomeFIs = findMechismoReactomeIntersection(reactomeFIs, mechismoInteractions);
         System.out.println(String.format("%d of %d (%.3f %%) PPIs in Mechismo covered by Reactome FIs",
                 mechismoInteractionsInReactomeFIs.keySet().size(),
                 mechismoInteractions.keySet().size(),
@@ -755,7 +838,7 @@ public class Interactome3dDriverAnalyzer {
             fop = new FileOutputStream(outFilePath);
 
             fop.write(("Interaction,Gene 1, Gene 2,Mechismo Score\n").getBytes());
-            for(String interaction:mechismoInteractionsInReactomeFIs.keySet()){
+            for (String interaction : mechismoInteractionsInReactomeFIs.keySet()) {
                 String[] interactionArray = interaction.split("\t");
                 String gene1 = uniprotIdToGene.get(interactionArray[0]);
                 String gene2 = uniprotIdToGene.get(interactionArray[1]);
@@ -766,12 +849,12 @@ public class Interactome3dDriverAnalyzer {
                         gene2,
                         mechismoInteractionsInReactomeFIs.get(interaction)).getBytes()));
             }
-        }catch(Exception e){
+        } catch (Exception e) {
             logger.error(String.format("%s: %s",
                     e.getMessage(),
                     Arrays.toString(e.getStackTrace())));
-        }finally {
-            if(fop != null) {
+        } finally {
+            if (fop != null) {
                 fop.flush();
                 fop.close();
             }
@@ -779,34 +862,34 @@ public class Interactome3dDriverAnalyzer {
         return mechismoInteractionsInReactomeFIs;
     }
 
-    private Map<String,Double> findMechismoReactomeIntersection(Set<String> reactomeFIs, Map<String,Double> mechismoInteractions){
+    private Map<String, Double> findMechismoReactomeIntersection(Set<String> reactomeFIs, Map<String, Double> mechismoInteractions) {
         Set<String> sortedFIs = new HashSet<>();
-        for (String fi:reactomeFIs){
+        for (String fi : reactomeFIs) {
             String[] fiArray = fi.split("\t");
             Arrays.sort(fiArray);
-            sortedFIs.add(String.format("%s\t%s",fiArray[0],fiArray[1]));
+            sortedFIs.add(String.format("%s\t%s", fiArray[0], fiArray[1]));
         }
 
-        Map<String,Double> mechismoInteractionsInReactomeFIs = new HashMap<>();
-        for( String interaction:mechismoInteractions.keySet()){
+        Map<String, Double> mechismoInteractionsInReactomeFIs = new HashMap<>();
+        for (String interaction : mechismoInteractions.keySet()) {
             String[] interactionArray = interaction.split("\t");
             Arrays.sort(interactionArray);
-            String sortedInteraction = String.format("%s\t%s",interactionArray[0],interactionArray[1]);
-            if(sortedFIs.contains(sortedInteraction)){
-                mechismoInteractionsInReactomeFIs.put(sortedInteraction,mechismoInteractions.get(interaction));
+            String sortedInteraction = String.format("%s\t%s", interactionArray[0], interactionArray[1]);
+            if (sortedFIs.contains(sortedInteraction)) {
+                mechismoInteractionsInReactomeFIs.put(sortedInteraction, mechismoInteractions.get(interaction));
             }
         }
         return mechismoInteractionsInReactomeFIs;
     }
 
-    private Map<String,Double> mechismoInteractionMap(String mechismoOutputFilePath,
-                                                       String mechismoInteractionScorePattern) throws IOException{
+    private Map<String, Double> mechismoInteractionMap(String mechismoOutputFilePath,
+                                                       String mechismoInteractionScorePattern) throws IOException {
         Pattern mechIntScorePattern = Pattern.compile(mechismoInteractionScorePattern);
         String prot1 = "prot1";
         String prot2 = "prot2";
         String mech = "mech";
 
-        Map<String,Double> mechismoInteractions = new HashMap<>();
+        Map<String, Double> mechismoInteractions = new HashMap<>();
 
         FileUtility fu = new FileUtility();
         fu.setInput(mechismoOutputFilePath);
@@ -824,7 +907,7 @@ public class Interactome3dDriverAnalyzer {
             if (tokens[19].trim().length() == 0)
                 continue;
             mechismoInteractions.put(tokens[1].trim() + "\t" + tokens[19].trim(),
-                                     new Double(tokens[17]));
+                    new Double(tokens[17]));
         }
         fu.close();
         return mechismoInteractions;
@@ -836,10 +919,10 @@ public class Interactome3dDriverAnalyzer {
      * @throws Exception
      */
     public Map<String, InteractionMutationProfile> findInteractionsWithMutatedInterfaces(CancerDriverReactomeAnalyzer cancerDriverReactomeAnalyzer,
-                                                      String mafDirectoryPath,
-                                                      String mafFileNamePattern,
-                                                      String pdbDirectoryPath,
-                                                      String outFilePath) throws Exception {
+                                                                                         String mafDirectoryPath,
+                                                                                         String mafFileNamePattern,
+                                                                                         String pdbDirectoryPath,
+                                                                                         String outFilePath) throws Exception {
 
         //Reactome FI's
         // Load all the non-disease reactions from Reactome
@@ -849,7 +932,7 @@ public class Interactome3dDriverAnalyzer {
 
         // Store interactions in a set
         // "<uniprot ID>\t<uniprot ID>"
-        Set<String> totalFIs = interactionSet(reactions);
+        Set<String> totalFIs = extractInteractionsFromReactions(reactions);
         System.out.println(String.format("Total FIs: %d", totalFIs.size()));
 
         // Map uniprot ID's to gene symbols (COSMIC uses gene symbols)
@@ -872,7 +955,7 @@ public class Interactome3dDriverAnalyzer {
 
         //MAF Mutations
         // "<gene symbol>" -> HashMap<"<AA Coord> -> <sample support>>
-        Map<String, Map<Integer, Set<MutationObservation>>> allSamplesGeneMap = mafGeneToMutation(mafFileNamePattern, mafDirectoryPath);
+        Map<String, Map<Integer, Set<MutationObservation>>> allSamplesGeneMap = summarizeAllMafs(mafFileNamePattern, mafDirectoryPath);
 
         //TODO: ensure this works... caps? some genes have multiple names (Akt/PKB) etc.
         allSamplesGeneMap.keySet().retainAll(totalGenes);
@@ -959,12 +1042,12 @@ public class Interactome3dDriverAnalyzer {
                 }
             }
             logger.info(String.format("Output written to %s", outFilePath));
-        }catch(Exception e){
+        } catch (Exception e) {
             logger.error(String.format("%s: %s",
                     e.getMessage(),
                     Arrays.toString(e.getStackTrace())));
-        }finally {
-            if(fop != null) {
+        } finally {
+            if (fop != null) {
                 fop.flush();
                 fop.close();
             }
@@ -973,44 +1056,247 @@ public class Interactome3dDriverAnalyzer {
         return interfaceMutationRatios;
     }
 
+    /**
+     * This method...
+     *
+     * @throws Exception
+     */
+    public Map<String, Map<String, InteractionMutationProfile>> findSamplesInteractionsWithMutatedInterfaces(Set<String> totalGenes,
+                                                                                                             Map<String, Map<String, ProteinChainSummary>> interactionsWithInterfaces,
+                                                                                                             String mafDirectoryPath,
+                                                                                                             String mafFileNamePattern,
+                                                                                                             String outFilePath) throws Exception {
+        //MAF Mutations
+        // "<gene symbol>" -> HashMap<"<AA Coord> -> <sample support>>
+        Map<String, Map<String, Map<Integer, Set<MutationObservation>>>> individualSamplesGeneMap = summarizeIndividualMafs(mafFileNamePattern, mafDirectoryPath);
+
+        //TODO: ensure this works... caps? some genes have multiple names (Akt/PKB) etc.
+        for (String individualSample : individualSamplesGeneMap.keySet()) {
+            individualSamplesGeneMap.get(individualSample).keySet().retainAll(totalGenes);
+        }
+
+
+
+        //Reactome FI's Interface Mutation Ratio
+        // "<gene symbol\tgene symbol>" -> HashMap<<"gene symbol">,<Mutation Ratio>>
+        Map<String, Map<String, InteractionMutationProfile>> sampleInterfaceMutationRatios = new HashMap<>();
+
+
+        FileOutputStream fop = null;
+        try {
+            File file = new File(outFilePath);
+            file.createNewFile();
+            fop = new FileOutputStream(outFilePath);
+
+            fop.write((
+                    "Sample,Interaction," +
+                            "Gene1 Name,Gene1 Interface Length,Gene1 Length,Gene1 Interface Mutation Count,Gene1 Mutation Count," +
+                            "Gene2 Name,Gene2 Interface Length,Gene2 Length,Gene2 Interface Mutation Count,Gene2 Mutation Count," +
+                            "P Value\n").getBytes());
+
+            for (String individualSample : individualSamplesGeneMap.keySet()) {
+                sampleInterfaceMutationRatios.put(individualSample, new HashMap<>());
+                for (String interactionWithInterface : interactionsWithInterfaces.keySet()) {
+
+                    String gene1Name = interactionWithInterface.split("\t")[0];
+                    String gene2Name = interactionWithInterface.split("\t")[1];
+
+                    GeneMutationProfile gene1MutationProfile = getGeneMutationProfile(individualSamplesGeneMap.get(individualSample), interactionsWithInterfaces, interactionWithInterface, gene1Name);
+                    GeneMutationProfile gene2MutationProfile = getGeneMutationProfile(individualSamplesGeneMap.get(individualSample), interactionsWithInterfaces, interactionWithInterface, gene2Name);
+
+                    if (gene1MutationProfile.isValid() && gene2MutationProfile.isValid()) {
+
+                        int interactionInterfaceMutationCount = gene1MutationProfile.interfaceMutationCount
+                                + gene2MutationProfile.interfaceMutationCount;
+
+                        if (interactionInterfaceMutationCount > 0) {
+                            double interactionInterfaceLengthRatio = ((double) gene1MutationProfile.interfaceLength
+                                    + (double) gene2MutationProfile.interfaceLength)
+                                    / ((double) gene1MutationProfile.geneLength
+                                    + (double) gene2MutationProfile.geneLength);
+
+                            int interactionMutationCount = gene1MutationProfile.geneMutationCount
+                                    + gene2MutationProfile.geneMutationCount;
+
+                            double p_value = 1.0;
+                            try {
+                                p_value = MathUtilities.calculateBinomialPValue(interactionInterfaceLengthRatio,
+                                        interactionMutationCount,
+                                        interactionInterfaceMutationCount);
+                            } catch (Exception e) {
+                                logger.error(String.format("Could not compute p-value for mutation profile pair: %s - %s: %s: %s",
+                                        gene1MutationProfile.toString(),
+                                        gene2MutationProfile.toString(),
+                                        e.getMessage(),
+                                        Arrays.toString(e.getStackTrace())));
+                            }
+
+                            sampleInterfaceMutationRatios.get(individualSample).put(interactionWithInterface, new InteractionMutationProfile(
+                                    gene1MutationProfile,
+                                    gene2MutationProfile,
+                                    p_value
+                            ));
+
+                            fop.write(String.format("%s,%s,%s,%s,%f\n",
+                                    individualSample,
+                                    interactionWithInterface,
+                                    gene1MutationProfile.toString(),
+                                    gene2MutationProfile.toString(),
+                                    p_value).getBytes());
+                        } else {
+                            logger.warn(String.format("No interface mutations in mutation profile pair: %s - %s",
+                                    gene1MutationProfile.toString(),
+                                    gene2MutationProfile.toString()));
+                        }
+                    } else {
+                        logger.warn(String.format("Invalid gene mutation profile pair: %s - %s",
+                                gene1MutationProfile.toString(),
+                                gene2MutationProfile.toString()));
+                    }
+                }
+            }
+            logger.info(String.format("Output written to %s", outFilePath));
+        } catch (Exception e) {
+            logger.error(String.format("%s: %s",
+                    e.getMessage(),
+                    Arrays.toString(e.getStackTrace())));
+        } finally {
+            if (fop != null) {
+                fop.flush();
+                fop.close();
+            }
+        }
+
+        return sampleInterfaceMutationRatios;
+    }
+
+    /***
+     *
+     * @param cancerTypeSampleInterfaceMutationRatios "sample id" -> Map<"gene\tgene" -> InteractionMutationProfile>
+     * @param interactionReactionSetMap "gene\tgene" -> Set<reaction>
+     * @param outFilePath
+     */
+    private void findSampleReactionsWithMutatedInteractionInterfaces(Map<String, Map<String, InteractionMutationProfile>> cancerTypeSampleInterfaceMutationRatios,
+                                                                     Map<String, Set<GKInstance>> interactionReactionSetMap,
+                                                                     String outFilePath) throws Exception{
+        //map of reactions to interactions found to have
+        //significantly mutated interface in at least one sample
+        Map<GKInstance,Set<String>> reactionToInteractionMap = new HashMap<>();
+        for(String sample:cancerTypeSampleInterfaceMutationRatios.keySet()){
+            for(String interaction : cancerTypeSampleInterfaceMutationRatios.get(sample).keySet()){
+                String x = interaction;
+                Set<GKInstance> reactions = interactionReactionSetMap.get(interaction);
+                if(reactions != null && !reactions.isEmpty()) {
+                    Iterator<GKInstance> gkInstanceIterator = reactions.iterator();
+                    while (gkInstanceIterator.hasNext()) {
+                        GKInstance reaction = gkInstanceIterator.next();
+                        Set<String> interactions;
+                        if (reactionToInteractionMap.keySet().contains(reaction)) {
+                            interactions = reactionToInteractionMap.get(reaction);
+                        } else {
+                            interactions = new HashSet<>();
+                        }
+                        interactions.add(interaction);
+                        reactionToInteractionMap.put(reaction, interactions);
+                    }
+                }else{
+                    logger.warn(String.format("No reactions mapped to %s...",interaction));
+                }
+            }
+        }
+        System.out.println(String.format("Reactions with interactions: %d", reactionToInteractionMap.keySet().size()));
+
+        //write reactions and maximum interaction interface mutation significance for samples
+        FileOutputStream fop = null;
+        try {
+            File file = new File(outFilePath);
+            file.createNewFile();
+            fop = new FileOutputStream(outFilePath);
+
+            fop.write((
+                    "Sample~Reaction ID~Reaction Description~MaxSigInteraction~P Value\n").getBytes());
+            for (String sample : cancerTypeSampleInterfaceMutationRatios.keySet()) {
+                for (GKInstance reaction : reactionToInteractionMap.keySet()) {
+                    String maxSigInteraction = "none";
+                    double minPValue = 1.0;
+
+                    Iterator<String> interactionIterator = reactionToInteractionMap.get(reaction).iterator();
+                    while(interactionIterator.hasNext()) {
+                        String interaction = interactionIterator.next();
+                        String x = interaction;
+                        if(cancerTypeSampleInterfaceMutationRatios.get(sample).containsKey(interaction)) {
+                            double pValue = cancerTypeSampleInterfaceMutationRatios.get(sample).get(interaction).getP_value();
+                            if(pValue < minPValue){
+                                minPValue = pValue;
+                                maxSigInteraction = interaction;
+                            }
+                        }
+                    }
+
+                    fop.write(String.format("%s~%s~%s~%s~%f\n",
+                            sample,
+                            reaction.getDBID(),
+                            reaction.getDisplayName(),
+                            maxSigInteraction,
+                            minPValue).getBytes());
+                }
+            }
+        } catch (IOException ioe) {
+            logger.error(String.format("%s: %s",
+                    ioe.getMessage(),
+                    Arrays.toString(ioe.getStackTrace())));
+        } finally {
+            if (fop != null) {
+                fop.flush();
+                fop.close();
+            }
+        }
+    }
+
     private class ProteinChainSummary {
         private Set<Integer> interfaceCoordinates;
         private int chainLength;
+
         ProteinChainSummary(Set<Integer> interfaceCoordinates,
-                            int chainLength){
+                            int chainLength) {
             this.interfaceCoordinates = interfaceCoordinates;
             this.chainLength = chainLength;
-            if(this.chainLength <= 0){
+            if (this.chainLength <= 0) {
                 logger.error("Invalid chain length detected...");
             }
         }
 
-        public Set<Integer> getInterfaceCoordinates(){
+        public Set<Integer> getInterfaceCoordinates() {
             return this.interfaceCoordinates;
         }
-        public int getChainLength(){
+
+        public int getChainLength() {
             return this.chainLength;
         }
     }
 
-    private class InteractionMutationProfile{
+    private class InteractionMutationProfile {
         private GeneMutationProfile gene1MutationProfile;
         private GeneMutationProfile gene2MutationProfile;
         private double p_value;
+
         InteractionMutationProfile(GeneMutationProfile gene1MutationProfile,
                                    GeneMutationProfile gene2MutationProfile,
-                                   double p_value){
+                                   double p_value) {
             this.gene1MutationProfile = gene1MutationProfile;
             this.gene2MutationProfile = gene2MutationProfile;
             this.p_value = p_value;
         }
-        public GeneMutationProfile getGene1MutationProfile(){
+
+        public GeneMutationProfile getGene1MutationProfile() {
             return this.gene1MutationProfile;
         }
-        public GeneMutationProfile getGene2MutationProfile(){
+
+        public GeneMutationProfile getGene2MutationProfile() {
             return this.gene2MutationProfile;
         }
-        public double getP_value(){
+
+        public double getP_value() {
             return this.p_value;
         }
     }
@@ -1021,46 +1307,53 @@ public class Interactome3dDriverAnalyzer {
         private int geneLength;
         private int interfaceMutationCount;
         private int geneMutationCount;
+
         GeneMutationProfile(String geneName,
                             int interfaceLength,
-                                   int geneLength,
-                                   int interfaceMutationCount,
-                                   int geneMutationCount){
+                            int geneLength,
+                            int interfaceMutationCount,
+                            int geneMutationCount) {
             this.geneName = geneName;
             this.interfaceLength = interfaceLength;
             this.geneLength = geneLength;
             this.interfaceMutationCount = interfaceMutationCount;
             this.geneMutationCount = geneMutationCount;
         }
-        public String getGeneName(){
+
+        public String getGeneName() {
             return this.geneName;
         }
-        public int getInterfaceLength(){
+
+        public int getInterfaceLength() {
             return this.interfaceLength;
         }
-        public int getGeneLength(){
+
+        public int getGeneLength() {
             return this.geneLength;
         }
-        public int getInterfaceMutationCount(){
+
+        public int getInterfaceMutationCount() {
             return this.interfaceMutationCount;
         }
-        public int getGeneMutationCount(){
+
+        public int getGeneMutationCount() {
             return this.geneMutationCount;
         }
 
-        public boolean isValid(){
+        public boolean isValid() {
             return this.geneName != null
                     && !this.geneName.equals("")
                     && this.geneLength > 0
                     && this.interfaceLength <= this.geneLength;
         }
-        public String toString(){
+
+        public String toString() {
             return String.format("%s,%d,%d,%d,%d",
-                                    this.geneName,
-                                    this.interfaceLength,
-                                    this.geneLength,
-                                    this.interfaceMutationCount,
-                                    this.geneMutationCount);
+                    this.geneName,
+                    this.interfaceLength,
+                    this.geneLength,
+                    this.interfaceMutationCount,
+                    this.geneMutationCount);
         }
     }
 
@@ -1075,9 +1368,9 @@ public class Interactome3dDriverAnalyzer {
         try {
             interfaceLength = interactionInterfaces.get(interactionInterface).get(geneName).getInterfaceCoordinates().size();
             geneLength = interactionInterfaces.get(interactionInterface).get(geneName).getChainLength();
-            if (allSamplesGeneMap.get(geneName) != null){
+            if (allSamplesGeneMap.get(geneName) != null) {
                 for (Integer aaCoord : allSamplesGeneMap.get(geneName).keySet()) {
-                    if(aaCoord != null) {
+                    if (aaCoord != null) {
                         geneMutationCount += allSamplesGeneMap.get(geneName).get(aaCoord).size();
                         if (interactionInterfaces.get(interactionInterface).get(geneName).getInterfaceCoordinates().contains(aaCoord)) {
                             interfaceMutationCount += allSamplesGeneMap.get(geneName).get(aaCoord).size();
@@ -1095,15 +1388,15 @@ public class Interactome3dDriverAnalyzer {
                 interfaceMutationCount,
                 geneMutationCount);
 
-        if(!geneMutationProfile.isValid()){
-            logger.warn(String.format("Invalid gene mutation profile created: %s",geneMutationProfile.toString()));
+        if (!geneMutationProfile.isValid()) {
+            logger.warn(String.format("Invalid gene mutation profile created: %s", geneMutationProfile.toString()));
         }
 
         return geneMutationProfile;
     }
 
     private Map<String, Map<String, ProteinChainSummary>> extractInterfaces(Map<String, File> interaction2PDBMap,
-                                                                Map<String, String> accessionToGene) throws IOException, StructureException {
+                                                                            Map<String, String> accessionToGene) throws IOException, StructureException {
         Interactome3dAnalyzer interactome3dAnalyzer = new Interactome3dAnalyzer();
         Map<String, Map<String, ProteinChainSummary>> interactionInterfaces = new HashMap<>();
         Map<Chain, List<Integer>> chainToContactCoordinates;
@@ -1154,14 +1447,21 @@ public class Interactome3dDriverAnalyzer {
             //Interactome3dAnalyzer.getMatchForExpStructure()
             assert chainToContactCoordinates.size() == 2;
             interactionInterface = new HashMap<>();
-            for (Chain chainID : chainToMatch.keySet()) {
-                //map geneID to set of contact coordinates for this interaction
-                interactionInterface.put(chainToMatch.get(chainID).getGene(),
-                        new ProteinChainSummary(
-                                new HashSet<>(chainToContactCoordinates.get(chainID)),
-                                chainToMatch.get(chainID).getChainSequence().length()));
+            try {
+                for (Chain chainID : chainToMatch.keySet()) {
+                    //map geneID to set of contact coordinates for this interaction
+                    interactionInterface.put(chainToMatch.get(chainID).getGene(),
+                            new ProteinChainSummary(
+                                    new HashSet<>(chainToContactCoordinates.get(chainID)),
+                                    chainToMatch.get(chainID).getChainSequence().length()));
+                }
+                interactionInterfaces.put(interaction, interactionInterface);
+            } catch (NullPointerException npe) {
+                logger.warn(String.format("Error finding interaction interface. %s: %s",
+                        npe.getMessage(),
+                        Arrays.toString(npe.getStackTrace())),
+                        npe);
             }
-            interactionInterfaces.put(interaction, interactionInterface);
         }
         return interactionInterfaces;
     }
@@ -1171,7 +1471,7 @@ public class Interactome3dDriverAnalyzer {
      *
      * @throws Exception
      */
-    private Set<String> interactionSet(List<GKInstance> reactions) throws Exception {
+    private Set<String> extractInteractionsFromReactions(List<GKInstance> reactions) throws Exception {
         ReactomeAnalyzer reactomeAnalyzer = new ReactomeAnalyzer();
         Set<String> totalFIs = new HashSet<>();
         Set<String> fis;
@@ -1184,13 +1484,47 @@ public class Interactome3dDriverAnalyzer {
         }
         return totalFIs;
     }
-    
+
+    private Map<String, Set<GKInstance>> generateInteractionReactionSetMap(Map<String, String> uniprotIdToGene,
+                                                                           List<GKInstance> reactions) throws Exception {
+        ReactomeAnalyzer reactomeAnalyzer = new ReactomeAnalyzer();
+        Map<String, Set<GKInstance>> interactionReactionSetMap = new HashMap<>();
+        Set<String> uniprotInteractions;
+        for (GKInstance reaction : reactions) {
+            uniprotInteractions = reactomeAnalyzer.generateTentativePPIsForReaction(reaction,
+                    false);
+            if (uniprotInteractions.size() == 0)
+                continue;
+            for (String uniprotInteraction : uniprotInteractions) {
+                //TODO: figure out a cuter way to do this...
+                String gene1 = uniprotIdToGene.get(uniprotInteraction.split("\t")[0]);
+                String gene2 = uniprotIdToGene.get(uniprotInteraction.split("\t")[1]);
+                if (gene1 == null || gene2 == null) {
+                    //TODO: figure out which proteins don't map to genes and why
+//                System.err.println("Cannot find gene for " + uniprotID);
+                    continue;
+                } else {
+                    String geneInteraction = String.format("%s\t%s", gene1, gene2);
+                    Set<GKInstance> interactionReactions;
+                    if (interactionReactionSetMap.containsKey(geneInteraction)) {
+                        interactionReactions = interactionReactionSetMap.get(geneInteraction);
+                    } else {
+                        interactionReactions = new HashSet<>();
+                    }
+                    interactionReactions.add(reaction);
+                    interactionReactionSetMap.put(geneInteraction, interactionReactions);
+                }
+            }
+        }
+        return interactionReactionSetMap;
+    }
+
     @Test
     public void testMafGenesToMutations() throws IOException {
         String mafDir = "datasets/firehose_all/";
         String mafPattern = "^.+\\.maf\\.txt$";
-        Map<String, Map<Integer, Set<MutationObservation>>> rtn = mafGeneToMutation(mafPattern,
-                                                                                    mafDir);
+        Map<String, Map<Integer, Set<MutationObservation>>> rtn = summarizeAllMafs(mafPattern,
+                mafDir);
         System.out.println(rtn.size());
     }
 
@@ -1199,8 +1533,8 @@ public class Interactome3dDriverAnalyzer {
      *
      * @throws Exception
      */
-    private Map<String, Map<Integer, Set<MutationObservation>>> mafGeneToMutation(String mafFileNamePattern, 
-                                                                                  String mafDirectoryPath) throws IOException {
+    private Map<String, Map<Integer, Set<MutationObservation>>> summarizeAllMafs(String mafFileNamePattern,
+                                                                                 String mafDirectoryPath) throws IOException {
         MAFFileLoader mafFileLoader = new MAFFileLoader();
         Map<String, Map<Integer, Set<MutationObservation>>> allSamplesGeneMap = new HashMap<>();
         Pattern mafFnPattern = Pattern.compile(mafFileNamePattern);
@@ -1210,23 +1544,23 @@ public class Interactome3dDriverAnalyzer {
             }
             return false;
         };
-        
+
         Path path = Paths.get(mafDirectoryPath);
         List<File> mafFiles = new ArrayList<>();
         Files.walkFileTree(path, new SimpleFileVisitor<Path>() {
 
             @Override
-            public FileVisitResult visitFile(Path file, 
+            public FileVisitResult visitFile(Path file,
                                              BasicFileAttributes attrs) throws IOException {
                 if (attrs.isRegularFile() && mafFnPattern.matcher(file.toFile().getName()).matches())
                     mafFiles.add(file.toFile());
                 return super.visitFile(file, attrs);
             }
-            
+
         });
 //        System.out.println("Total maf files: " + mafFiles.size());
 //        mafFiles.forEach(System.out::println);
-        
+
 //        File[] mafFiles = new File(mafDirectoryPath).listFiles(filenameFilter);
         Map<String, Map<Integer, Set<MutationObservation>>> sampleGeneMap;
         for (File mafFile : mafFiles) {
@@ -1255,6 +1589,47 @@ public class Interactome3dDriverAnalyzer {
                     allSamplesGeneMap.put(geneKey, sampleGeneMap.get(geneKey));
                 }
             }
+        }
+        return allSamplesGeneMap;
+    }
+
+    /**
+     * This method...
+     *
+     * @throws Exception
+     */
+    private Map<String, Map<String, Map<Integer, Set<MutationObservation>>>> summarizeIndividualMafs(String mafFileNamePattern,
+                                                                                                     String mafDirectoryPath) throws IOException {
+        MAFFileLoader mafFileLoader = new MAFFileLoader();
+        Map<String, Map<String, Map<Integer, Set<MutationObservation>>>> allSamplesGeneMap = new HashMap<>();
+        Pattern mafFnPattern = Pattern.compile(mafFileNamePattern);
+        FilenameFilter filenameFilter = (dir, name) -> {
+            if (mafFnPattern.matcher(name).matches()) {
+                return true;
+            }
+            return false;
+        };
+
+        Path path = Paths.get(mafDirectoryPath);
+        List<File> mafFiles = new ArrayList<>();
+        Files.walkFileTree(path, new SimpleFileVisitor<Path>() {
+
+            @Override
+            public FileVisitResult visitFile(Path file,
+                                             BasicFileAttributes attrs) throws IOException {
+                if (attrs.isRegularFile() && mafFnPattern.matcher(file.toFile().getName()).matches())
+                    mafFiles.add(file.toFile());
+                return super.visitFile(file, attrs);
+            }
+
+        });
+//        System.out.println("Total maf files: " + mafFiles.size());
+//        mafFiles.forEach(System.out::println);
+
+//        File[] mafFiles = new File(mafDirectoryPath).listFiles(filenameFilter);
+        Map<String, Map<Integer, Set<MutationObservation>>> sampleGeneMap;
+        for (File mafFile : mafFiles) {
+            allSamplesGeneMap.put(mafFile.getName(), mafFileLoader.loadSampleToGenes(mafFile.getPath()));
         }
         return allSamplesGeneMap;
     }
