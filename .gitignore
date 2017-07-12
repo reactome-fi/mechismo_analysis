@@ -4,6 +4,7 @@
 .cvsignore
 *.log*
 src/*/*.pdf
+src/*/*.zip
 .idea/workspace.xml
 .idea/tasks.xml
 .idea/*.iws
