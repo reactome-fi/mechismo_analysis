@@ -7,14 +7,17 @@ package org.reactome.r3;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.Reader;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVRecord;
@@ -24,6 +27,7 @@ import org.gk.model.ReactomeJavaConstants;
 import org.gk.persistence.MySQLAdaptor;
 import org.gk.util.FileUtilities;
 import org.junit.Test;
+import org.reactome.r3.util.Configuration;
 
 /**
  * This test class is used to generate a network of reactions. Reaction1 and Reaction2 will be linked
@@ -35,6 +39,7 @@ import org.junit.Test;
 @SuppressWarnings("unchecked")
 public class ReactionMapGenerator {
     private final String DIR_NAME = "/Users/gwu/Documents/wgm/work/reactome/ReactionNetwork/";
+    private final String REACTION_NETWORK_NAME = DIR_NAME + "ReactionNetwork_070517.txt";
     private Set<String> entityEscapeNames;
     
     /**
@@ -48,10 +53,13 @@ public class ReactionMapGenerator {
 //                                            "gk_central_041416",
 //                                            "root",
 //                                            "macmysql01");
-        MySQLAdaptor dba = new MySQLAdaptor("localhost",
-                                            "reactome_55_plus_i",
-                                            "root",
-                                            "macmysql01");
+//        MySQLAdaptor dba = new MySQLAdaptor("localhost",
+//                                            "reactome_55_plus_i",
+//                                            "root",
+//                                            "macmysql01");
+        
+        MySQLAdaptor dba = Configuration.getConfiguration().getReactomeDBA();
+        
         return dba;
     }
     
@@ -130,14 +138,43 @@ public class ReactionMapGenerator {
     }
     
     @Test
+    public void generateSubNetwork(Set<String> reactionIds) throws IOException {
+        try (Stream<String> stream = Files.lines(Paths.get(REACTION_NETWORK_NAME))){
+            stream.forEach(line -> {
+                String[] tokens = line.split(" ");
+                if (reactionIds.contains(tokens[0]) && reactionIds.contains(tokens[2])) {
+                      System.out.println(line);
+                  }
+            });
+        }
+    }
+    
+    /**
+     * Load the network without directions.
+     * @return
+     * @throws IOException
+     */
+    public Set<String> loadSimpleNetwork() throws IOException {
+        try (Stream<String> stream = Files.lines(Paths.get(REACTION_NETWORK_NAME))){
+            Set<String> pairs = stream.map(line -> {
+                String[] tokens = line.split(" ");
+                // Do a sort
+                int compare = tokens[0].compareTo(tokens[2]);
+                if (compare < 0)
+                    return tokens[0] + "\t" + tokens[2];
+                else 
+                    return tokens[2] + "\t" + tokens[0];
+            })
+                    .collect(Collectors.toSet());
+            return pairs;
+        }
+    }
+    
+    @Test
     public void generate() throws Exception {
         MySQLAdaptor dba = getDBA();
-        GKInstance human = dba.fetchInstance(48887L); 
-        // Load instances
-        Collection<GKInstance> reactions = dba.fetchInstanceByAttribute(ReactomeJavaConstants.ReactionlikeEvent,
-                                                                        ReactomeJavaConstants.species,
-                                                                        "=",
-                                                                        human);
+        
+        Collection<GKInstance> reactions = new ReactomeAnalyzer().loadHumanReactions(dba);
         Collection<GKInstance> regulations = dba.fetchInstancesByClass(ReactomeJavaConstants.Regulation);
         // Load attributes
         dba.loadInstanceAttributeValues(reactions, 
@@ -149,12 +186,17 @@ public class ReactionMapGenerator {
                                         new String[] {ReactomeJavaConstants.physicalEntity,
                                                       ReactomeJavaConstants.regulatedEntity});
         List<GKInstance> reactionList = new ArrayList<GKInstance>(reactions);
-        filterReaction(reactionList);
+        
+        System.out.println("Total reactions: " + reactionList.size());
+//        if (true)
+//            return;
+        
         FileUtilities fu = new FileUtilities();
 //        fu.setOutput("tmp/ReactionNetwork.txt");
 //        fu.setOutput(DIR_NAME + "ReactionNetwork_082916.txt");
-        fu.setOutput(DIR_NAME + "ReactionNetwork_101316.txt");
-        for (int i = 0; i < reactionList.size() - 1; i++) {
+//        fu.setOutput(DIR_NAME + "ReactionNetwork_101316.txt");
+        fu.setOutput(REACTION_NETWORK_NAME);
+        for (int i = 0; i < reactionList.size(); i++) {
             GKInstance reaction1 = reactionList.get(i);
             System.out.println(i + ": " + reaction1);
             for (int j = 0; j < reactionList.size(); j++) { // Since it is possible two reactions may point to each other
@@ -165,28 +207,10 @@ public class ReactionMapGenerator {
                 boolean isPreceding = isPrecedingTo(reaction1, reaction2);
                 if (isPreceding)
                     fu.printLine(reaction1.getDBID() + " preceding " + reaction2.getDBID());
-                else {
-                    isPreceding = isPrecedingTo(reaction2, reaction1);
-                    if (isPreceding)
-                        fu.printLine(reaction2.getDBID() + " preceding " + reaction1.getDBID());
-                }
+                // The other direction will be checked by two loops
             }
         }
         fu.close();
-    }
-    
-    /**
-     * Filter reactions annotated for diseases
-     * @param reactionList
-     * @throws Exception
-     */
-    private void filterReaction(List<GKInstance> reactionList) throws Exception {
-        for (Iterator<GKInstance> it = reactionList.iterator(); it.hasNext();) {
-            GKInstance rxt = it.next();
-            GKInstance disease = (GKInstance) rxt.getAttributeValue(ReactomeJavaConstants.disease);
-            if (disease != null)
-                it.remove();
-        }
     }
     
     private boolean shouldEscape(GKInstance output) throws Exception {
@@ -236,10 +260,10 @@ public class ReactionMapGenerator {
         List<GKInstance> output1 = rxt1.getAttributeValuesList(ReactomeJavaConstants.output);
         if (output1.size() == 0)
             return false;
+        Set<GKInstance> lfhEntities = getLeftHandEntities(rxt2);
         for (GKInstance output : output1) {
             if (shouldEscape(output))
                 continue;
-            Set<GKInstance> lfhEntities = getLeftHandEntities(rxt2);
             for (GKInstance lfhEntity : lfhEntities) {
                 if (shouldEscape(lfhEntity))
                     continue;
@@ -268,16 +292,22 @@ public class ReactionMapGenerator {
         // If they are the same, return true
         if (lfhEntity == output)
             return true;
+        Set<GKInstance> lfhMembers = null;
+        if (lfhEntity.getSchemClass().isa(ReactomeJavaConstants.EntitySet)) {
+            // If both are EntitySets having shared member, return true
+            lfhMembers = InstanceUtilities.getContainedInstances(lfhEntity,
+                                                                 ReactomeJavaConstants.hasMember);
+            if (lfhMembers.contains(output))
+                return true; // If the first reaction output is a member of the second reaction input set
+        }
         if (output.getSchemClass().isa(ReactomeJavaConstants.EntitySet)) {
             // If output is an EntitySet having lfhEntity as a member, return true
             Set<GKInstance> members = InstanceUtilities.getContainedInstances(output,
                                                                               ReactomeJavaConstants.hasMember);
             if (members.contains(lfhEntity))
-                return true;
-            if (lfhEntity.getSchemClass().isa(ReactomeJavaConstants.EntitySet)) {
+                return true; // If some member of the output in the first reaction is input to the second reaction
+            if (lfhMembers != null) {
                 // If both are EntitySets having shared member, return true
-                Set<GKInstance> lfhMembers = InstanceUtilities.getContainedInstances(lfhEntity,
-                                                                                     ReactomeJavaConstants.hasMember);
                 lfhMembers.retainAll(members);
                 if (lfhMembers.size() > 0)
                     return true; // There is at least one shared member
