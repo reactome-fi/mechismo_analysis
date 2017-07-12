@@ -34,6 +34,7 @@ import org.reactome.annotate.PathwayBasedAnnotator;
 import org.reactome.data.ReactomeAnalyzer;
 import org.reactome.data.ReactomeReactionExpander;
 import org.reactome.r3.ReactionMapGenerator;
+import org.reactome.r3.graph.GraphAnalyzer;
 import org.reactome.r3.util.Configuration;
 import org.reactome.r3.util.FileUtility;
 import org.reactome.r3.util.FisherExact;
@@ -379,42 +380,132 @@ public class CancerDriverReactomeAnalyzer {
     }
     
     @Test
+    public void generateReactionNetworkForEnrichedReactions() throws IOException {
+        Set<String> enrichedReactionIds = loadEnrichedReactionIds();
+        ReactionMapGenerator networkGenerator = new ReactionMapGenerator();
+        networkGenerator.generateSubNetwork(enrichedReactionIds);
+    }
+    
+    @Test
+    public void performNetworkComponentSizeTest() throws IOException {
+        Set<String> network = new ReactionMapGenerator().loadSimpleNetwork();
+        Set<String> ids = InteractionUtilities.grepIDsFromInteractions(network);
+        System.out.println("Total reaction ids in network: " + ids.size());
+        
+        GraphAnalyzer graphAnalyzer = new GraphAnalyzer();
+        
+        Set<String> selectedIds = loadEnrichedReactionIds();
+        System.out.println("Total selected ids: " + selectedIds.size());
+        selectedIds.retainAll(ids);
+        System.out.println("\tIn the network: " + selectedIds.size());
+        
+        Set<String> selectedNetwork = InteractionUtilities.getFIs(selectedIds, network);
+        List<Set<String>> components = graphAnalyzer.calculateGraphComponents(selectedNetwork);
+        components.forEach(comp -> System.out.println(comp.size()));
+        
+        System.out.println("\nRandom permutations:");
+        int permutation = 10000;
+        List<Integer> randomFirstSizes = new ArrayList<>();
+        for (int i = 0; i < permutation; i++) {
+            Set<String> randomIds = MathUtilities.randomSampling(ids, selectedIds.size());
+            Set<String> randomSelectedNetwork = InteractionUtilities.getFIs(randomIds, network);
+            List<Set<String>> randomComps = graphAnalyzer.calculateGraphComponents(randomSelectedNetwork);
+            // Just use the first component
+//            System.out.println(i + "\t" + randomComps.get(0).size());
+            randomFirstSizes.add(randomComps.get(0).size());
+        }
+        randomFirstSizes.sort(Comparator.reverseOrder());
+        for (int i = 0; i < randomFirstSizes.size(); i++)
+            System.out.println(i + "\t" + randomFirstSizes.get(i));
+    }
+    
+    private Set<String> loadEnrichedReactionIds() throws IOException {
+       double fdrCutff = 0.05d;
+        
+        // Choose FDRs with expansion
+        int index = 7;
+        Map<String, Double> reactionIdToFDRViaExp = loadReactionIdToCancerGeneEnrichment(index);
+        Set<String> selectedReactionIdsViaExp = new HashSet<>();
+        reactionIdToFDRViaExp.forEach((id, fdr) -> {
+            if (fdr <= fdrCutff)
+                selectedReactionIdsViaExp.add(id);
+        });
+        System.out.println("Selected with expansion: " + selectedReactionIdsViaExp.size());
+        
+        index = 11; // FDRs without expanding reactions
+        Map<String, Double> reactionIdToFDR = loadReactionIdToCancerGeneEnrichment(index);
+        Set<String> selectedReactionIds = new HashSet<>();
+        reactionIdToFDR.forEach((id, fdr) -> {
+            if (fdr <= fdrCutff)
+                selectedReactionIds.add(id);
+        });
+        System.out.println("Selected without expansion: " + selectedReactionIds.size());
+        
+        Set<String> shared = InteractionUtilities.getShared(selectedReactionIdsViaExp, 
+                                                            selectedReactionIds);
+        System.out.println("\tShared: " + shared.size());
+        
+        // Use reactions having single genes that are cancer driver genes too
+        Set<String> oneHitReactions = loadReactionIdForOneHitGene();
+        System.out.println("One hit gene reactions: " + oneHitReactions.size());
+        
+        Set<String> totalSelected = new HashSet<>();
+        totalSelected.addAll(selectedReactionIds);
+        totalSelected.addAll(selectedReactionIdsViaExp);
+        totalSelected.addAll(oneHitReactions);
+        System.out.println("Total selected reactions: " + totalSelected.size());
+        
+        System.out.println("All checked reactions: " + reactionIdToFDRViaExp.size());
+        double percentage = (double) totalSelected.size() / reactionIdToFDRViaExp.size();
+        System.out.println("\tPercentage: " + percentage * 100.0d);
+        
+        return totalSelected;
+    }
+    
+    @Test
+    public void checkEnrichedReactions() throws IOException {
+        loadEnrichedReactionIds();
+    }
+    
+    @Test
     public void checkPathwaysForEnrichedReactions() throws Exception {
         // Reaction to enrichment scores
 //        Map<String, Double> reactionNameToScore = loadReactionToCancerGeneEnrichment();
 //        double cutoff = 1.30d; // fdr <= 0.05
         
         // Choose FDRs with expansion
-        int index = 7;
-        index = 11; // FDRs without expanding reactions
-        Map<String, Double> reactionIdToFDR = loadReactionIdToCancerGeneEnrichment(index);
-        Set<String> selectedReactionIds = new HashSet<>();
-        
-        double fdrCutff = 0.05d;
-        
-        reactionIdToFDR.forEach((id, fdr) -> {
-            if (fdr <= fdrCutff)
-                selectedReactionIds.add(id);
-        });
-        
-        // Use to map from name to id since ids are used for reaction to pathway map
-//        Map<String, String> reactionIdToName = loadReactionDBIDToName();
-//        Map<String, String> reactionNameToId = new HashMap<>();
-//        reactionIdToName.forEach((id, name) -> reactionNameToId.put(name, id));
-//        Set<String> selectedReactionIds =  reactionNameToScore.keySet().stream().map(name -> reactionNameToId.get(name)).collect(Collectors.toSet());
-        
-        // Use reactions having single genes that are cancer driver genes too
-        Set<String> oneHitReactions = loadReactionIdForOneHitGene();
-        System.out.println("One hit gene reactions: " + oneHitReactions.size());
-        
-        System.out.println("Total selected reactions: " + selectedReactionIds.size());
-        selectedReactionIds.addAll(oneHitReactions);
+//        int index = 7;
+//        index = 11; // FDRs without expanding reactions
+//        Map<String, Double> reactionIdToFDR = loadReactionIdToCancerGeneEnrichment(index);
+//        Set<String> selectedReactionIds = new HashSet<>();
+//        
+//        double fdrCutff = 0.05d;
+//        
+//        reactionIdToFDR.forEach((id, fdr) -> {
+//            if (fdr <= fdrCutff)
+//                selectedReactionIds.add(id);
+//        });
+//        
+//        // Use to map from name to id since ids are used for reaction to pathway map
+////        Map<String, String> reactionIdToName = loadReactionDBIDToName();
+////        Map<String, String> reactionNameToId = new HashMap<>();
+////        reactionIdToName.forEach((id, name) -> reactionNameToId.put(name, id));
+////        Set<String> selectedReactionIds =  reactionNameToScore.keySet().stream().map(name -> reactionNameToId.get(name)).collect(Collectors.toSet());
+//        
+//        // Use reactions having single genes that are cancer driver genes too
+//        Set<String> oneHitReactions = loadReactionIdForOneHitGene();
+//        System.out.println("One hit gene reactions: " + oneHitReactions.size());
+//        
+//        System.out.println("Total selected reactions: " + selectedReactionIds.size());
+//        selectedReactionIds.addAll(oneHitReactions);
         
         PathwayBasedAnnotator annotator = new PathwayBasedAnnotator();
         AnnotationHelper helper = new AnnotationHelper();
         helper.setReactionIdToPathwayFile("resources/ReactomeReactionsToPathways_051017.txt");
         annotator.setAnnotationHelper(helper);
         annotator.setUseBenjaminiHochbergForFDR(true);
+        
+        Set<String> selectedReactionIds = loadEnrichedReactionIds();
         
         List<GeneSetAnnotation> results = annotator.annotateReactionsWithReactomePathways(selectedReactionIds);
         System.out.println("Pathway\tNumberInPathway\tRatioOfPathway\tHitNumber\tpValue\tFDR\tHitIds");
@@ -449,6 +540,10 @@ public class CancerDriverReactomeAnalyzer {
         // Load all human reactions
         List<GKInstance> reactions = loadHumanReactions();
         System.out.println("Total human reactions: " + reactions.size());
+        
+        if (true)
+            return;
+        
         // helper
         ReactomeReactionExpander expander = new ReactomeReactionExpander();
         ReactomeAnalyzer reactomeAnalyzer = new ReactomeAnalyzer();
