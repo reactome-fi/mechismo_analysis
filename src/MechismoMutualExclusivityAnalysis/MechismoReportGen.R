@@ -12,6 +12,6 @@ for(cancer_type in cancer_types){
     rmarkdown::render("/media/burkhart/Media/Software/Ogmios/src/MechismoMutualExclusivityAnalysis/MechismoHeatmaps.Rmd",
                       output_format = "pdf_document",
                       output_file = paste("MechismoHeatmaps_",cancer_type,".pdf",sep=""),
-                      output_dir = "/media/burkhart/Media/Software/Ogmios/src/MechismoMutualExclusivityAnalysis/")
+                      output_dir = "/media/burkhart/Media/Software/Ogmios/src/MechismoMutualExclusivityAnalysis/MechismoOutput/")
   }
 }

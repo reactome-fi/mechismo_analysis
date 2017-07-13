@@ -684,7 +684,7 @@ public class Interactome3dDriverAnalyzer {
                         interactionWithInterface,
                         interfaceMutationRatios.get(interactionWithInterface).gene1MutationProfile.toString(),
                         interfaceMutationRatios.get(interactionWithInterface).gene2MutationProfile.toString(),
-                        interfaceMutationRatios.get(interactionWithInterface).p_value,
+                        interfaceMutationRatios.get(interactionWithInterface).significance,
                         mechismoScore).getBytes());
             }
         } catch (Exception e) {
@@ -762,15 +762,15 @@ public class Interactome3dDriverAnalyzer {
         // TCGA-AY-4070-01.hg19.oncotator.hugo_entrez_remapped.maf.txt
         // TCGA-AY-4071-01.hg19.oncotator.hugo_entrez_remapped.maf.txt
         String mafFileNamePattern = "^.+\\.maf\\.txt$";
-        double p_value_thresh = 0.05;
+        double p_value_thresh = 0.1;
         for (String firehoseCancerTypeDir : firehoseCancerTypeDirs) {
-            String mafDirPath = String.format("%s/%s",
-                    firehoseCancerTypesDir,
-                    firehoseCancerTypeDir);
 
             /**
              * CANCER TYPE RESOLUTION
              */
+            String mafDirPath = String.format("%s/%s",
+                    firehoseCancerTypesDir,
+                    firehoseCancerTypeDir);
 
             //MAF Mutations
             // "<gene symbol>" -> HashMap<"<AA Coord> -> <sample support>>
@@ -784,44 +784,48 @@ public class Interactome3dDriverAnalyzer {
                     cancerTypeOutFilePath);
             Set<String> significantInteractions = new HashSet<>();
             for (String interaction : cancerTypeTotalInterfaceMutationRatios.keySet()) {
-                if (cancerTypeTotalInterfaceMutationRatios.get(interaction).getP_value() < p_value_thresh) {
+                if (cancerTypeTotalInterfaceMutationRatios.get(interaction).getSignificance() < p_value_thresh) {
                     significantInteractions.add(interaction);
                 }
             }
 
             //Keep only significant interactions for individual sample-level analysis
-            Map<String, Map<String, ProteinChainSummary>> significantInteractionsWithInterfaces = interactionsWithInterfaces;
-                    significantInteractionsWithInterfaces.keySet().retainAll(significantInteractions);
+            Map<String, Map<String, ProteinChainSummary>> significantInteractionsWithInterfaces = new HashMap<>(interactionsWithInterfaces);
+            significantInteractionsWithInterfaces.keySet().retainAll(significantInteractions);
 
             /**
              * SAMPLE RESOLUTION
              */
 
-            //heatmap of cancer type with each sample using p-value as value
+            if(significantInteractionsWithInterfaces.size() > 0) {
+                //heatmap of cancer type with each sample using p-value as value
 
-            //ppi
-            String ppiOutFilePath = String.format("%s/firehose_%s_individual_interactions_with_mutated_interfaces.csv",
-                    outputDir,
-                    firehoseCancerTypeDir);
-            cancerTypeSampleInterfaceMutationRatios =
-                    findSamplesInteractionsWithMutatedInterfaces(totalGenes,
-                            interactionsWithInterfaces,
-                            mafDirPath,
-                            mafFileNamePattern,
-                            ppiOutFilePath);
-            //reaction
-            String reactionOutFilePath = String.format("%s/firehose_%s_individual_reactions_with_mutated_interfaces.csv",
-                    outputDir,
-                    firehoseCancerTypeDir);
-            findSampleReactionsWithMutatedInteractionInterfaces(
-                    cancerTypeSampleInterfaceMutationRatios,
-                    interactionReactionSetMap,
-                    reactionOutFilePath);
+                //ppi
+                String ppiOutFilePath = String.format("%s/firehose_%s_individual_interactions_with_mutated_interfaces.csv",
+                        outputDir,
+                        firehoseCancerTypeDir);
+                cancerTypeSampleInterfaceMutationRatios =
+                        findSamplesInteractionsWithMutatedInterfaces(totalGenes,
+                                significantInteractionsWithInterfaces,
+                                mafDirPath,
+                                mafFileNamePattern,
+                                ppiOutFilePath);
+                //reaction
+                String reactionOutFilePath = String.format("%s/firehose_%s_individual_reactions_with_mutated_interfaces.csv",
+                        outputDir,
+                        firehoseCancerTypeDir);
+                findSampleReactionsWithMutatedInteractionInterfaces(
+                        cancerTypeSampleInterfaceMutationRatios,
+                        interactionReactionSetMap,
+                        reactionOutFilePath);
 
-            //pathway
-            //List<GeneSetAnnotation> annotateGenesWithReactomePathways(Collection<String> genes...);
+                //pathway
+                //List<GeneSetAnnotation> annotateGenesWithReactomePathways(Collection<String> genes...);
+            }else{
+                logger.warn(String.format("No significant interactions found in %s.",firehoseCancerTypeDir));
+            }
         }
-        //heatmap of firehose data with cancer type using p-value as value
+        //heatmap of firehose data with cancer type using p-value as value? Maybe do this with R using output above
 
         //For each cancer type in mechismo
         //heatmap of cancer type with each sample using p-value as value
@@ -1132,7 +1136,7 @@ public class Interactome3dDriverAnalyzer {
                     "Sample,Interaction," +
                             "Gene1 Name,Gene1 Interface Length,Gene1 Length,Gene1 Interface Mutation Count,Gene1 Mutation Count," +
                             "Gene2 Name,Gene2 Interface Length,Gene2 Length,Gene2 Interface Mutation Count,Gene2 Mutation Count," +
-                            "P Value\n").getBytes());
+                            "Interface Mutation Present\n").getBytes());
 
             for (String individualSample : individualSamplesGeneMap.keySet()) {
                 sampleInterfaceMutationRatios.put(individualSample, new HashMap<>());
@@ -1163,7 +1167,7 @@ public class Interactome3dDriverAnalyzer {
                             1 = interaction has interface mutations
                             0 = interaction does not have interface mutations
                              */
-                            double has_interface_muts = interactionInterfaceLengthRatio > 0 ? 1 : 0;
+                            double has_interface_muts = interactionInterfaceMutationCount > 0 ? 1 : 0;
                             /*double p_value = 1.0;
                             try {
                                 p_value = MathUtilities.calculateBinomialPValue(interactionInterfaceLengthRatio,
@@ -1260,22 +1264,38 @@ public class Interactome3dDriverAnalyzer {
             fop = new FileOutputStream(outFilePath);
 
             fop.write((
-                    "Sample~Reaction ID~Reaction Description~MaxSigInteraction~P Value\n").getBytes());
+                    "Sample~Reaction ID~Reaction Description~SigInteractions~SigCount\n").getBytes());
             for (String sample : cancerTypeSampleInterfaceMutationRatios.keySet()) {
                 for (GKInstance reaction : reactionToInteractionMap.keySet()) {
-                    String maxSigInteraction = "none";
-                    double minPValue = 1.0;
+                    String sigInteractions = "";
+                    //double minPValue = 1.0;
+                    double significantCount = 0.0;
 
                     Iterator<String> interactionIterator = reactionToInteractionMap.get(reaction).iterator();
                     while (interactionIterator.hasNext()) {
                         String interaction = interactionIterator.next();
-                        String x = interaction;
                         if (cancerTypeSampleInterfaceMutationRatios.get(sample).containsKey(interaction)) {
-                            double pValue = cancerTypeSampleInterfaceMutationRatios.get(sample).get(interaction).getP_value();
+
+                            /*
+                            now just counting
+                             */
+
+                            double significance = cancerTypeSampleInterfaceMutationRatios.get(sample).get(interaction).getSignificance();
+                            if(significance > 0){
+                                significantCount += 1;
+                                if(significantCount < 1){
+                                    sigInteractions = interaction;
+                                }else {
+                                    sigInteractions = String.format("%s,%s",sigInteractions,interaction);
+                                }
+                            }
+
+                            /*double pValue = cancerTypeSampleInterfaceMutationRatios.get(sample).get(interaction).getSignificance();
                             if (pValue < minPValue) {
                                 minPValue = pValue;
                                 maxSigInteraction = interaction;
                             }
+                            */
                         }
                     }
 
@@ -1283,8 +1303,8 @@ public class Interactome3dDriverAnalyzer {
                             sample,
                             reaction.getDBID(),
                             reaction.getDisplayName(),
-                            maxSigInteraction,
-                            minPValue).getBytes());
+                            sigInteractions,
+                            significantCount).getBytes());
                 }
             }
         } catch (IOException ioe) {
@@ -1324,14 +1344,14 @@ public class Interactome3dDriverAnalyzer {
     private class InteractionMutationProfile {
         private GeneMutationProfile gene1MutationProfile;
         private GeneMutationProfile gene2MutationProfile;
-        private double p_value;
+        private double significance;
 
         InteractionMutationProfile(GeneMutationProfile gene1MutationProfile,
                                    GeneMutationProfile gene2MutationProfile,
-                                   double p_value) {
+                                   double significance) {
             this.gene1MutationProfile = gene1MutationProfile;
             this.gene2MutationProfile = gene2MutationProfile;
-            this.p_value = p_value;
+            this.significance = significance;
         }
 
         public GeneMutationProfile getGene1MutationProfile() {
@@ -1342,8 +1362,8 @@ public class Interactome3dDriverAnalyzer {
             return this.gene2MutationProfile;
         }
 
-        public double getP_value() {
-            return this.p_value;
+        public double getSignificance() {
+            return this.significance;
         }
     }
 

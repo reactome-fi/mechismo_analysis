@@ -1,11 +1,16 @@
 ---
+title: "Firehose PanCancer Interaction Heatmaps"
+author: "Joshua Burkhart"
+date: "July 12, 2017"
 output:
-pdf_document: default
-html_document: default
+  pdf_document:
+    latex_engine: xelatex
 ---
+
 # libs
 ```{r}
 library(magrittr)
+library(plyr)
 library(dplyr)
 library(reshape2)
 library(ggplot2)
@@ -15,37 +20,47 @@ library(gtable)
 library(grid)
 library(plotly)
 library(pheatmap)
+
 ```
 
-# load ACC
+# load
 ```{r}
-sample_df <- read.csv(input_csv_path,header = TRUE, sep=",")
+input_csvs <- list.files("/media/burkhart/Media/Software/Ogmios/results/heatmapData/",pattern = "*total_interactions_with_mutated_interfaces.csv",full.names = TRUE)
+
+all_csvs <- lapply(input_csvs,read.csv,header=TRUE,sep=",")
+for(csvIdx in 1:length(all_csvs)){
+  all_csvs[[csvIdx]]$CancerType = sub(".*firehose_([A-Z]+).*","\\1",input_csvs[csvIdx])
+}
+
+sample_df <- do.call("rbind.fill",all_csvs)
 ```
+
 # filter low 
 ```{r}
 processed_ppi_sample_df <- sample_df %>%
-  dplyr::select(Sample,Interaction,Interface.Mutation.Present)
+  dplyr::select(CancerType,Interaction,P.Value) %>%
+  dplyr::mutate(P.Value = -log10(P.Value + 0.000001)) %>%
+  dplyr::filter(P.Value > 4)
 
-processed_ppi_sample_df$Sample <- sub("(^[0-9A-Z-]+).*","\\1",as.character(processed_ppi_sample_df$Sample))
 processed_ppi_sample_df$Interaction <- sub("(.*)\t(.*)","\\1 \\2",as.character(processed_ppi_sample_df$Interaction))
 ```
 
 # ggplot2 tile heatmap
 ```{r}
 processed_ppi_sample_df %>%
-  ggplot2::ggplot(aes(x=as.character(Sample),y=Interaction,fill=Interface.Mutation.Present)) +
+  ggplot2::ggplot(aes(x=as.character(CancerType),y=Interaction,fill=P.Value)) +
   geom_tile() +
   ylim(rev(sort(unique(as.character(processed_ppi_sample_df$Interaction))))) +
-  xlim(sort(unique(as.character(processed_ppi_sample_df$Sample)))) +
+  xlim(sort(unique(as.character(processed_ppi_sample_df$CancerType)))) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1),
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank(),
         panel.background = element_blank()) +
-  labs(title="Sample/Interaction p-value",
-       x="Sample",
+  labs(title="CancerType/Interaction p-value",
+       x="CancerType",
        y="Interaction") +
   scale_fill_gradient2(name = "p-value",
-                       midpoint = 0.5,
+                       midpoint = median(processed_ppi_sample_df$P.Value),
                        low="blue",
                        mid="green",
                        high="red")
@@ -55,9 +70,9 @@ processed_ppi_sample_df %>%
 
 ```{r}
 ppi_dendro <- processed_ppi_sample_df %>%
-  reshape(idvar = "Sample", timevar = "Interaction", direction = "wide")
+  reshape(idvar = "CancerType", timevar = "Interaction", direction = "wide")
 
-names(ppi_dendro) <- gsub("Interface.Mutation.Present.(.*)","\\1",names(ppi_dendro))
+names(ppi_dendro) <- gsub("P.Value.(.*)","\\1",names(ppi_dendro))
 
 rownames(ppi_dendro) <- ppi_dendro[,1]
 ppi_dendro <- ppi_dendro[,-1]
@@ -104,9 +119,9 @@ map <- reshape2::melt(xx, id.vars="sample") %>%
         panel.background = element_blank(),
         legend.position="none") +
   labs(x="Interaction",
-       y=paste("Sample (default)",sep="")) +
+       y=paste("CancerType (default)",sep="")) +
   scale_fill_gradient2(name = "p-value",
-                       midpoint = 0.5,
+                       midpoint = median(processed_ppi_sample_df$P.Value),
                        low="blue",
                        mid="green",
                        high="red")
