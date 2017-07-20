@@ -19,6 +19,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.apache.commons.math.MathException;
 import org.apache.commons.math.stat.correlation.PearsonsCorrelation;
@@ -43,6 +44,7 @@ import org.reactome.r3.util.Plotter;
 public class MechismoAnalyzer {
     private String dirName = "datasets/Mechismo/";
     private String outputFileName = dirName + "COSMICv74_somatic_noSNPs_GWS_mechismo_output.tsv";
+    private String pciContactFile = dirName + "human_pci_contact_hits.tsv";
     private FileUtility fu = new FileUtility();
     
     /**
@@ -499,6 +501,48 @@ public class MechismoAnalyzer {
         scores.removeAll(mutationToScore.values());
         for (String score : scores)
             System.out.println(score);
+    }
+    
+    @Test
+    public void checkOutputFile() throws IOException {
+        try (Stream<String> stream = Files.lines(Paths.get(outputFileName))) {
+            String id_seq_a1 = "316";
+            String id_hit = "293865";
+            stream.forEach(line -> {
+                String[] tokens = line.split("\t");
+                if (tokens[2].equals(id_seq_a1))
+                    System.out.println(line);
+//                if (tokens.length > 31 && tokens[31].equals(id_hit))
+//                    System.out.println(line);
+            });
+        }
+    }
+    
+    @Test
+    public void checkPCIContactFile() throws IOException {
+        String targetGene = "AKT1";
+        String pdbId = "2uvm";
+        
+        Map<String, String> idSeqA1ToGene = loadIdSeqA1ToGene();
+        
+        try (Stream<String> stream = Files.lines(Paths.get(pciContactFile))) {
+            stream.skip(1)
+                  .filter(line -> {
+                      String[] tokens = line.split("\t");
+                      String gene = idSeqA1ToGene.get(tokens[0]);
+                      return targetGene.equals(gene) && tokens[2].equals(pdbId);
+                  })
+                  .forEach(System.out::println);
+        }
+    }
+    
+    private Map<String, String> loadIdSeqA1ToGene() throws IOException {
+        try (Stream<String> stream = Files.lines(Paths.get(outputFileName))) {
+            Map<String, String> idToGene = new HashMap<>();
+            stream.map(line -> line.split("\t"))
+                  .forEach(tokens -> idToGene.put(tokens[2], tokens[0]));
+            return idToGene;
+        }
     }
     
     @Test
