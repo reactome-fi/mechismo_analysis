@@ -31,8 +31,7 @@ import org.reactome.annotate.AnnotationHelper;
 import org.reactome.annotate.AnnotationType;
 import org.reactome.annotate.GeneSetAnnotation;
 import org.reactome.annotate.PathwayBasedAnnotator;
-import org.reactome.data.ReactomeAnalyzer;
-import org.reactome.data.ReactomeReactionExpander;
+import org.reactome.r3.ReactomeAnalyzer;
 import org.reactome.r3.ReactionMapGenerator;
 import org.reactome.r3.graph.GraphAnalyzer;
 import org.reactome.r3.util.Configuration;
@@ -520,12 +519,13 @@ public class CancerDriverReactomeAnalyzer {
         }
         
     }
-    
-    /**
+
+    /*
+
      * In this analysis, a reaction is expanded to multiple implementations if EntitySet is involved
      * in the reaction participants or complexes contained by participants (recursively).
      * @throws Exception
-     */
+
     @Test
     public void checkCancerDrivesInReactionsViaExpand() throws Exception {
         // Load all reaction genes for use
@@ -638,6 +638,7 @@ public class CancerDriverReactomeAnalyzer {
         });
         fu.close();
     }
+    */
 
     private Map<String, Double> calculateFDRsForLines(List<String> lines,
                                                       int pvalueIndex) {

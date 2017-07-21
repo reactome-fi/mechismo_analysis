@@ -1,7 +1,7 @@
 ---
-title: "Firehose PanCancer Interaction Heatmaps"
+title: "Firehose PanCancer Interaction Heatmap"
 author: "Joshua Burkhart"
-date: "July 12, 2017"
+date: "July 20, 2017"
 output:
   pdf_document:
     latex_engine: xelatex
@@ -21,10 +21,6 @@ library(grid)
 library(plotly)
 library(pheatmap)
 
-```
-
-# load
-```{r}
 input_csvs <- list.files("/media/burkhart/Media/Software/Ogmios/results/heatmapData/",pattern = "*total_interactions_with_mutated_interfaces.csv",full.names = TRUE)
 
 all_csvs <- lapply(input_csvs,read.csv,header=TRUE,sep=",")
@@ -33,120 +29,35 @@ for(csvIdx in 1:length(all_csvs)){
 }
 
 sample_df <- do.call("rbind.fill",all_csvs)
-```
-
-# filter low 
-```{r}
 processed_ppi_sample_df <- sample_df %>%
-  dplyr::select(CancerType,Interaction,P.Value) %>%
-  dplyr::mutate(P.Value = -log10(P.Value + 0.000001)) %>%
-  dplyr::filter(P.Value > 4)
+  dplyr::select(CancerType,Interaction,P.Value,FDR) %>%
+  dplyr::mutate(N.Log10.FDR = -log10(FDR + 0.00001)) %>%
+  dplyr::filter(FDR < 0.05) %>%
+  dplyr::select(CancerType,Interaction,N.Log10.FDR)
 
 processed_ppi_sample_df$Interaction <- sub("(.*)\t(.*)","\\1 \\2",as.character(processed_ppi_sample_df$Interaction))
-```
-
-# ggplot2 tile heatmap
-```{r}
-processed_ppi_sample_df %>%
-  ggplot2::ggplot(aes(x=as.character(CancerType),y=Interaction,fill=P.Value)) +
-  geom_tile() +
-  ylim(rev(sort(unique(as.character(processed_ppi_sample_df$Interaction))))) +
-  xlim(sort(unique(as.character(processed_ppi_sample_df$CancerType)))) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        panel.background = element_blank()) +
-  labs(title="CancerType/Interaction p-value",
-       x="CancerType",
-       y="Interaction") +
-  scale_fill_gradient2(name = "p-value",
-                       midpoint = median(processed_ppi_sample_df$P.Value),
-                       low="blue",
-                       mid="green",
-                       high="red")
-```
-
-# custom heatmap with dendrogram
-
-```{r}
 ppi_dendro <- processed_ppi_sample_df %>%
   reshape(idvar = "CancerType", timevar = "Interaction", direction = "wide")
 
-names(ppi_dendro) <- gsub("P.Value.(.*)","\\1",names(ppi_dendro))
+names(ppi_dendro) <- gsub("N.Log10.FDR.(.*)","\\1",names(ppi_dendro))
 
 rownames(ppi_dendro) <- ppi_dendro[,1]
 ppi_dendro <- ppi_dendro[,-1]
 ppi_dendro[is.na(ppi_dendro)] <- 0
 
-#dendogram data
-x <- as.matrix(ppi_dendro)
+m <- data.matrix(ppi_dendro, rownames.force = TRUE)
 
-dd.col <- as.dendrogram(hclust(dist(x)))
-dd.row <- as.dendrogram(hclust(dist(t(x))))
-
-dx <- dendro_data(dd.row)
-dy <- dendro_data(dd.col)
-
-# helper function for creating dendograms
-ggdend <- function(df) {
-  ggplot() +
-    geom_segment(data = df, aes(x=x, y=y, xend=xend, yend=yend)) +
-    labs(x = "", y = "") + theme_minimal() +
-    theme(axis.text = element_blank(), axis.ticks = element_blank(),
-          panel.grid.major = element_blank(),
-          panel.grid.minor = element_blank(),
-          panel.background = element_blank(),            
-          panel.grid = element_blank())
-}
-
-# x/y dendograms
-px <- ggdend(dx$segments)
-py <- ggdend(dy$segments) + coord_flip()
-
-# heatmap
-col.ord <- order.dendrogram(dd.col)
-row.ord <- order.dendrogram(dd.row)
-xx <- ppi_dendro[col.ord, row.ord]
-xx$sample <- rownames(xx)
-xx$sample <- with(xx, factor(sample, levels=sample))
-
-map <- reshape2::melt(xx, id.vars="sample") %>%
-  ggplot2::ggplot(aes(x=variable,y=sample,fill=value)) +
-  geom_tile() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        panel.background = element_blank(),
-        legend.position="none") +
-  labs(x="Interaction",
-       y=paste("CancerType (default)",sep="")) +
-  scale_fill_gradient2(name = "p-value",
-                       midpoint = median(processed_ppi_sample_df$P.Value),
-                       low="blue",
-                       mid="green",
-                       high="red")
-
-# from http://stackoverflow.com/questions/6673162/reproducing-lattice-dendrogram-graph-with-ggplot2
-### Draw graphic ###
-# width, height, x, y
-heatmap_image=c(0.7,0.8,0.4,0.45)
-ydendro=c(0.2,0.71,0.8,0.49)
-xdendro=c(0.58,0.2,0.45,0.9)
-
-grid.newpage()
-print(map, vp=viewport(width=heatmap_image[1], height=heatmap_image[2], x=heatmap_image[3], y=heatmap_image[4]))
-print(px, vp=viewport(width=xdendro[1], height=xdendro[2], x=xdendro[3], y=xdendro[4]))
-print(py, vp=viewport(width=ydendro[1], height=ydendro[2], x=ydendro[3], y=ydendro[4]))
-```
-
-# built-in heatmap libraries
-```{r}
-m <- ppi_dendro %>%
-  as.matrix()
-
-rownames(m) <- m[,1]
-m <- m[,-1]
-m[is.na(m)] <- 0
-Heatplus::heatmap_plus(m)
-pheatmap::pheatmap(m)
+img_height = 6
+img_width = 24
+svg(filename = "/home/burkhart/Software/Ogmios/results/heatmapData/FirehosePanCancerInteractionHeatmap.svg",width = img_width, height = img_height)
+pheatmap::pheatmap(m,
+                   color = c("white","grey","yellow","orange","red","darkred","purple"),
+                   main = "Pan Cancer Interaction -log10(FDR) for Interactions with FDR < 0.05",
+                   clustering_distance_cols = "euclidean",
+                   clustering_distance_rows = "euclidean",
+                   fontsize = 8,
+                   clustering_method = "complete",
+                   width = img_width,
+                   height = img_height)
+dev.off()
 ```
