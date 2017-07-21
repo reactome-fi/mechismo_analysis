@@ -48,6 +48,11 @@ import org.reactome.r3.util.MathUtilities;
  */
 @SuppressWarnings("unchecked")
 public class CancerDriverReactomeAnalyzer {
+    // FDR cutoff to choose cancer driver reactions
+    // The following value is based on results generated from method
+    // searchForBestFDRCutoffForEnrichedReactions() (output was plotted
+    // in R and then manually chosen)
+    private final static double REACTION_FDR_CUTOFF = 0.017d;
     private FileUtility fu = new FileUtility();
     private MySQLAdaptor dba;
 
@@ -387,6 +392,33 @@ public class CancerDriverReactomeAnalyzer {
     }
     
     @Test
+    public void searchForBestFDRCutoffForEnrichedReactions() throws IOException {
+        Set<String> network = new ReactionMapGenerator().loadSimpleNetwork();
+        Set<String> ids = InteractionUtilities.grepIDsFromInteractions(network);
+        System.out.println("Total reaction ids in network: " + ids.size());
+        
+        GraphAnalyzer graphAnalyzer = new GraphAnalyzer();
+        
+        StringBuilder output = new StringBuilder();
+        output.append("FDR\tTotalSelected\tLargetsComponentSize\tPercent\n");
+        for (double fdr = 0.005d; fdr <= 0.05d; fdr += 0.001d) {
+            System.out.println("FDR: " + fdr);
+            Set<String> selectedIds = loadEnrichedReactionIds(fdr);
+            System.out.println("Total selected ids: " + selectedIds.size());
+            selectedIds.retainAll(ids);
+            System.out.println("\tIn the network: " + selectedIds.size());
+            Set<String> selectedNetwork = InteractionUtilities.getFIs(selectedIds, network);
+            List<Set<String>> components = graphAnalyzer.calculateGraphComponents(selectedNetwork);
+            components.forEach(comp -> System.out.println(comp.size()));
+            output.append(fdr + "\t" + 
+                          selectedIds.size() + "\t" + 
+                          components.get(0).size() + "\t" + 
+                          (double)components.get(0).size() / selectedIds.size() + "\n");
+        }
+        System.out.println("\n" + output.toString());
+    }
+    
+    @Test
     public void performNetworkComponentSizeTest() throws IOException {
         Set<String> network = new ReactionMapGenerator().loadSimpleNetwork();
         Set<String> ids = InteractionUtilities.grepIDsFromInteractions(network);
@@ -420,14 +452,16 @@ public class CancerDriverReactomeAnalyzer {
     }
     
     private Set<String> loadEnrichedReactionIds() throws IOException {
-       double fdrCutff = 0.05d;
-        
+        return loadEnrichedReactionIds(REACTION_FDR_CUTOFF);
+    }
+    
+    private Set<String> loadEnrichedReactionIds(Double fdrCutoff) throws IOException {
         // Choose FDRs with expansion
         int index = 7;
         Map<String, Double> reactionIdToFDRViaExp = loadReactionIdToCancerGeneEnrichment(index);
         Set<String> selectedReactionIdsViaExp = new HashSet<>();
         reactionIdToFDRViaExp.forEach((id, fdr) -> {
-            if (fdr <= fdrCutff)
+            if (fdr <= fdrCutoff)
                 selectedReactionIdsViaExp.add(id);
         });
         System.out.println("Selected with expansion: " + selectedReactionIdsViaExp.size());
@@ -436,7 +470,7 @@ public class CancerDriverReactomeAnalyzer {
         Map<String, Double> reactionIdToFDR = loadReactionIdToCancerGeneEnrichment(index);
         Set<String> selectedReactionIds = new HashSet<>();
         reactionIdToFDR.forEach((id, fdr) -> {
-            if (fdr <= fdrCutff)
+            if (fdr <= fdrCutoff)
                 selectedReactionIds.add(id);
         });
         System.out.println("Selected without expansion: " + selectedReactionIds.size());
