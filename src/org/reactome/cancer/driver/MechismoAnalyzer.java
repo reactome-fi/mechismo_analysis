@@ -520,8 +520,10 @@ public class MechismoAnalyzer {
     
     @Test
     public void checkPCIContactFile() throws IOException {
-        String targetGene = "AKT1";
-        String pdbId = "2uvm";
+//        String targetGene = "AKT1";
+        String targetGene = "PTEN";
+        String pdbId = null;
+//        String pdbId = "2uvm";
         
         Map<String, String> idSeqA1ToGene = loadIdSeqA1ToGene();
         
@@ -530,7 +532,10 @@ public class MechismoAnalyzer {
                   .filter(line -> {
                       String[] tokens = line.split("\t");
                       String gene = idSeqA1ToGene.get(tokens[0]);
-                      return targetGene.equals(gene) && tokens[2].equals(pdbId);
+                      if (pdbId == null)
+                          return targetGene.equals(gene);
+                      else
+                          return targetGene.equals(gene) && tokens[2].equals(pdbId);
                   })
                   .forEach(System.out::println);
         }
@@ -548,7 +553,8 @@ public class MechismoAnalyzer {
     @Test
     public void pickRows() throws IOException {
         String[] targetGenes = new String[] {
-                "HRAS", "NRAS", "KRAS", "SOS1"
+//                "HRAS", "NRAS", "KRAS", "SOS1"
+                "PTEN"
         };
         Set<String> geneSet = new HashSet<>();
         for (String gene : targetGenes)
