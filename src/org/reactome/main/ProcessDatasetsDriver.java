@@ -51,6 +51,7 @@ public class ProcessDatasetsDriver {
                 "Mechismo/Reactome Overlay 1\n" +
                 "Mechismo/Reactome Interface Enrichment 2\n" +
                 "Prepare Heatmap Data 3\n" +
+                "Compare Known Drivers 4\n" +
                 "Cancel <enter>\n");
         Scanner scanner = new Scanner(System.in);
         String ex = scanner.nextLine();
@@ -103,6 +104,12 @@ public class ProcessDatasetsDriver {
                         "results/heatmapData/",
                         "datasets/firehose_data/all_oncotated_calls",
                         "datasets/Mechismo/cancer_types/");
+            }else if(Integer.parseInt(ex) == 4){
+                interactome3dDriverAnalyzer.compareKnownDrivers(cancerDriverReactomeAnalyzer,
+                        "datasets/interactome3d/2016_06/prebuilt/representative/",
+                        "results/knownDriverData/",
+                        "datasets/firehose_data/all_oncotated_calls",
+                        "datasets/guanming_known_drivers.txt");
             }
             else{
                 System.out.println("Execution Cancelled.");

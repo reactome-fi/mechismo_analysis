@@ -706,6 +706,26 @@ public class Interactome3dDriverAnalyzer {
         //TODO: Rerun analysis for all cancer types (along with interface enrichment comparison)
     }
 
+    public void compareKnownDrivers(CancerDriverReactomeAnalyzer cancerDriverReactomeAnalyzer,
+    String pdbDirectoryPath,
+    String outputDir,
+    String firehoseCancerTypesDir,
+    String knownDriverPath) throws Exception {
+        //report reactions significantly enriched in known drivers
+
+        //report mutation hotspots in known drivers
+
+        //report known driver PPI's with structures
+
+        //report known driver PPI's interface mutation ratios & significance
+
+        //report reactions affected by interface mutations
+
+        //report pathways containing affected reactions
+
+        //report pan-cancer & cancer type specific results
+    }
+
     public void prepareHeatmapData(CancerDriverReactomeAnalyzer cancerDriverReactomeAnalyzer,
                                    String pdbDirectoryPath,
                                    String outputDir,
