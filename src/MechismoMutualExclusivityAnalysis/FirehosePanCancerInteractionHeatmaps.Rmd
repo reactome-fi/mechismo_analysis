@@ -20,6 +20,11 @@ library(gtable)
 library(grid)
 library(plotly)
 library(pheatmap)
+library(rJava)
+library(xlsxjars)
+library(openxlsx)
+
+output_xlsx <- "/media/burkhart/Media/Software/Ogmios/results/heatmapData/PPIsVsKnownDrivers.xlsx"
 
 input_csvs <- list.files("/media/burkhart/Media/Software/Ogmios/results/heatmapData/",pattern = "*total_interactions_with_mutated_interfaces.csv",full.names = TRUE)
 
@@ -45,6 +50,32 @@ rownames(ppi_dendro) <- ppi_dendro[,1]
 ppi_dendro <- ppi_dendro[,-1]
 ppi_dendro[is.na(ppi_dendro)] <- 0
 
+```
+
+```{r throw_away}
+colGenes <- c()
+for(colIdx in 1:ncol(ppi_dendro)){
+  colname <- colnames(ppi_dendro)[colIdx]
+  colGenes <- c(strsplit(colname, split = " "),colGenes)
+}
+#colGenes <- unique(colGenes)
+
+colGenes <- data.frame(t(data.frame(colGenes))) %>%
+  dplyr::transmute(GeneName1 = as.character(X1),
+                   GeneName2 = as.character(X2))
+colGenes$InterfaceEnriched <- TRUE
+
+knownGenes <- read.table(file="/media/burkhart/Media/Software/Ogmios/datasets/guanming_known_drivers.txt",header = FALSE) %>%
+  dplyr::transmute(GeneName = as.character(V1))
+knownGenes$KnownDriver <- TRUE
+
+colGenes %>%
+  dplyr::left_join(by = c("GeneName1" = "GeneName"), knownGenes) %>%
+  dplyr::left_join(by = c("GeneName2" = "GeneName"), knownGenes) %>%
+  write.xlsx(file=output_xlsx)
+```
+
+```{r}
 m <- data.matrix(ppi_dendro, rownames.force = TRUE)
 
 img_height = 6
