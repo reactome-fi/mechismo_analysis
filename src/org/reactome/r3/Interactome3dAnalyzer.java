@@ -236,14 +236,21 @@ public class Interactome3dAnalyzer {
         for (File file : interactionPDBFiles) {
             // Do a simple parsing
             String fi = extractFIFromFileName(file);
-            if (ppiToPDB.containsKey(fi))
-                // TODO: simple parsing isn't good enough
-                // we end up with a bunch of "MDL" and "EXP" entries that
-                // shouldn't exist... should only contain uniprot ID's
-                // we'll fix this later with a regex like FIOncoNet
-                //throw new IllegalStateException("Duplicated PDB for " + fi);
-                logger.warn(String.format("ppiToPDB already contains %s", fi));
-            ppiToPDB.put(fi, file);
+            String[] proteins = fi.split("\t");
+            assert proteins.length == 2;
+            if(!proteins[0].equals("EXP") && !proteins[0].equals("MDL") &&
+                    !proteins[1].equals("EXP") && !proteins[1].equals("MDL")) {
+                if (ppiToPDB.containsKey(fi))
+                    // TODO: simple parsing isn't good enough
+                    // we end up with a bunch of "MDL" and "EXP" entries that
+                    // shouldn't exist... should only contain uniprot ID's
+                    // we'll fix this later with a regex like FIOncoNet
+                    //throw new IllegalStateException("Duplicated PDB for " + fi);
+                    logger.warn(String.format("ppiToPDB already contains %s", fi));
+                ppiToPDB.put(fi, file);
+            }else{
+                //skip single-protein EXP and MDL structures
+            }
         }
         return ppiToPDB;
     }
@@ -378,30 +385,37 @@ public class Interactome3dAnalyzer {
                                                                    INTERFACE_THRESHOLD,
                                                                    false);
         GroupContactSet groupSet = new GroupContactSet(contacts);
-        Map<Chain, Set<Integer>> chainToCoordinates = new HashMap<Chain, Set<Integer>>();
-        for (GroupContact contact : groupSet) {
-            Pair<Group> pair = contact.getPair();
-            Set<Integer> coordinates = chainToCoordinates.get(pair.getFirst().getChain());
-            if (coordinates == null) {
-                coordinates = new HashSet<Integer>();
-                chainToCoordinates.put(pair.getFirst().getChain(),
-                                       coordinates);
+        Map<Chain, Set<Integer>> chainToCoordinates = new HashMap<>();
+        Map<Chain, List<Integer>> rtn = new HashMap<>();
+        if(groupSet.size() > 0) {
+            for (GroupContact contact : groupSet) {
+                Pair<Group> pair = contact.getPair();
+                Set<Integer> coordinates = chainToCoordinates.get(pair.getFirst().getChain());
+                if (coordinates == null) {
+                    coordinates = new HashSet<>();
+                    chainToCoordinates.put(pair.getFirst().getChain(),
+                            coordinates);
+                }
+                coordinates.add(pair.getFirst().getResidueNumber().getSeqNum());
+                coordinates = chainToCoordinates.get(pair.getSecond().getChain());
+                if (coordinates == null) {
+                    coordinates = new HashSet<>();
+                    chainToCoordinates.put(pair.getSecond().getChain(),
+                            coordinates);
+                }
+                coordinates.add(pair.getSecond().getResidueNumber().getSeqNum());
             }
-            coordinates.add(pair.getFirst().getResidueNumber().getSeqNum());
-            coordinates = chainToCoordinates.get(pair.getSecond().getChain());
-            if (coordinates == null) {
-                coordinates = new HashSet<Integer>();
-                chainToCoordinates.put(pair.getSecond().getChain(),
-                                       coordinates);
+            for (Chain chain : chainToCoordinates.keySet()) {
+                Set<Integer> set = chainToCoordinates.get(chain);
+                List<Integer> list = new ArrayList<>(set);
+                Collections.sort(list);
+                rtn.put(chain, list);
             }
-            coordinates.add(pair.getSecond().getResidueNumber().getSeqNum());
-        }
-        Map<Chain, List<Integer>> rtn = new HashMap<Chain, List<Integer>>();
-        for (Chain chain : chainToCoordinates.keySet()) {
-            Set<Integer> set = chainToCoordinates.get(chain);
-            List<Integer> list = new ArrayList<Integer>(set);
-            Collections.sort(list);
-            rtn.put(chain, list);
+        }else{
+            logger.info(String.format("Detected structure without %.2fA interface.",
+                    INTERFACE_THRESHOLD));
+            rtn.put(chainA,new ArrayList<>());
+            rtn.put(chainB,new ArrayList<>());
         }
         return rtn;
     }
@@ -411,7 +425,9 @@ public class Interactome3dAnalyzer {
         // PDBs downloaded from Interactome3D.
         Chain chainA = structure.getChainByPDB("A");
         Chain chainB = structure.getChainByPDB("B");
-        
+        if(chainA == null || chainB == null){
+            throw new NullPointerException();
+        }
         return extractContacts(chainA, chainB);
     }
     
@@ -426,7 +442,7 @@ public class Interactome3dAnalyzer {
             Chain chain = structure.getChainByPDB(chainId);
             PDBUniProtMatch match = new PDBUniProtMatch();
             match.chainID = chainId;
-            match.chainSequence = chain.getAtomSequence();
+            match.chainResSequence = chain.getSeqResSequence();
             match.uniprot = accessions[i];
             match.gene = accToGene.get(match.uniprot);
             match.offset = 0;
@@ -507,7 +523,7 @@ public class Interactome3dAnalyzer {
 //                    System.out.println(chainID.getAtomSequence());
                     PDBUniProtMatch match = new PDBUniProtMatch();
                     match.chainID = chain.getChainID();
-                    match.chainSequence = chain.getAtomSequence();
+                    match.chainResSequence = chain.getSeqResSequence();
                     match.gene = uniprotToGene.get(uniprotID);
                     match.uniprot = uniprotID;
                     match.pdbStart = chain.getAtomGroup(0).getResidueNumber().getSeqNum();
@@ -544,7 +560,7 @@ public class Interactome3dAnalyzer {
     public static class PDBUniProtMatch {
 
         private String chainID;
-        private String chainSequence;
+        private String chainResSequence;
         private String uniprot;
         private String gene;
         private int pdbStart;
@@ -559,8 +575,8 @@ public class Interactome3dAnalyzer {
             return chainID;
         }
 
-        public String getChainSequence(){
-            return chainSequence;
+        public String getChainResSequence(){
+            return chainResSequence;
         }
 
         public String getUniprot() {

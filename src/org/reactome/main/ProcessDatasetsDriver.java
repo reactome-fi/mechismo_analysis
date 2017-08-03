@@ -74,7 +74,7 @@ public class ProcessDatasetsDriver {
                         // TCGA-AY-4070-01.hg19.oncotator.hugo_entrez_remapped.maf.txt
                         // TCGA-AY-4071-01.hg19.oncotator.hugo_entrez_remapped.maf.txt
                         "^.+\\.maf\\.txt$",
-                        "datasets/interactome3d/2016_06/prebuilt/representative/",
+                        "datasets/interactome3d/pdb_structures/",
                         "results/interactions_with_mutated_interfaces.csv");
             }else if(Integer.parseInt(ex) == 1){
                 interactome3dDriverAnalyzer.findMechismoInteractionsInReactome(cancerDriverReactomeAnalyzer,
@@ -95,18 +95,18 @@ public class ProcessDatasetsDriver {
                         // TCGA-AY-4070-01.hg19.oncotator.hugo_entrez_remapped.maf.txt
                         // TCGA-AY-4071-01.hg19.oncotator.hugo_entrez_remapped.maf.txt
                         "^.+\\.maf\\.txt$",
-                        "datasets/interactome3d/2016_06/prebuilt/representative/",
+                        "datasets/interactome3d/pdb_structures/",
                         "results/interactions_with_mutated_interfaces.csv",
                         "results/interactions_with_mechismo_enrichment_and_mutated_interfaces.csv");
             }else if(Integer.parseInt(ex) == 3){
                 interactome3dDriverAnalyzer.prepareHeatmapData(cancerDriverReactomeAnalyzer,
-                        "datasets/interactome3d/2016_06/prebuilt/representative/",
+                        "datasets/interactome3d/pdb_structures/",
                         "results/heatmapData/",
                         "datasets/firehose_data/all_oncotated_calls",
                         "datasets/Mechismo/cancer_types/");
             }else if(Integer.parseInt(ex) == 4){
                 interactome3dDriverAnalyzer.compareKnownDrivers(cancerDriverReactomeAnalyzer,
-                        "datasets/interactome3d/2016_06/prebuilt/representative/",
+                        "datasets/interactome3d/pdb_structures/",
                         "results/knownDriverData/",
                         "datasets/firehose_data/all_oncotated_calls",
                         "datasets/guanming_known_drivers.txt");
