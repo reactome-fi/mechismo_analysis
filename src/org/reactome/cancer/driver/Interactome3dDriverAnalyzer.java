@@ -711,80 +711,247 @@ public class Interactome3dDriverAnalyzer {
         //------------------
         //load known drivers
         //------------------
-        FileInputStream fis = new FileInputStream(knownDriverPath);
+        Set<String> knownDrivers = new HashSet<>();
+        BufferedReader br = null;
         try{
-            FileInputStream fileInputStream = new FileInputStream(knownDriverPath);
-
+            br = new BufferedReader(new FileReader(knownDriverPath));
+            String line;
+            while((line = br.readLine()) != null) {
+                knownDrivers.add(line);
+            }
         }catch(IOException ioe){
-
+            logger.error(String.format("%s: %s",
+                    ioe.getMessage(),
+                    Arrays.toString(ioe.getStackTrace())));
         }finally {
-
+            try{
+                if(br != null){
+                    br.close();
+                }
+            }catch(IOException ioe2){
+                logger.error(String.format("Couldn't close %s, %s: %s",
+                        br.toString(),
+                        ioe2.getMessage(),
+                        Arrays.toString(ioe2.getStackTrace())));
+                }
         }
-        //---------------------------------
-        //report reactions of known drivers
-        //---------------------------------
+        //--------------------
+        //accumulate mutations
+        //--------------------
+        Map<String,Map<Integer,Set<MutationObservation>>> allMutatedGenesMap = new HashMap<>();
+        //For each cancer type in firehose
+        File firehoseCancerTypes = new File(firehoseCancerTypesDir);
+        String[] firehoseCancerTypeDirs =
+                firehoseCancerTypes.list((current, name) -> new File(current, name).isDirectory());
+        // The MAF filenames look like:
+        // TCGA-AY-4070-01.hg19.oncotator.hugo_entrez_remapped.maf.txt
+        // TCGA-AY-4071-01.hg19.oncotator.hugo_entrez_remapped.maf.txt
+        String mafFileNamePattern = "^.+\\.maf\\.txt$";
+        for (String firehoseCancerTypeDir : firehoseCancerTypeDirs) {
 
-        //Reactome FI's
-        // Load all the non-disease reactions from Reactome
-        // dbID + string description + other stuff
-        List<GKInstance> reactions = cancerDriverReactomeAnalyzer.loadHumanReactions();
-        System.out.println(String.format("Total reactions: %d", reactions.size()));
+            /**
+             * CANCER TYPE RESOLUTION
+             */
+            String mafDirPath = String.format("%s/%s",
+                    firehoseCancerTypesDir,
+                    firehoseCancerTypeDir);
 
-        // Store interactions in a set
-        // "<uniprot ID>\t<uniprot ID>"
-        Set<String> totalFIs = extractInteractionsFromReactions(reactions);
-        System.out.println(String.format("Total FIs: %d", totalFIs.size()));
+            //MAF Mutations
+            // "<gene symbol>" -> HashMap<"<AA Coord> -> <sample support>>
+            Map<String, Map<Integer, Set<MutationObservation>>> cancerTypeMutatedGenesMap = summarizeAllMafs(mafFileNamePattern, mafDirPath);
+             cancerTypeMutatedGenesMap.keySet().retainAll(knownDrivers);
+            allMutatedGenesMap = combineMaps(allMutatedGenesMap, cancerTypeMutatedGenesMap);
+            //------------------------------
+            //write cancer type genes to csv
+            //------------------------------
+            String cancerTypeOutFilePath = String.format("%s/firehose_%s_knownDriverMutations.csv",
+                    outputDir,
+                    firehoseCancerTypeDir);
+            FileOutputStream fos = null;
+            try{
+               fos = new FileOutputStream(cancerTypeOutFilePath);
+               String header = "Gene Symbol,AA Coordinate,Number of Samples\n";
+               fos.write(header.getBytes());
+               for(String geneSymbol :  cancerTypeMutatedGenesMap.keySet()){
+                   for(Integer aaCoord : cancerTypeMutatedGenesMap.get(geneSymbol).keySet()){
+                       fos.write(String.format("%s,%d,%d\n",
+                               geneSymbol,
+                               aaCoord,
+                               cancerTypeMutatedGenesMap.get(geneSymbol).get(aaCoord).size()).getBytes());
+                   }
+               }
+            }catch(IOException ioe){
+                logger.error(String.format("%s: %s",
+                        ioe.getMessage(),
+                        Arrays.toString(ioe.getStackTrace())));
+            }finally{
+                try {
+                    if(fos != null) {
+                        fos.close();
+                    }
+                }catch(IOException ioe2){
+                    logger.error(String.format("Couldn't close %s, %s: %s",
+                            fos.toString(),
+                            ioe2.getMessage(),
+                            Arrays.toString(ioe2.getStackTrace())));
+                }
+            }
+        }
+        //----------------------------------
+        //slide window, calculating p-values
+        //----------------------------------
 
-        // Map uniprot ID's to gene symbols (COSMIC uses gene symbols)
-        // "<uniprot ID>" -> "<gene symbol>"
-        Map<String, String> uniprotIdToGene = new UniProtAnalyzer().getUniProtAccessionToGeneName();
+        int windowSize = 300;
+        //<gene symbol> -> ArrayList<Integer[<AA Coord>, <sample support>]>
+        Map<String,List<Integer[]>> allMutatedGenesListMap = convertToListMap(allMutatedGenesMap);
 
-        // Extract and store unique proteins from interactions in a set
-        // "<uniprot ID>"
-        Set<String> totalProteins = InteractionUtilities.grepIDsFromInteractions(totalFIs);
-        System.out.println(String.format("Total proteins: %d", totalProteins.size()));
+        //<gene symbol> -> Integer[<Window Start AA Coord>, <Window sample support>]
+        Map<String,List<Integer[]>> allMutatedGenesWindowSupport = slideWindow(allMutatedGenesListMap,windowSize);
 
-        // Keep only uniprot ID's from interactions in uniprotIdToGene map
-        uniprotIdToGene.keySet().retainAll(totalProteins);
+        //<gene symnbol -> Double[<max support Window Start AA Coord>, <max support Window sample support>]
+        Map<String,Double[]> allMutatedGenesMaxDensity = calculateMaxWindowDensity(allMutatedGenesWindowSupport,windowSize);
 
-        //Keep only Reactome FI's containing >= 1 gene mutated in MAF
-        // Lookup and store gene symbols for proteins in a set
-        // "<gene symbol>"
-        Set<String> totalGenes = keepGenesWithMappedProteins(totalProteins, uniprotIdToGene);
-        System.out.println(String.format("Total genes: %d", totalGenes.size()));
+        //--------------
+        //calculate FDRs
+        //--------------
 
-        //Map Interactions to sets of Reactions
-        Map<String, Set<GKInstance>> interactionReactionSetMap = generateInteractionReactionSetMap(uniprotIdToGene, reactions);
+        //----------------------
+        //write all genes to csv
+        //----------------------
+        String mutationDensityOutFilePath = String.format("%s/firehose_mutationDensity.csv",outputDir);
+        FileOutputStream fos = null;
+        try{
+            fos = new FileOutputStream(mutationDensityOutFilePath);
+            String header = String.format("Gene Symbol,%s AA Window Start Position,Mutation Density\n",windowSize);
+            fos.write(header.getBytes());
+            for(String geneSymbol : allMutatedGenesMaxDensity.keySet()){
+                fos.write(String.format("%s,%d,%.3f\n",
+                        geneSymbol,
+                        allMutatedGenesMaxDensity.get(geneSymbol)[0].intValue(),
+                        allMutatedGenesMaxDensity.get(geneSymbol)[1]).getBytes());
+            }
+        }catch(IOException ioe){
+            logger.error(String.format("%s: %s",
+                    ioe.getMessage(),
+                    Arrays.toString(ioe.getStackTrace())));
+        }finally{
+            try{
+                if(fos != null){
+                    fos.close();
+                }
+            }catch(IOException ioe2){
+                logger.error(String.format("Couldn't close %s, %s: %s",
+                        fos.toString(),
+                        ioe2.getMessage(),
+                        Arrays.toString(ioe2.getStackTrace())));
+            }
+        }
+    }
 
-        ///////some function like this.... probs have to write another one/////////////
-        //findSampleReactionsWithMutatedInteractionInterfaces(
-        //        cancerTypeSampleInterfaceMutationRatios,
-        //        interactionReactionSetMap,
-        //        reactionOutFilePath);
+    Map<String,Double[]> calculateMaxWindowDensity(Map<String,List<Integer[]>> geneWindowSupport,int windowSize){
+        Map<String,Double[]> genesMaxDensity = new HashMap<>();
 
-        //-----------------------------------------
-        //report mutation hotspots in known drivers
-        //-----------------------------------------
+        for(String geneSymbol : geneWindowSupport.keySet()){
+            double maxDensityAACoord = -1.0;
+            double maxDensity = 0.0;
+            for(int supportListIdx = 0; supportListIdx < geneWindowSupport.get(geneSymbol).size(); supportListIdx++){
+                int curAACoord = geneWindowSupport.get(geneSymbol).get(supportListIdx)[0];
+                int curSupport = geneWindowSupport.get(geneSymbol).get(supportListIdx)[1];
+                double curDensity = (double) curSupport / (double) windowSize;
+                if(curDensity > maxDensity){
+                    maxDensityAACoord = curAACoord;
+                    maxDensity = curDensity;
+                }
+            }
+            genesMaxDensity.put(geneSymbol,new Double[]{maxDensityAACoord,maxDensity});
+        }
 
-        //-----------------------------------------
-        //report known driver PPI's with structures
-        //-----------------------------------------
+        return genesMaxDensity;
+    }
 
-        //------------------------------------------------------------------
-        //report known driver PPI's interface mutation ratios & significance
-        //------------------------------------------------------------------
+    Map<String,List<Integer[]>> slideWindow(Map<String,List<Integer[]>> listMap, Integer windowSize){
+        Map<String,List<Integer[]>> geneWindowSupport = new HashMap<>();
+        for(String geneSymbol : listMap.keySet()){
+            List<Integer[]> mutationList = listMap.get(geneSymbol);
+            List<Integer[]> aaWindowSupport = new ArrayList<>();
+            boolean windowWithinGene = true;
+            for(int mutationIdx = 0;
+                mutationIdx < mutationList.size()
+                    && windowWithinGene;
+                mutationIdx++){
+                int windowStartIdx = mutationList.get(mutationIdx)[0];
+                int sampleSupport = 0;
+                int lookAhead = 0;
+                int curAAIdx = windowStartIdx;
+                while(curAAIdx < windowStartIdx + windowSize
+                        && windowWithinGene){
+                    curAAIdx = mutationList.get(mutationIdx + lookAhead)[0];
+                    sampleSupport += mutationList.get(mutationIdx + lookAhead)[1];
+                    lookAhead++;
+                    if((mutationIdx + lookAhead) >= mutationList.size()){
+                        windowWithinGene = false;
+                    }
+                }
+                aaWindowSupport.add(new Integer[]{windowStartIdx,sampleSupport});
+            }
+            geneWindowSupport.put(geneSymbol,aaWindowSupport);
+                System.out.println(String.format("Added window support for %s",geneSymbol));
+        }
+        return geneWindowSupport;
+    }
 
-        //------------------------------------------------
-        //report reactions affected by interface mutations
-        //------------------------------------------------
+    Map<String,List<Integer[]>> convertToListMap(Map<String,Map<Integer,Set<MutationObservation>>> map){
+        Map<String,List<Integer[]>> listMap = new HashMap<>();
 
-        //---------------------------------------------
-        //report pathways containing affected reactions
-        //---------------------------------------------
+        for(String geneSymbol : map.keySet()){
+            Set<Integer> aaCoordSet = map.get(geneSymbol).keySet();
+            Integer[] aaCoordAry = aaCoordSet.toArray(new Integer[aaCoordSet.size()]);
+            Arrays.sort(aaCoordAry);
+            List<Integer[]> geneMutations = new ArrayList<>();
+            for(int aaCoordIdx = 0; aaCoordIdx < aaCoordAry.length; aaCoordIdx++){
+                Integer[] mutationAry = new Integer[2];
+                mutationAry[0] = aaCoordAry[aaCoordIdx];
+                mutationAry[1] = map.get(geneSymbol).get(aaCoordAry[aaCoordIdx]).size();
+                geneMutations.add(mutationAry);
+            }
+            listMap.put(geneSymbol,geneMutations);
+        }
 
-        //------------------------------------------------
-        //report pan-cancer & cancer type specific results
-        //------------------------------------------------
+        return listMap;
+    }
+
+    Map<String,Map<Integer,Set<MutationObservation>>> combineMaps(Map<String,Map<Integer,Set<MutationObservation>>> body,
+                                                                  Map<String,Map<Integer,Set<MutationObservation>>> member){
+       int initialBodySize = body.keySet().size();
+        for(String geneSymbol : member.keySet()){
+            if(body.containsKey(geneSymbol)){
+                for(Integer aaCoord : member.get(geneSymbol).keySet()){
+                    if(body.get(geneSymbol).containsKey(aaCoord)){
+                       Map<Integer,Set<MutationObservation>> bodyValue1 = body.get(geneSymbol);
+                        Set<MutationObservation> bodyValue2 = body.get(geneSymbol).get(aaCoord);
+                         Set<MutationObservation> memberValue = member.get(geneSymbol).get(aaCoord);
+                         bodyValue2.addAll(memberValue);
+                        bodyValue1.put(aaCoord,bodyValue2);
+                       body.put(geneSymbol,bodyValue1);
+                    }else{
+                      Map<Integer,Set<MutationObservation>> bodyValue = body.get(geneSymbol);
+                      Set<MutationObservation> memberValue = member.get(geneSymbol).get(aaCoord);
+                      bodyValue.put(aaCoord,memberValue);
+                      body.put(geneSymbol,bodyValue);
+                    }
+                }
+            }else{
+                Map<Integer,Set<MutationObservation>> memberValue = member.get(geneSymbol);
+                body.put(geneSymbol,memberValue);
+            }
+        }
+        int finalBodySize = body.keySet().size();
+        int bodySizeDiff = finalBodySize - initialBodySize;
+        if(bodySizeDiff < 0 || bodySizeDiff > member.keySet().size()){
+            throw new IllegalStateException();
+        }
+        //System.out.println(String.format("Final Body Size: %d",body.keySet().size()));
+        return body;
     }
 
     public void prepareHeatmapData(CancerDriverReactomeAnalyzer cancerDriverReactomeAnalyzer,
@@ -808,6 +975,13 @@ public class Interactome3dDriverAnalyzer {
         // "<uniprot ID>" -> "<gene symbol>"
         Map<String, String> uniprotIdToGene = new UniProtAnalyzer().getUniProtAccessionToGeneName();
 
+        // Map total FI proteins to genes both ways as we're unsure
+        // which order our pdb files ues
+        // "<gene symbol1>\t<gene symbol2>"
+        // "<gene symbol2>\t<gene symbol1>"
+        Set<String> totalFIgenes = remapFIsToGeneSymbols(totalFIs,uniprotIdToGene);
+        System.out.println(String.format("Total FI genes: %d",totalFIgenes.size()));
+
         // Extract and store unique proteins from interactions in a set
         // "<uniprot ID>"
         Set<String> totalProteins = InteractionUtilities.grepIDsFromInteractions(totalFIs);
@@ -826,6 +1000,11 @@ public class Interactome3dDriverAnalyzer {
         // "<gene symbol>\t<gene symbol>" -> "path/to/complex.pdb"
         Map<String, File> interaction2PDBMap = getInteraction2PDBMap(pdbDirectoryPath, uniprotIdToGene);
         System.out.println(String.format("Total PDB's: %d", interaction2PDBMap.size()));
+
+        //Keep only interactions contained in totalFIs, removing
+        // multimers not reported by extractInteractionsFromReactions()
+        interaction2PDBMap.keySet().retainAll(totalFIgenes);
+        System.out.println(String.format("Keeping intersection with totalFIgenes: %d", interaction2PDBMap.size()));
 
         //Extract Interfaces
         // "<gene symbol\tgene symbol>" -> HashMap<"<gene symbol>", Set<interface coordinate>>
@@ -924,6 +1103,30 @@ public class Interactome3dDriverAnalyzer {
         //heatmap of mechismo data with cancer type using mechismo score as value
 
 
+    }
+
+    public Set<String> remapFIsToGeneSymbols(Set<String> totalFIs, Map<String,String> uniprotIdToGene){
+        Set<String> totalFIgenes = new HashSet<>();
+        for(String uniprotFI : totalFIs){
+            String[] uniprotFIary = uniprotFI.split("\t");
+            if(uniprotFIary == null || uniprotFIary.length != 2){
+                throw new IllegalStateException();
+            }
+            String g1 = uniprotIdToGene.get(uniprotFIary[0]);
+            String g2 = uniprotIdToGene.get(uniprotFIary[1]);
+            if(g1 != null && !g1.isEmpty() &&
+                    g2 != null && !g2.isEmpty()){
+                //forward
+                totalFIgenes.add(String.format("%s\t%s", g1, g2));
+                //reverse
+                totalFIgenes.add(String.format("%s\t%s", g2, g1));
+            }else{
+                logger.warn(String.format("Could not find gene symbols for interaction %s-%s",
+                        uniprotFIary[0],
+                        uniprotFIary[1]));
+            }
+        }
+        return totalFIgenes;
     }
 
     public Map<String, Double> findMechismoInteractionsInReactome(CancerDriverReactomeAnalyzer cancerDriverReactomeAnalyzer,
@@ -1853,9 +2056,6 @@ public class Interactome3dDriverAnalyzer {
             }
         }
         for (String geneName : allSamplesMutatedGeneMap.keySet()) {
-            if(geneName.equals("IRS2")){
-                int x = 1;
-            }
             Map<Integer, Set<MutationObservation>> mismo = allSamplesMutatedGeneMap.get(geneName);
             if (mismo == null) {
                 throw new IllegalStateException();
@@ -1866,7 +2066,6 @@ public class Interactome3dDriverAnalyzer {
                     throw new IllegalStateException();
                 }
             }
-
         }
         return allSamplesMutatedGeneMap;
     }
