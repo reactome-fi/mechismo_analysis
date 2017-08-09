@@ -703,14 +703,13 @@ public class Interactome3dDriverAnalyzer {
         //TODO: Rerun analysis for all cancer types (along with interface enrichment comparison)
     }
 
-    public void compareKnownDrivers(CancerDriverReactomeAnalyzer cancerDriverReactomeAnalyzer,
-    String pdbDirectoryPath,
-    String outputDir,
+    public void compareKnownDrivers(String outputDir,
     String firehoseCancerTypesDir,
     String knownDriverPath) throws Exception {
         //------------------
         //load known drivers
         //------------------
+        System.out.println("Loading known drivers...");
         Set<String> knownDrivers = new HashSet<>();
         BufferedReader br = null;
         try{
@@ -738,6 +737,7 @@ public class Interactome3dDriverAnalyzer {
         //--------------------
         //accumulate mutations
         //--------------------
+        System.out.println("Accumulating mutations...");
         Map<String,Map<Integer,Set<MutationObservation>>> allMutatedGenesMap = new HashMap<>();
         //For each cancer type in firehose
         File firehoseCancerTypes = new File(firehoseCancerTypesDir);
@@ -764,6 +764,7 @@ public class Interactome3dDriverAnalyzer {
             //------------------------------
             //write cancer type genes to csv
             //------------------------------
+            System.out.println(String.format("Writing mutations for %s...",firehoseCancerTypeDir));
             String cancerTypeOutFilePath = String.format("%s/firehose_%s_knownDriverMutations.csv",
                     outputDir,
                     firehoseCancerTypeDir);
@@ -796,11 +797,65 @@ public class Interactome3dDriverAnalyzer {
                             Arrays.toString(ioe2.getStackTrace())));
                 }
             }
-        }
-        //----------------------------------
-        //slide window, calculating p-values
-        //----------------------------------
+            //
+            //------------
+            //slide window
+            //----------------------------------
+            System.out.println("Sliding window...");
+            int windowSize = 300;
+            //<gene symbol> -> ArrayList<Integer[<AA Coord>, <sample support>]>
+            Map<String,List<Integer[]>> cancerTypeMutatedGenesListMap = convertToListMap(cancerTypeMutatedGenesMap);
 
+            //<gene symbol> -> Integer[<Window Start AA Coord>, <Window sample support>]
+            Map<String,List<Integer[]>> cancerTypeMutatedGenesWindowSupport = slideWindow(cancerTypeMutatedGenesListMap,windowSize);
+
+            //<gene symnbol -> Double[<max support Window Start AA Coord>, <max support Window sample support>]
+            Map<String,Double[]> cancerTypeMutatedGenesMaxDensity = calculateMaxWindowDensity(cancerTypeMutatedGenesWindowSupport,windowSize);
+
+            //--------------
+            //calculate FDRs
+            //--------------
+
+            //----------------------
+            //write all genes to csv
+            //----------------------
+            System.out.println("Writing window densities...");
+            String mutationDensityOutFilePath = String.format("%s/firehose_%s_mutationDensity.csv",
+                    outputDir,
+                    firehoseCancerTypeDir);
+            fos = null;
+            try{
+                fos = new FileOutputStream(mutationDensityOutFilePath);
+                String header = String.format("Gene Symbol,%s AA Window Start Position,Mutation Density\n",windowSize);
+                fos.write(header.getBytes());
+                for(String geneSymbol : cancerTypeMutatedGenesMaxDensity.keySet()){
+                    fos.write(String.format("%s,%d,%.3f\n",
+                            geneSymbol,
+                            cancerTypeMutatedGenesMaxDensity.get(geneSymbol)[0].intValue(),
+                            cancerTypeMutatedGenesMaxDensity.get(geneSymbol)[1]).getBytes());
+                }
+            }catch(IOException ioe){
+                logger.error(String.format("%s: %s",
+                        ioe.getMessage(),
+                        Arrays.toString(ioe.getStackTrace())));
+            }finally{
+                try{
+                    if(fos != null){
+                        fos.close();
+                    }
+                }catch(IOException ioe2){
+                    logger.error(String.format("Couldn't close %s, %s: %s",
+                            fos.toString(),
+                            ioe2.getMessage(),
+                            Arrays.toString(ioe2.getStackTrace())));
+                }
+            }
+            //
+        }
+        //------------
+        //slide window
+        //----------------------------------
+        System.out.println("Sliding window...");
         int windowSize = 300;
         //<gene symbol> -> ArrayList<Integer[<AA Coord>, <sample support>]>
         Map<String,List<Integer[]>> allMutatedGenesListMap = convertToListMap(allMutatedGenesMap);
@@ -818,6 +873,7 @@ public class Interactome3dDriverAnalyzer {
         //----------------------
         //write all genes to csv
         //----------------------
+        System.out.println("Writing window densities...");
         String mutationDensityOutFilePath = String.format("%s/firehose_mutationDensity.csv",outputDir);
         FileOutputStream fos = null;
         try{
@@ -895,7 +951,6 @@ public class Interactome3dDriverAnalyzer {
                 aaWindowSupport.add(new Integer[]{windowStartIdx,sampleSupport});
             }
             geneWindowSupport.put(geneSymbol,aaWindowSupport);
-                System.out.println(String.format("Added window support for %s",geneSymbol));
         }
         return geneWindowSupport;
     }

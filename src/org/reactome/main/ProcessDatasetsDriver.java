@@ -105,9 +105,7 @@ public class ProcessDatasetsDriver {
                         "datasets/firehose_data/all_oncotated_calls",
                         "datasets/Mechismo/cancer_types/");
             }else if(Integer.parseInt(ex) == 4){
-                interactome3dDriverAnalyzer.compareKnownDrivers(cancerDriverReactomeAnalyzer,
-                        "datasets/interactome3d/pdb_structures/",
-                        "results/knownDriverData/",
+                interactome3dDriverAnalyzer.compareKnownDrivers("results/knownDriverData/",
                         "datasets/firehose_data/all_oncotated_calls",
                         "datasets/guanming_known_drivers.txt");
             }
