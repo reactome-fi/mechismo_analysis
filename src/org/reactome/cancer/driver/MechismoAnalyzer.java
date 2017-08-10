@@ -283,11 +283,16 @@ public class MechismoAnalyzer {
     
     @Test
     public void checkAllHumanReactions() throws Exception {
-        String output = "results/ReactionsInMechisom_051017.txt";
-        output = "results/ReactionsInMechisom_052217.txt";
+        String output = "results/ReactionsInMechismo_051017.txt";
+        output = "results/ReactionsInMechismo_052217.txt";
         CancerDriverReactomeAnalyzer reactomeAnalyzer = new CancerDriverReactomeAnalyzer();
         
-        checkAllHumanReactions(reactomeAnalyzer, output);
+        Long targetReactionId = 5658435L;
+        targetReactionId = 5672950L;
+        
+        checkAllHumanReactions(reactomeAnalyzer, 
+        						  targetReactionId,
+        						  output);
     }
     
     /**
@@ -295,6 +300,7 @@ public class MechismoAnalyzer {
      * @throws Exception
      */
     public void checkAllHumanReactions(CancerDriverReactomeAnalyzer reactomeAnalyzer,
+    									  Long targetReactionId,
                                        String outputFileName) throws Exception {
         // Load all the non-disease reactions from Reactome
         List<GKInstance> reactions = reactomeAnalyzer.loadHumanReactions();
@@ -304,38 +310,48 @@ public class MechismoAnalyzer {
         System.out.println("Total PPIs in mechismo: " + ppiToScore.size());
         
         ReactomeAnalyzer reactomeDataAnalyzer = new ReactomeAnalyzer();
-        fu.setOutput(outputFileName);
-        fu.printLine("DB_ID\tName\tTotal_FIs\tMechismo_FIs\tMax_Score");
+        if (targetReactionId == null) {
+        		fu.setOutput(outputFileName);
+        		fu.printLine("DB_ID\tName\tTotal_FIs\tMechismo_FIs\tMax_Score");
+        }
         int total = 0;
         int checkedReactions = 0;
         for (GKInstance reaction : reactions) {
-            Set<String> fis = reactomeDataAnalyzer.generateTentativePPIsForReaction(reaction,
+        		if (targetReactionId != null && !reaction.getDBID().equals(targetReactionId))
+        			continue;
+            System.out.println("Checking " + reaction + "...");
+        		Set<String> fis = reactomeDataAnalyzer.generateTentativePPIsForReaction(reaction,
                                                                                     false);
-            if (fis.size() == 0)
+            System.out.println("\tExtracted FIs: " + fis.size());
+        		if (fis.size() == 0)
                 continue;
             // Check if there is a structure available from interactome3d
             int overlap = 0;
             Double score = null;
             for (String fi : fis) {
                 if (ppiToScore.containsKey(fi)) {
-                    overlap ++;
+                   overlap ++;
                    Double currentScore = ppiToScore.get(fi);
                    if (score == null || Math.abs(currentScore) > Math.abs(score))
                        score = currentScore;
+                   System.out.println(fi + "\t" + currentScore);
                 }
             }
-            fu.printLine(reaction.getDBID() + "\t" +
-                    reaction.getDisplayName() + "\t" +
-                    fis.size() + "\t" +
-                    overlap + "\t" +
-                    (score == null ? "" : score));
+            if (targetReactionId == null) {
+            	    fu.printLine(reaction.getDBID() + "\t" +
+            					reaction.getDisplayName() + "\t" +
+            					fis.size() + "\t" +
+            					overlap + "\t" +
+            					(score == null ? "" : score));
+            }
             if (overlap > 0)
                 total ++;
             checkedReactions ++;
         }
-        fu.close();
+        if (targetReactionId == null)
+        		fu.close();
         System.out.println("Total checked reactions: " + checkedReactions);
-        System.out.println("Total reactions having FIs in mechsimo: " + total);
+        System.out.println("Total reactions having FIs in mechismo: " + total);
         // Output ran on May 10, 2017
 //        Total human reactions in Reactome: 9453
 //        Total PPIs in mechismo: 13323
@@ -552,9 +568,14 @@ public class MechismoAnalyzer {
     
     @Test
     public void pickRows() throws IOException {
+    		boolean needChemical = false;
         String[] targetGenes = new String[] {
-//                "HRAS", "NRAS", "KRAS", "SOS1"
-                "PTEN"
+                "HRAS", 
+//                "NRAS", 
+//                "KRAS"
+//                , "SOS1"
+//                "PTEN"
+//        		"AKT1"
         };
         Set<String> geneSet = new HashSet<>();
         for (String gene : targetGenes)
@@ -562,17 +583,30 @@ public class MechismoAnalyzer {
         
         String fileName = outputFileName;
         //        fileName = dirName + "HRAS_mechismo_op.tsv";
-        fu.setInput(fileName);
-        String line = null;
-        while ((line = fu.readLine()) != null) {
-            String[] tokens = line.split("\t");
-            if (tokens.length < 19)
-                continue; // Cannot get interactors
-            //            System.out.println(tokens[0] + "\t" + tokens[18]);
-            if (geneSet.contains(tokens[0]) && geneSet.contains(tokens[18]))
-                System.out.println(line);
+        try (Stream<String> stream = Files.lines(Paths.get(fileName))) {
+        		stream.map(line -> line.split("\t"))
+        			  .filter(tokens -> tokens.length >= 19)
+        			  .forEach(tokens -> {
+        				 if (geneSet.contains(tokens[0])) {
+        					 if (!needChemical ||
+        					     needChemical && tokens[18].contains("CHEM"))
+        						 System.out.println(String.join("\t", tokens));
+        				 }
+        			  });
         }
-        fu.close();
+//        fu.setInput(fileName);
+//        String line = null;
+//        while ((line = fu.readLine()) != null) {
+//            String[] tokens = line.split("\t");
+//            if (tokens.length < 19)
+//                continue; // Cannot get interactors
+//            //            System.out.println(tokens[0] + "\t" + tokens[18]);
+////            if (geneSet.contains(tokens[0]) && geneSet.contains(tokens[18]))
+////                System.out.println(line);
+//            if (geneSet.contains(tokens[0]))
+//            		System.out.println();
+//        }
+//        fu.close();
     }
     
 }

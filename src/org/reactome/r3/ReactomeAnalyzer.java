@@ -14,6 +14,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.gk.model.GKInstance;
 import org.gk.model.InstanceUtilities;
@@ -25,6 +26,7 @@ import org.gk.schema.SchemaAttribute;
 import org.gk.schema.SchemaClass;
 import org.gk.util.StringUtils;
 import org.junit.Test;
+import org.reactome.data.ReactomeReactionExpander;
 import org.reactome.r3.util.FileUtility;
 import org.reactome.r3.util.InteractionUtilities;
 
@@ -196,7 +198,7 @@ public class ReactomeAnalyzer {
         }
     }
 
-    private Set<String> grepGenesFromReaction(GKInstance rxn) throws Exception {
+    public Set<String> grepGenesFromReaction(GKInstance rxn) throws Exception {
         Set<GKInstance> participants = InstanceUtilities.getReactionParticipants(rxn);
         Set<String> genes = new HashSet<String>();
         for (GKInstance participant : participants) {
@@ -254,6 +256,53 @@ public class ReactomeAnalyzer {
             rtn.add(reaction);
         }
         return rtn;
+    }
+    
+    @Test
+    public void testGenerateFIsWithExpandForReaction() throws Exception {
+        MySQLAdaptor dba = new MySQLAdaptor("localhost",
+                "reactome_59_plus_i",
+                "root",
+                "macmysql01");
+        
+//        Long dbId = 5205799L; // CCND1:CDK4:PRMT5:pT5-WDR77 methylates arginine-9 of histone H3 (H3R8)
+//        GKInstance reaction = dba.fetchInstance(dbId);
+//        System.out.println("Check reaction " + reaction);
+        
+        List<GKInstance> humanReactions = loadHumanReactions(dba);
+        
+        ReactomeReactionExpander expander = new ReactomeReactionExpander();
+        System.out.println("ReactionID\tReactionName\tOrignal\tFilter\tDiff\tSets");
+        
+        humanReactions.forEach(reaction -> {
+            try {
+                Set<Set<String>> sets = expander.extractGenesFromReaction(reaction);
+                Set<String> fis = generateTentativePPIsForReaction(reaction, true);
+                //System.out.println("Total generated FIs: " + fis.size());
+                // Make sure two genes in the same FI should be included in the same set
+                Set<String> filtered = fis.stream().filter(fi -> {
+                    String[] genes = fi.split("\t");
+                    boolean isInSameSet = false;
+                    for (Set<String> set : sets) {
+                        if (set.contains(genes[0]) && set.contains(genes[1])) {
+                            isInSameSet = true;
+                            break;
+                        }
+                    }
+                    return isInSameSet;
+                }).collect(Collectors.toSet());
+                //System.out.println("After filtering: " + filtered.size());
+                System.out.println(reaction.getDBID() + "\t" +
+                                   reaction.getDisplayName() + "\t" + 
+                                   fis.size() + "\t" + 
+                                   filtered.size() + "\t" + 
+                                   (fis.size() - filtered.size()) + "\t" + 
+                                   sets.size());
+            }
+            catch(Exception e) {
+                e.printStackTrace();
+            }
+        });
     }
     
     /**

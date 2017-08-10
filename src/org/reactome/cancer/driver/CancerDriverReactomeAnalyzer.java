@@ -706,6 +706,27 @@ public class CancerDriverReactomeAnalyzer {
     }
     
     @Test
+    public void listCancerDriversInReaction() throws Exception {
+        Set<String> driverGenes = new CancerDriverAnalyzer().getDriverGenes(null);
+        System.out.println("Total cancer driver genes: " + driverGenes.size());
+        
+//        driverGenes.stream().forEach(System.out::println);
+
+        Long targetReaction = 5672950L;
+        targetReaction = 3364026L;
+        
+        MySQLAdaptor dba = getDBA();
+        GKInstance reaction = dba.fetchInstance(targetReaction);
+        
+        ReactomeAnalyzer analyzer = new ReactomeAnalyzer();
+        Set<String> reactionGenes = analyzer.grepGenesFromReaction(reaction);
+        System.out.println("Genes in reaction: " + reactionGenes.size());
+        
+        Set<String> shared = InteractionUtilities.getShared(reactionGenes, driverGenes);
+        System.out.println("\tDrivers: " + shared.size() + " " + String.join(", ", shared));
+    }
+    
+    @Test
     public void checkCancerDriversInReactions() throws Exception {
 //        String dir = "../FINetworkBuild/results/2015/";
         Set<String> driverGenes = new CancerDriverAnalyzer().getDriverGenes(null);
