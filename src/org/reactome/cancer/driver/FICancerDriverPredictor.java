@@ -41,6 +41,10 @@ public class FICancerDriverPredictor {
     private final String NATURE_DRIVER_GENE_FILE_NAME = DIR_NAME + "Nature_PMID_24132290.txt";
     private final String NATURE_GAD_DRIVER_GENE_FILE_NAME = DIR_NAME + "Nature_PMID_24390350.txt";
     private final String SCIENCE_REPORT_DRIVER_GENE_FILE_NAME = DIR_NAME + "ScientificReports_PMID_24084849.csv";
+    private final String CANCER_GENE_CENSUS_FILE_NAME = DIR_NAME + "Census_allTue Aug 15 18_36_38 2017.csv";
+    // The following values should be checked for the above data file
+    private final int CGC_FILE_MUTATION_TYPE_INDEX = 14;
+    private final int CGC_FILE_TUMOR_TYPE_INDEX = 8;
     private final String RESULT_DIR_NAME = "results/DriverGenes/";
     
     /**
@@ -328,13 +332,13 @@ public class FICancerDriverPredictor {
     public Set<String> loadCancerCensusGenes(String cancerType,
                                              Set<String> allowedMutationTypes) throws IOException {
         Set<String> genes = new HashSet<String>();
-        String fileName = DIR_NAME + "cancer_gene_census.csv";
+        String fileName = CANCER_GENE_CENSUS_FILE_NAME;
         Reader reader = new FileReader(fileName);
         Iterable<CSVRecord> records = CSVFormat.DEFAULT.parse(reader);
         boolean isHeader = true;
-        int mutationTypeIndex = 12;
+        int mutationTypeIndex = CGC_FILE_MUTATION_TYPE_INDEX;
         int geneIndex = 0;
-        int tumorTypeIndex = 7;
+        int tumorTypeIndex = CGC_FILE_TUMOR_TYPE_INDEX;
         for (CSVRecord record : records) {
             if (isHeader) {
                 isHeader = false;
@@ -378,11 +382,11 @@ public class FICancerDriverPredictor {
     
     @Test
     public void checkCancerCensusGenes() throws IOException {
-        String fileName = DIR_NAME + "cancer_gene_census.csv";
+        String fileName = CANCER_GENE_CENSUS_FILE_NAME;
         Reader reader = new FileReader(fileName);
         Iterable<CSVRecord> records = CSVFormat.DEFAULT.parse(reader);
         Set<String> types = new HashSet<String>();
-        int mutationTypeIndex = 12;
+        int mutationTypeIndex = CGC_FILE_MUTATION_TYPE_INDEX;
         boolean isHeader = true;
         for (CSVRecord record : records) {
             if (isHeader) {
