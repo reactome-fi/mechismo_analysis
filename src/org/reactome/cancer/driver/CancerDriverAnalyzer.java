@@ -591,6 +591,14 @@ public class CancerDriverAnalyzer {
     }
     
     @Test
+    public void outputKnownCancerDriverGenes() throws IOException {
+        Set<String> allKnownGenes = getDriverGenes(null);
+        System.out.println("All known cancer genes: " + allKnownGenes.size());
+        List<String> list = new ArrayList<>(allKnownGenes);
+        list.stream().sorted().forEach(System.out::println);
+    }
+    
+    @Test
     public void testKnownDriverGenes() throws Exception {
         FileUtility.initializeLogging();
         

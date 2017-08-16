@@ -6,7 +6,7 @@ package org.reactome.r3;
 
 import org.junit.Test;
 import org.reactome.r3.util.FileUtility;
-import org.reactome.r3.util.MutationObservation;
+import org.reactome.structure.model.MutationObservation;
 
 import java.io.IOException;
 import java.util.*;

@@ -9,10 +9,18 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
-import java.util.*;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
+import org.apache.log4j.Logger;
 import org.biojava.nbio.alignment.Alignments;
 import org.biojava.nbio.alignment.SimpleGapPenalty;
 import org.biojava.nbio.core.alignment.matrices.SubstitutionMatrixHelper;
@@ -20,7 +28,6 @@ import org.biojava.nbio.core.alignment.template.SubstitutionMatrix;
 import org.biojava.nbio.core.exceptions.CompoundNotFoundException;
 import org.biojava.nbio.core.sequence.ProteinSequence;
 import org.biojava.nbio.core.sequence.compound.AminoAcidCompound;
-import org.apache.log4j.Logger;
 import org.biojava.nbio.structure.Chain;
 import org.biojava.nbio.structure.Group;
 import org.biojava.nbio.structure.Structure;
@@ -37,6 +44,8 @@ import org.junit.Test;
 import org.reactome.px.util.InteractionUtilities;
 import org.reactome.r3.ProteinSequenceHandler.Sequence;
 import org.reactome.r3.util.FileUtility;
+
+import sun.misc.RegexpPool;
 
 /**
  * This class is used to handle interaction structure data downloaded from interactome3d.
@@ -249,6 +258,57 @@ public class Interactome3dAnalyzer {
     }
     
     /**
+     * In the complete data set, one PPI may have multiple PDB files. It has been found
+     * that the chosen PDF files in the representative may not be good. Therefore, it will
+     * be better to perform analysis by loading all PDB files for a PPI.
+     * @param dirName
+     * @param recursive
+     * @return
+     * @throws IOException
+     */
+    public Map<String, List<File>> loadPPIToCompletePDBFiles(String dirName,
+                                                             boolean recursive) throws IOException {
+        Map<String, List<File>> ppiToPDBs = new HashMap<>();
+        List<File> interactionPDBFiles = getInteractionStructureFiles(dirName,
+                                                                      recursive);
+        interactionPDBFiles.forEach(file -> {
+            String fi = extractFIFromFileName(file);
+            ppiToPDBs.compute(fi, (key, list) -> {
+                if (list == null)
+                    list = new ArrayList<>();
+                list.add(file);
+                return list;
+            });
+        });
+        return ppiToPDBs;
+    }
+    
+    @Test
+    public void testLoadPPIToCompletePDBFiles() throws IOException {
+        String dirName = "datasets/interactome3d/2017_01/complete";
+        Map<String, List<File>> ppiToPDBs = loadPPIToCompletePDBFiles(dirName, true);
+        System.out.println("Total PPIs: " + ppiToPDBs.size());
+//        ppiToPDBs.forEach((ppi, list) -> System.out.println(ppi + ": " + list.size()));
+        
+        // Compare with representative dataset
+        dirName = "datasets/interactome3d/2017_01/representative";
+        Map<String, List<File>> repPPIToPDBs = loadPPIToCompletePDBFiles(dirName, true);
+        System.out.println("Total PPIs in representative: " + repPPIToPDBs.size());
+        
+       ppiToPDBs.forEach((ppi, list) -> {
+           List<File> repPDBs = repPPIToPDBs.get(ppi);
+           List<String> fileNames = list.stream().map(file -> file.getName()).collect(Collectors.toList());
+           List<String> repFileNames = repPDBs.stream().map(file -> file.getName()).collect(Collectors.toList());
+           // There is only one case: P42345    Q8N122, caused different letter case usage.
+           if (!fileNames.containsAll(repFileNames)) {
+               System.out.println(ppi + " is not contained in complete!");
+               System.out.println("Complete: " + fileNames);
+               System.out.println("Representative: " + repFileNames);
+           }
+       });
+    }
+    
+    /**
      * Load the map from proteins to their structures. One protein may have multiple structures in
      * either representative or complete folder.
      * @param dirName
@@ -276,40 +336,46 @@ public class Interactome3dAnalyzer {
     
     @Test
     public void downloadData() throws Exception {
-//        String dirName = "datasets/interactome3d/2016_06/representative/";
-//        String hostUrl = "http://interactome3d.irbbarcelona.org/user_data/human/download/representative/";
+        String interactome3dDir = "datasets/interactome3d/2016_06/";
+        interactome3dDir = "datasets/interactome3d/2017_01/";
+        
+        String dirName = interactome3dDir + "representative/";
+        String hostUrl = "http://interactome3d.irbbarcelona.org/user_data/human/download/representative/";
+        int largestInt = 23;
 //        
-//        dirName = "datasets/interactome3d/2016_06/complete/";
-//        hostUrl = "http://interactome3d.irbbarcelona.org/user_data/human/download/complete/";
+        dirName = interactome3dDir + "complete/";
+        hostUrl = "http://interactome3d.irbbarcelona.org/user_data/human/download/complete/";
+        largestInt = 149;
+        
         // Results for reactions having enrichment fdrs <= 0.01
         // Representative
-        String dirName = "datasets/interactome3d/2016_06/reactions_fdr_01/representative/";
-        String hostUrl = "http://interactome3d.irbbarcelona.org/user_data/EXggwX2u6XZQVKWMpuBQ/download/representative/";
-        int largestInt = 1;
-        int largestProtein = 2;
-        // Complete
-        dirName = "datasets/interactome3d/2016_06/reactions_fdr_01/complete/";
-        hostUrl = "http://interactome3d.irbbarcelona.org/user_data/EXggwX2u6XZQVKWMpuBQ/download/complete/";
-        largestInt = 2;
-        largestProtein = 26;
-        // Results for reactions having encirhment fdr [0.05, 0.01)
-        // representative
-        dirName = "datasets/interactome3d/2016_06/reactions_fdr_05_01/representative/";
-        hostUrl = "http://interactome3d.irbbarcelona.org/user_data/CEtGowWWxcDu6bxu5rm6/download/representative/";
-        largestInt = 2;
-        largestProtein = 2;
-        // Complete
-        dirName = "datasets/interactome3d/2016_06/reactions_fdr_05_01/complete/";
-        hostUrl = "http://interactome3d.irbbarcelona.org/user_data/CEtGowWWxcDu6bxu5rm6/download/complete/";
-        largestInt = 7;
-        largestProtein = 28;
+//        String dirName = "datasets/interactome3d/2016_06/reactions_fdr_01/representative/";
+//        String hostUrl = "http://interactome3d.irbbarcelona.org/user_data/EXggwX2u6XZQVKWMpuBQ/download/representative/";
+//        int largestInt = 1;
+//        int largestProtein = 2;
+//        // Complete
+//        dirName = "datasets/interactome3d/2016_06/reactions_fdr_01/complete/";
+//        hostUrl = "http://interactome3d.irbbarcelona.org/user_data/EXggwX2u6XZQVKWMpuBQ/download/complete/";
+//        largestInt = 2;
+//        largestProtein = 26;
+//        // Results for reactions having encirhment fdr [0.05, 0.01)
+//        // representative
+//        dirName = "datasets/interactome3d/2016_06/reactions_fdr_05_01/representative/";
+//        hostUrl = "http://interactome3d.irbbarcelona.org/user_data/CEtGowWWxcDu6bxu5rm6/download/representative/";
+//        largestInt = 2;
+//        largestProtein = 2;
+//        // Complete
+//        dirName = "datasets/interactome3d/2016_06/reactions_fdr_05_01/complete/";
+//        hostUrl = "http://interactome3d.irbbarcelona.org/user_data/CEtGowWWxcDu6bxu5rm6/download/complete/";
+//        largestInt = 7;
+//        largestProtein = 28;
         
         String fileName = "interactions.dat";
         download(dirName, hostUrl, fileName);
-        fileName = "proteins.dat";
-        download(dirName, hostUrl, fileName);
+//        fileName = "proteins.dat";
+//        download(dirName, hostUrl, fileName);
         downloadDataFiles(dirName, hostUrl, "interactions", largestInt);
-        downloadDataFiles(dirName, hostUrl, "proteins", largestProtein);
+//        downloadDataFiles(dirName, hostUrl, "proteins", largestProtein);
         // After downloading, use a simple script as following:
         // $ for f in *.tar; do tar xf $f; done (http://stackoverflow.com/questions/583889/how-can-you-untar-more-than-one-file-at-a-time)
         // Or use the following script (preferred) to keep the original folder

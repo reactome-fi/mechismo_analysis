@@ -1,4 +1,4 @@
-package org.reactome.r3.util;
+package org.reactome.structure.model;
 
 /**
  * Created by burkhart on 3/10/17.
@@ -16,7 +16,10 @@ public class MutationObservation {
     public MutationObservation() {
     }
 
-    public MutationObservation(String gene,Integer coordinate,String mutation,String sample){
+    public MutationObservation(String gene,
+                               Integer coordinate,
+                               String mutation,
+                               String sample){
         this.gene = gene;
         this.coordinate = coordinate;
         this.mutation = mutation;
