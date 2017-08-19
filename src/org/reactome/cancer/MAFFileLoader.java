@@ -25,7 +25,7 @@ import org.reactome.r3.UCSCDataAnalyzer;
 import org.reactome.r3.UniProtAnalyzer;
 import org.reactome.r3.util.FileUtility;
 import org.reactome.r3.util.InteractionUtilities;
-import org.reactome.structure.model.MutationObservation;
+import org.reactome.structure.model.ProteinMutation;
 
 /**
  * This file is used to load MAF (mutation annotation format) based on this URL: 
@@ -292,11 +292,11 @@ public class MAFFileLoader {
      * @return
      * @throws IOException
      */
-    public Map<String, Map<Integer, Set<MutationObservation>>> loadSampleToGenes(String fileName) throws IOException {
+    public Map<String, Map<Integer, Set<ProteinMutation>>> loadSampleToGenes(String fileName) throws IOException {
         Pattern mafMetaPattern = Pattern.compile("^#+.*$");
         Pattern aaXtrctPattern = Pattern.compile("^p\\.[a-zA-Z*-]*(?<aaCoord>[0-9_]+)[a-zA-Z*]+.*$");
         String aaCoord = "aaCoord";
-        Map<String, Map<Integer, Set<MutationObservation>>> sampleGeneMap = new HashMap<>();
+        Map<String, Map<Integer, Set<ProteinMutation>>> sampleGeneMap = new HashMap<>();
         Set<String> allowedTypes = getAllowedMutationTypes();
         FileUtility fu = new FileUtility();
         fu.setInput(fileName);
@@ -327,26 +327,26 @@ public class MAFFileLoader {
             String proteinChange = tokens[proteinChangeIndex];
             Matcher matcher = aaXtrctPattern.matcher(proteinChange);
             String proteinChangeCoord;
-            Map<Integer,Set<MutationObservation>> mutationMap;
+            Map<Integer,Set<ProteinMutation>> mutationMap;
             if(matcher.find()) {
                 proteinChangeCoord = matcher.group(aaCoord);
                 if(proteinChangeCoord.contains("_")){
                     Integer coord1 = new Integer(proteinChangeCoord.split("_")[0]);
                     Integer coord2 = new Integer(proteinChangeCoord.split("_")[1]);
-                    MutationObservation mut1 = new MutationObservation(geneSymbol,
+                    ProteinMutation mut1 = new ProteinMutation(geneSymbol,
                             coord1,
                             proteinChange,
                             fileName
                     );
-                    MutationObservation mut2 = new MutationObservation(geneSymbol,
+                    ProteinMutation mut2 = new ProteinMutation(geneSymbol,
                             coord2,
                             proteinChange,
                             fileName
                             );
                     if (sampleGeneMap.containsKey(geneSymbol)) {
                         mutationMap = sampleGeneMap.get(geneSymbol);
-                        HashSet<MutationObservation> mut1S = new HashSet<>(Arrays.asList(mut1));
-                        HashSet<MutationObservation> mut2S = new HashSet<>(Arrays.asList(mut2));
+                        HashSet<ProteinMutation> mut1S = new HashSet<>(Arrays.asList(mut1));
+                        HashSet<ProteinMutation> mut2S = new HashSet<>(Arrays.asList(mut2));
                         if (mutationMap.get(coord1) == null) {
                             mutationMap.put(coord1, mut1S);
                         }
@@ -371,12 +371,12 @@ public class MAFFileLoader {
                 }
                 else {
                     Integer coord = new Integer(proteinChangeCoord);
-                    MutationObservation mut = new MutationObservation(geneSymbol,
+                    ProteinMutation mut = new ProteinMutation(geneSymbol,
                             coord,
                             proteinChange,
                             fileName
                     );
-                    HashSet<MutationObservation> mutS = new HashSet<>(Arrays.asList(mut));
+                    HashSet<ProteinMutation> mutS = new HashSet<>(Arrays.asList(mut));
                     if (sampleGeneMap.containsKey(geneSymbol)) {
                         mutationMap = sampleGeneMap.get(geneSymbol);
                         if (mutationMap.get(coord) == null) {

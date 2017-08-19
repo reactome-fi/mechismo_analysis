@@ -43,17 +43,17 @@ import org.reactome.cancer.MAFFileLoader;
 import org.reactome.px.util.InteractionUtilities;
 import org.reactome.r3.CosmicAnalyzer;
 import org.reactome.r3.Interactome3dAnalyzer;
-import org.reactome.r3.Interactome3dAnalyzer.PDBUniProtMatch;
 import org.reactome.r3.ProteinSequenceHandler;
 import org.reactome.r3.ProteinSequenceHandler.Sequence;
 import org.reactome.r3.ReactomeAnalyzer;
 import org.reactome.r3.UniProtAnalyzer;
 import org.reactome.r3.util.FileUtility;
 import org.reactome.r3.util.MathUtilities;
-import org.reactome.structure.model.ProteinMutationProfile;
 import org.reactome.structure.model.InteractionMutationProfile;
-import org.reactome.structure.model.MutationObservation;
-import org.reactome.structure.model.ProteinChainSummary;
+import org.reactome.structure.model.ProteinMutation;
+import org.reactome.structure.model.PDBUniProtMatch;
+import org.reactome.structure.model.ProteinChainInfo;
+import org.reactome.structure.model.ProteinMutationProfile;
 
 /**
  * This class is used to handle protein 3D structures based on PDB using biojava APIs.
@@ -364,7 +364,7 @@ public class Interactome3dDriverAnalyzer {
         Set<String> driverGenes = new CancerDriverAnalyzer().getDriverGenes(null);
         CosmicAnalyzer cosmicAnalyzer = new CosmicAnalyzer();
         Set<String> matchedGenes = getMatchedGenes(rxtIdsToFIsWithFeatures, fiToFile);
-        Map<String, List<MutationObservation>> geneToCosmicEntries = cosmicAnalyzer.loadMutations(matchedGenes);
+        Map<String, List<ProteinMutation>> geneToCosmicEntries = cosmicAnalyzer.loadMutations(matchedGenes);
 
         MySQLAdaptor dba = reactomeAnalyzer.getDBA();
         Set<String> matchedFIs = new HashSet<String>();
@@ -573,7 +573,7 @@ public class Interactome3dDriverAnalyzer {
         // Map gene symbols to COSMIC mutation profiles
         // "<gene symbol>" -> [<MutationObservation>]
         CosmicAnalyzer cosmicAnalyzer = new CosmicAnalyzer();
-        Map<String, List<MutationObservation>> geneToCosmicEntries = cosmicAnalyzer.loadMutations(totalGenes);
+        Map<String, List<ProteinMutation>> geneToCosmicEntries = cosmicAnalyzer.loadMutations(totalGenes);
         System.out.println("Total genes in cosmic: " + geneToCosmicEntries.size());
 
         // Check interactions one by one
@@ -884,7 +884,7 @@ public class Interactome3dDriverAnalyzer {
 
         //MAF Mutations
         // "<gene symbol>" -> HashMap<"<AA Coord> -> <sample support>>
-        Map<String, Map<Integer, Set<MutationObservation>>> allSamplesGeneMap = mafGeneToMutation(mafFileNamePattern, mafDirectoryPath);
+        Map<String, Map<Integer, Set<ProteinMutation>>> allSamplesGeneMap = mafGeneToMutation(mafFileNamePattern, mafDirectoryPath);
 
         //TODO: ensure this works... caps? some genes have multiple names (Akt/PKB) etc.
         allSamplesGeneMap.keySet().retainAll(totalGenes);
@@ -896,7 +896,7 @@ public class Interactome3dDriverAnalyzer {
 
         //Extract Interfaces
         // "<gene symbol\tgene symbol>" -> HashMap<"<gene symbol>", Set<interface coordinate>>
-        Map<String, Map<String, ProteinChainSummary>> interactionsWithInterfaces = extractInterfaces(interaction2PDBMap, uniprotIdToGene);
+        Map<String, Map<String, ProteinChainInfo>> interactionsWithInterfaces = extractInterfaces(interaction2PDBMap, uniprotIdToGene);
 
         //Reactome FI's Interface Mutation Ratio
         // "<gene symbol\tgene symbol>" -> HashMap<<"gene symbol">,<Mutation Ratio>>
@@ -985,8 +985,8 @@ public class Interactome3dDriverAnalyzer {
         return interfaceMutationRatios;
     }
 
-    private ProteinMutationProfile getGeneMutationProfile(Map<String, Map<Integer, Set<MutationObservation>>> allSamplesGeneMap,
-                                                       Map<String, Map<String, ProteinChainSummary>> interactionInterfaces,
+    private ProteinMutationProfile getGeneMutationProfile(Map<String, Map<Integer, Set<ProteinMutation>>> allSamplesGeneMap,
+                                                       Map<String, Map<String, ProteinChainInfo>> interactionInterfaces,
                                                        String interactionInterface,
                                                        String geneName) {
         int interfaceLength = -1;
@@ -1023,13 +1023,13 @@ public class Interactome3dDriverAnalyzer {
         return geneMutationProfile;
     }
 
-    private Map<String, Map<String, ProteinChainSummary>> extractInterfaces(Map<String, File> interaction2PDBMap,
+    private Map<String, Map<String, ProteinChainInfo>> extractInterfaces(Map<String, File> interaction2PDBMap,
                                                                 Map<String, String> accessionToGene) throws IOException, StructureException {
         Interactome3dAnalyzer interactome3dAnalyzer = new Interactome3dAnalyzer();
-        Map<String, Map<String, ProteinChainSummary>> interactionInterfaces = new HashMap<>();
+        Map<String, Map<String, ProteinChainInfo>> interactionInterfaces = new HashMap<>();
         Map<Chain, List<Integer>> chainToContactCoordinates;
         Map<Chain, PDBUniProtMatch> chainToMatch;
-        Map<String, ProteinChainSummary> interactionInterface;
+        Map<String, ProteinChainInfo> interactionInterface;
         Structure structure;
         File pdbFile;
 
@@ -1078,7 +1078,7 @@ public class Interactome3dDriverAnalyzer {
             for (Chain chainID : chainToMatch.keySet()) {
                 //map geneID to set of contact coordinates for this interaction
                 interactionInterface.put(chainToMatch.get(chainID).getGene(),
-                        new ProteinChainSummary(
+                        new ProteinChainInfo(
                                 new HashSet<>(chainToContactCoordinates.get(chainID)),
                                 chainToMatch.get(chainID).getChainSequence().length()));
             }
@@ -1110,7 +1110,7 @@ public class Interactome3dDriverAnalyzer {
     public void testMafGenesToMutations() throws IOException {
         String mafDir = "datasets/firehose_all/";
         String mafPattern = "^.+\\.maf\\.txt$";
-        Map<String, Map<Integer, Set<MutationObservation>>> rtn = mafGeneToMutation(mafPattern,
+        Map<String, Map<Integer, Set<ProteinMutation>>> rtn = mafGeneToMutation(mafPattern,
                                                                                     mafDir);
         System.out.println(rtn.size());
     }
@@ -1120,10 +1120,10 @@ public class Interactome3dDriverAnalyzer {
      *
      * @throws Exception
      */
-    private Map<String, Map<Integer, Set<MutationObservation>>> mafGeneToMutation(String mafFileNamePattern, 
+    private Map<String, Map<Integer, Set<ProteinMutation>>> mafGeneToMutation(String mafFileNamePattern, 
                                                                                   String mafDirectoryPath) throws IOException {
         MAFFileLoader mafFileLoader = new MAFFileLoader();
-        Map<String, Map<Integer, Set<MutationObservation>>> allSamplesGeneMap = new HashMap<>();
+        Map<String, Map<Integer, Set<ProteinMutation>>> allSamplesGeneMap = new HashMap<>();
         Pattern mafFnPattern = Pattern.compile(mafFileNamePattern);
         FilenameFilter filenameFilter = (dir, name) -> {
             if (mafFnPattern.matcher(name).matches()) {
@@ -1149,7 +1149,7 @@ public class Interactome3dDriverAnalyzer {
 //        mafFiles.forEach(System.out::println);
         
 //        File[] mafFiles = new File(mafDirectoryPath).listFiles(filenameFilter);
-        Map<String, Map<Integer, Set<MutationObservation>>> sampleGeneMap;
+        Map<String, Map<Integer, Set<ProteinMutation>>> sampleGeneMap;
         for (File mafFile : mafFiles) {
             sampleGeneMap = mafFileLoader.loadSampleToGenes(mafFile.getPath());
             //TODO: we can write our own data structure for hashed sets later
@@ -1157,8 +1157,8 @@ public class Interactome3dDriverAnalyzer {
                 if (allSamplesGeneMap.containsKey(geneKey)) {
                     for (Integer coordKey : sampleGeneMap.get(geneKey).keySet()) {
                         if (allSamplesGeneMap.get(geneKey).containsKey(coordKey)) {
-                            Map<Integer, Set<MutationObservation>> mutationMap = allSamplesGeneMap.get(geneKey);
-                            Set<MutationObservation> set = sampleGeneMap.get(geneKey).get(coordKey);
+                            Map<Integer, Set<ProteinMutation>> mutationMap = allSamplesGeneMap.get(geneKey);
+                            Set<ProteinMutation> set = sampleGeneMap.get(geneKey).get(coordKey);
                             if (mutationMap.get(coordKey) == null) {
                                 mutationMap.put(coordKey, set);
                             } else {
@@ -1167,7 +1167,7 @@ public class Interactome3dDriverAnalyzer {
                             }
                             sampleGeneMap.put(geneKey, mutationMap);
                         } else {
-                            Map<Integer, Set<MutationObservation>> mutationMap = allSamplesGeneMap.get(geneKey);
+                            Map<Integer, Set<ProteinMutation>> mutationMap = allSamplesGeneMap.get(geneKey);
                             mutationMap.put(coordKey, sampleGeneMap.get(geneKey).get(coordKey));
                             sampleGeneMap.put(geneKey, mutationMap);
                         }
@@ -1277,7 +1277,7 @@ public class Interactome3dDriverAnalyzer {
         Set<String> driverGenesinReaction = InteractionUtilities.getShared(driverGenes, genes);
         System.out.println("Driver genes in reaction: " + driverGenesinReaction.size() + ": " + driverGenesinReaction);
         CosmicAnalyzer cosmicAnalyzer = new CosmicAnalyzer();
-        Map<String, List<MutationObservation>> geneToCosmicEntries = cosmicAnalyzer.loadMutations(genes);
+        Map<String, List<ProteinMutation>> geneToCosmicEntries = cosmicAnalyzer.loadMutations(genes);
         System.out.println("Loaded mutations for genes: " + geneToCosmicEntries.size());
 
         checkInterfaces(proteinToGene.keySet(),
@@ -1357,7 +1357,7 @@ public class Interactome3dDriverAnalyzer {
     //TODO: More thoroughly document/describe this method
     private Set<String> checkInterfaces(Collection<String> accessions,
                                         Map<String, String> accessionToGene,
-                                        Map<String, List<MutationObservation>> geneToCosmicEntries,
+                                        Map<String, List<ProteinMutation>> geneToCosmicEntries,
                                         Collection<File> pdbFiles) throws Exception {
         if (accToSeq == null) {
             ProteinSequenceHandler sequenceHandler = new ProteinSequenceHandler();
@@ -1408,8 +1408,8 @@ public class Interactome3dDriverAnalyzer {
         for (String gene : geneToContacts.keySet()) {
             Set<Integer> contacts = geneToContacts.get(gene);
             Integer length = geneToLength.get(gene);
-            List<MutationObservation> mutations = geneToCosmicEntries.get(gene);
-            List<MutationObservation> mutationsInContacts = cosmicAnalyzer.filterEntries(mutations, contacts);
+            List<ProteinMutation> mutations = geneToCosmicEntries.get(gene);
+            List<ProteinMutation> mutationsInContacts = cosmicAnalyzer.filterEntries(mutations, contacts);
             double ratio = contacts.size() / (double) length;
             double mutationRatio = (double) mutationsInContacts.size() / mutations.size();
             double pvalue = MathUtilities.calculateBinomialPValue(ratio, mutations.size(), mutationsInContacts.size());
@@ -1430,7 +1430,7 @@ public class Interactome3dDriverAnalyzer {
 
     private void checkInterfaces(Map<Chain, List<Integer>> chainToContactCoordiantes,
                                  Map<Chain, PDBUniProtMatch> chainToMatch,
-                                 Map<String, List<MutationObservation>> geneToMutations,
+                                 Map<String, List<ProteinMutation>> geneToMutations,
                                  Map<String, Set<Integer>> geneToContacts,
                                  Map<String, Double> geneToSinglePValue) {
         System.out.println("Chain\tGene\tUniProt\tContacts\tLength\tRatio\tMutations\tMutationsInChain\tMutationsInContacts\tRatio\tp-value\tp-value(single_aa_in_interface, corrected)");
@@ -1440,18 +1440,18 @@ public class Interactome3dDriverAnalyzer {
             PDBUniProtMatch match = chainToMatch.get(chain);
             //TODO: Figure out why match can be null
             if (match != null) {
-                List<MutationObservation> mutations = geneToMutations.get(match.getGene());
+                List<ProteinMutation> mutations = geneToMutations.get(match.getGene());
                 if (mutations == null) {
                     System.out.println(match.getGene() + " doesn't have an entry in COSMIC!");
                     continue;
                 }
                 List<Integer> remappedSeqNumbers = remapChainSeqNumbers(chain, match);
-                List<MutationObservation> mutationsInChain = cosmicHelper.filterEntries(mutations, remappedSeqNumbers);
+                List<ProteinMutation> mutationsInChain = cosmicHelper.filterEntries(mutations, remappedSeqNumbers);
                 if (mutationsInChain.size() == 0) {
                     System.out.println(match.getGene() + " doesn't have mutations in chain!");
                     continue;
                 }
-                List<MutationObservation> interfaceMutations = cosmicHelper.filterEntries(mutations, contactCoords);
+                List<ProteinMutation> interfaceMutations = cosmicHelper.filterEntries(mutations, contactCoords);
                 if (interfaceMutations.size() == 0) {
                     System.out.println(match.getGene() + " dosn't have mutations in interface!");
                     continue;
@@ -1492,31 +1492,32 @@ public class Interactome3dDriverAnalyzer {
                     geneToContacts.put(match.getGene(), geneContacts);
                 }
                 geneContacts.addAll(contactCoords);
-            } else {
+            } 
+            else {
                 logger.warn(String.format("match was null for chain %s", chain));
             }
         }
     }
 
-    private void outputMutationsInInterface(List<MutationObservation> interfaceMutations, PDBUniProtMatch match) {
+    private void outputMutationsInInterface(List<ProteinMutation> interfaceMutations, PDBUniProtMatch match) {
         StringBuilder builder = new StringBuilder();
         builder.append("Coordinate offset: ").append(match.getOffset()).append(": ");
-        Collections.sort(interfaceMutations, new Comparator<MutationObservation>() {
-            public int compare(MutationObservation entry1, MutationObservation entry2) {
+        Collections.sort(interfaceMutations, new Comparator<ProteinMutation>() {
+            public int compare(ProteinMutation entry1, ProteinMutation entry2) {
                 return entry1.getCoordinate().compareTo(entry2.getCoordinate());
             }
         });
-        for (MutationObservation entry : interfaceMutations)
+        for (ProteinMutation entry : interfaceMutations)
             builder.append(entry.getCoordinate()).append(",").append(entry.getMutation()).append(";");
         builder.deleteCharAt(builder.length() - 1);
         System.out.println(builder.toString());
     }
 
-    private double calculatePValueForPositionMutation(List<MutationObservation> interfaceMutations,
-                                                      List<MutationObservation> chainMutations,
+    private double calculatePValueForPositionMutation(List<ProteinMutation> interfaceMutations,
+                                                      List<ProteinMutation> chainMutations,
                                                       List<Integer> chainNumbers) {
         Map<Integer, Integer> posToMutCount = new HashMap<Integer, Integer>();
-        for (MutationObservation entry : interfaceMutations) {
+        for (ProteinMutation entry : interfaceMutations) {
             Integer count = posToMutCount.get(entry.getCoordinate());
             if (count == null)
                 posToMutCount.put(entry.getCoordinate(), 1);
@@ -1553,8 +1554,9 @@ public class Interactome3dDriverAnalyzer {
                 //TODO: figure out why NullPointerException is thrown
                 if (coordinates != null && match != null) {
                     coordinates.set(i, coord + match.getOffset());
-                } else {
-                    logger.warn(String.format("i=%d,coordinates=%s,match=%s",
+                } 
+                else {
+                    logger.error(String.format("i=%d,coordinates=%s,match=%s",
                             i, coordinates, match));
                 }
             }

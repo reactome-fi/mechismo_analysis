@@ -6,7 +6,7 @@ import java.util.Set;
 
 import org.gk.model.GKInstance;
 import org.reactome.r3.ReactomeAnalyzer;
-import org.reactome.structure.model.MutationObservation;
+import org.reactome.structure.model.ProteinMutation;
 import org.reactome.structure.model.ReactionMutationProfile;
 
 /**
@@ -18,7 +18,7 @@ public class ReactomeReactionAnalyzer {
     private ReactomeAnalyzer reactomeDataAnalyzer;
     private Map<String, Set<File>> ppiToPDBs;
     private Map<String, String> uniprotIdToGene;
-    private Map<String, Set<MutationObservation>> geneToMutations;
+    private Map<String, Set<ProteinMutation>> geneToMutations;
     
     public ReactomeReactionAnalyzer() {
     }

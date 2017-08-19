@@ -44,8 +44,8 @@ import org.junit.Test;
 import org.reactome.px.util.InteractionUtilities;
 import org.reactome.r3.ProteinSequenceHandler.Sequence;
 import org.reactome.r3.util.FileUtility;
-
-import sun.misc.RegexpPool;
+import org.reactome.structure.model.PDBUniProtMatch;
+import org.reactome.structure.model.ProteinChainInfo;
 
 /**
  * This class is used to handle interaction structure data downloaded from interactome3d.
@@ -491,11 +491,11 @@ public class Interactome3dAnalyzer {
             String chainId = (i == 0 ? "A" : "B");
             Chain chain = structure.getChainByPDB(chainId);
             PDBUniProtMatch match = new PDBUniProtMatch();
-            match.chainID = chainId;
-            match.chainSequence = chain.getAtomSequence();
-            match.uniprot = accessions[i];
-            match.gene = accToGene.get(match.uniprot);
-            match.offset = 0;
+            match.setChainID(chainId);
+            match.setChainSequence(chain.getAtomSequence());
+            match.setUniprot(accessions[i]);
+            match.setGene(accToGene.get(match.getUniprot()));
+            match.setOffset(0);
             chainToMatch.put(chain, match);
         }
         return chainToMatch;
@@ -517,7 +517,7 @@ public class Interactome3dAnalyzer {
                                                                                 accToGene);
         for (Chain chain : chainToMatch.keySet()) {
             PDBUniProtMatch match = chainToMatch.get(chain);
-            System.out.println(chain.getChainID() + ": " + match.offset);
+            System.out.println(chain.getChainID() + ": " + match.getOffset());
         }
     }
 
@@ -539,7 +539,22 @@ public class Interactome3dAnalyzer {
                 acces,
                 accToSeq,
                 accToGene,
-        true);
+                true);
+    }
+    
+    public void remapCoordinates(Map<Chain, PDBUniProtMatch> chainToMatch,
+                                 Map<Chain, List<Integer>> chainToCoordinates) {
+        for (Chain chain : chainToCoordinates.keySet()) {
+            List<Integer> coordinates = chainToCoordinates.get(chain);
+            //System.out.println(chain.getChainID() + ": " + coordinates);
+            PDBUniProtMatch match = chainToMatch.get(chain);
+            if (match == null)
+                throw new IllegalStateException("Cannot find match for chain: " + chain);
+            for (int i = 0; i < coordinates.size(); i++) {
+                Integer coord = coordinates.get(i);
+                coordinates.set(i, coord + match.getOffset());
+            }
+        }
     }
 
     public Map<Chain, PDBUniProtMatch> mapCoordinatesToUniProtInPDB(Structure structure,
@@ -572,13 +587,13 @@ public class Interactome3dAnalyzer {
 //                    System.out.println(seq.getSequence());
 //                    System.out.println(chainID.getAtomSequence());
                     PDBUniProtMatch match = new PDBUniProtMatch();
-                    match.chainID = chain.getChainID();
-                    match.chainSequence = chain.getAtomSequence();
-                    match.gene = uniprotToGene.get(uniprotID);
-                    match.uniprot = uniprotID;
-                    match.pdbStart = chain.getAtomGroup(0).getResidueNumber().getSeqNum();
-                    match.uniprotStart = index + 1;
-                    match.offset = match.uniprotStart - match.pdbStart;
+                    match.setChainID(chain.getChainID());
+                    match.setChainSequence(chain.getAtomSequence());
+                    match.setGene(uniprotToGene.get(uniprotID));
+                    match.setUniprot(uniprotID);
+                    match.setPdbStart(chain.getAtomGroup(0).getResidueNumber().getSeqNum());
+                    match.setUniprotStart(index + 1);
+                    match.setOffset(match.getUniprotStart() - match.getPdbStart());
                     chainToMatch.put(chain, match);
 
                     //no duplicates
@@ -607,49 +622,6 @@ public class Interactome3dAnalyzer {
         return -1.0;
     }
 
-    public static class PDBUniProtMatch {
-
-        private String chainID;
-        private String chainSequence;
-        private String uniprot;
-        private String gene;
-        private int pdbStart;
-        private int uniprotStart;
-        private int offset; // Add this number to pdb cooridnate to get UniProt coordiate
-        
-        public PDBUniProtMatch() {
-            
-        }
-
-        public String getChainID() {
-            return chainID;
-        }
-
-        public String getChainSequence(){
-            return chainSequence;
-        }
-
-        public String getUniprot() {
-            return uniprot;
-        }
-
-        public String getGene() {
-            return gene;
-        }
-
-        public int getPdbStart() {
-            return pdbStart;
-        }
-
-        public int getUniprotStart() {
-            return uniprotStart;
-        }
-
-        public int getOffset() {
-            return offset;
-        }
-    }
-    
     private class InteractionPDBScore implements Comparable<InteractionPDBScore> {
         
         private boolean isInRepresent;

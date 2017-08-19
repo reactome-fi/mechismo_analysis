@@ -1,11 +1,13 @@
 package org.reactome.structure.model;
 
+import org.reactome.funcInt.Protein;
+
 /**
  * Created by burkhart on 3/10/17.
  */
-public class MutationObservation {
+public class ProteinMutation {
 
-    private String gene;
+    private Protein protein;
     private Integer coordinate;
     private String mutation;
     private String mutationType;
@@ -13,14 +15,14 @@ public class MutationObservation {
     private String mutationZygosity;
     private String sample;
 
-    public MutationObservation() {
+    public ProteinMutation() {
     }
 
-    public MutationObservation(String gene,
-                               Integer coordinate,
-                               String mutation,
-                               String sample){
-        this.gene = gene;
+    public ProteinMutation(String gene,
+                           Integer coordinate,
+                           String mutation,
+                           String sample){
+        setGene(gene);
         this.coordinate = coordinate;
         this.mutation = mutation;
         this.sample = sample;
@@ -43,11 +45,22 @@ public class MutationObservation {
     }
 
     public String getGene() {
-        return gene;
+        if (protein != null)
+            return protein.getShortName();
+        return null;
     }
 
     public void setGene(String gene) {
-        this.gene = gene;
+        protein = new Protein();
+        protein.setShortName(gene);
+    }
+    
+    public void setProtein(Protein protein) {
+        this.protein = protein;
+    }
+    
+    public Protein getProtein() {
+        return this.protein;
     }
 
     public Integer getCoordinate() {
@@ -83,6 +96,6 @@ public class MutationObservation {
     }
 
     public String toString() {
-        return gene + " " + mutation + " " + fathmmType + " " + sample + " " + mutationZygosity;
+        return protein.getShortName() + " " + mutation + " " + fathmmType + " " + sample + " " + mutationZygosity;
     }
 }

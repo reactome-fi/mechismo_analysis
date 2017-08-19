@@ -5,7 +5,11 @@ public class InteractionMutationProfile{
     private ProteinMutationProfile gene1MutationProfile;
     private ProteinMutationProfile gene2MutationProfile;
     private double p_value;
-    private String pdbFileName;
+    private InteractionStructure structure;
+    
+    public InteractionMutationProfile() {
+        
+    }
     
     public InteractionMutationProfile(ProteinMutationProfile gene1MutationProfile,
                                       ProteinMutationProfile gene2MutationProfile,
@@ -15,6 +19,14 @@ public class InteractionMutationProfile{
         this.p_value = p_value;
     }
     
+    public InteractionStructure getStructure() {
+        return structure;
+    }
+
+    public void setStructure(InteractionStructure structure) {
+        this.structure = structure;
+    }
+
     public ProteinMutationProfile getGene1MutationProfile(){
         return this.gene1MutationProfile;
     }
@@ -25,14 +37,6 @@ public class InteractionMutationProfile{
     
     public double getP_value(){
         return this.p_value;
-    }
-
-    public String getPdbFileName() {
-        return pdbFileName;
-    }
-
-    public void setPdbFileName(String pdbFileName) {
-        this.pdbFileName = pdbFileName;
     }
 
     public void setGene1MutationProfile(ProteinMutationProfile gene1MutationProfile) {

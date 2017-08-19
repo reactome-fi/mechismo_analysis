@@ -1,38 +1,101 @@
 package org.reactome.structure.model;
 
+import java.util.Collection;
+
+import org.reactome.funcInt.Protein;
+
 public class ProteinMutationProfile {
     
-    private String proteinName;
-    private int interfaceLength;
-    private int geneLength;
     private int interfaceMutationCount;
-    private int geneMutationCount;
+    private Protein protein;
+    private ProteinChainInfo chainInfo;
+    private Collection<ProteinMutation> mutations;
+    // These two p-values are related to interface enrichment results
+    private Double enrichmentPValue;
+    private Double singleAAPValue;
     
     public ProteinMutationProfile() {
     }
     
+    @Deprecated
     public ProteinMutationProfile(String geneName,
                                   int interfaceLength,
                                   int geneLength,
                                   int interfaceMutationCount,
                                   int geneMutationCount){
-        this.proteinName = geneName;
-        this.interfaceLength = interfaceLength;
-        this.geneLength = geneLength;
         this.interfaceMutationCount = interfaceMutationCount;
-        this.geneMutationCount = geneMutationCount;
+        setGeneName(geneName);
+//        setInterfaceLength(interfaceLength);
+//        setInteractionMuationCount(interactionMutationCount);
     }
     
+    public Double getEnrichmentPValue() {
+        return enrichmentPValue;
+    }
+
+    public void setEnrichmentPValue(Double enrichmentPValue) {
+        this.enrichmentPValue = enrichmentPValue;
+    }
+
+    public Double getSingleAAPValue() {
+        return singleAAPValue;
+    }
+
+    public void setSingleAAPValue(Double singleAAPValue) {
+        this.singleAAPValue = singleAAPValue;
+    }
+
+    public void setGeneName(String geneName) {
+        if (protein != null)
+            return;
+        protein = new Protein();
+        protein.setShortName(geneName);
+    }
+    
+    public Protein getProtein() {
+        return protein;
+    }
+
+    public void setProtein(Protein protein) {
+        this.protein = protein;
+    }
+
+    public ProteinChainInfo getChainInfo() {
+        return chainInfo;
+    }
+
+    public void setChainInfo(ProteinChainInfo chainInfo) {
+        this.chainInfo = chainInfo;
+    }
+
+    public Collection<ProteinMutation> getMutations() {
+        return mutations;
+    }
+
+    public void setMutations(Collection<ProteinMutation> mutations) {
+        this.mutations = mutations;
+    }
+
+    public void setInterfaceMutationCount(int interfaceMutationCount) {
+        this.interfaceMutationCount = interfaceMutationCount;
+    }
+
     public String getGeneName(){
-        return this.proteinName;
+        if (protein != null)
+            return protein.getShortName();
+        return null;
     }
     
-    public int getInterfaceLength(){
-        return this.interfaceLength;
+    public int getInterfaceLength() {
+        if (chainInfo != null)
+            return chainInfo.getInterfaceCoordinates().size();
+        return -1;
     }
     
     public int getGeneLength(){
-        return this.geneLength;
+        if (protein != null)
+            return protein.getSequence().length();
+        return -1;
     }
     
     public int getInterfaceMutationCount(){
@@ -40,23 +103,23 @@ public class ProteinMutationProfile {
     }
     
     public int getGeneMutationCount(){
-        return this.geneMutationCount;
+        if (mutations != null)
+            return mutations.size();
+        return -1;
     }
 
     public boolean isValid(){
-        return this.proteinName != null
-                && !this.proteinName.equals("")
-                && this.geneLength > 0
-                && this.interfaceLength <= this.geneLength;
+        return getInterfaceLength() > -1 && getGeneLength() > -1 &&
+               getGeneLength() > getInterfaceLength();
     }
     
     public String toString(){
         return String.format("%s,%d,%d,%d,%d",
-                                this.proteinName,
-                                this.interfaceLength,
-                                this.geneLength,
-                                this.interfaceMutationCount,
-                                this.geneMutationCount);
+                                getGeneName(),
+                                getInterfaceLength(),
+                                getGeneLength(),
+                                getInterfaceMutationCount(),
+                                getGeneMutationCount());
     }
 
 }

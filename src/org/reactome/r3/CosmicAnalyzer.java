@@ -6,7 +6,7 @@ package org.reactome.r3;
 
 import org.junit.Test;
 import org.reactome.r3.util.FileUtility;
-import org.reactome.structure.model.MutationObservation;
+import org.reactome.structure.model.ProteinMutation;
 
 import java.io.IOException;
 import java.util.*;
@@ -47,10 +47,10 @@ public class CosmicAnalyzer {
      * @param coordinates
      * @return
      */
-    public List<MutationObservation> filterEntries(List<MutationObservation> entries,
+    public List<ProteinMutation> filterEntries(List<ProteinMutation> entries,
                                                    Collection<Integer> coordinates) {
-        List<MutationObservation> rtn = new ArrayList<MutationObservation>();
-        for (MutationObservation entry : entries) {
+        List<ProteinMutation> rtn = new ArrayList<ProteinMutation>();
+        for (ProteinMutation entry : entries) {
             if (coordinates.contains(entry.getCoordinate()))
                 rtn.add(entry);
 //            else if (coordinates.contains(entry.coordinate + 1))
@@ -68,7 +68,7 @@ public class CosmicAnalyzer {
      * @return
      * @throws IOException
      */
-    public Map<String, List<MutationObservation>> loadMutations(Set<String> genes) throws IOException {
+    public Map<String, List<ProteinMutation>> loadMutations(Set<String> genes) throws IOException {
         Set<String> mutationTypes = new HashSet<String>();
         mutationTypes.add("Substitution - Missense");
 //        mutationTypes.add("Substitution - Nonsense");
@@ -110,11 +110,11 @@ public class CosmicAnalyzer {
      * @return
      * @throws IOException
      */
-    public Map<String, List<MutationObservation>> loadMutations(Set<String> genes,
+    public Map<String, List<ProteinMutation>> loadMutations(Set<String> genes,
                                                                 boolean pathogenicOnly,
                                                                 boolean needZygosity,
                                                                 Set<String> mutationTypes) throws IOException {
-        List<MutationObservation> list = new ArrayList<MutationObservation>();
+        List<ProteinMutation> list = new ArrayList<ProteinMutation>();
         String fileName = DIR_NAME + "CosmicMutantExport.tsv";
         FileUtility fu = new FileUtility();
         fu.setInput(fileName);
@@ -133,7 +133,7 @@ public class CosmicAnalyzer {
             // Check mutation type
             if (!mutationTypes.contains(tokens[19]))
                 continue;
-            MutationObservation entry = new MutationObservation();
+            ProteinMutation entry = new ProteinMutation();
             entry.setGene(tokens[0]);
             entry.setFathmmType(tokens[27]);
             entry.setMutationType(tokens[19]);
@@ -146,36 +146,36 @@ public class CosmicAnalyzer {
         }
         fu.close();
         // Do a sort into a map
-        Map<String, List<MutationObservation>> geneToEntries = new HashMap<String, List<MutationObservation>>();
-        for (MutationObservation entry : list) {
-            List<MutationObservation> entries = geneToEntries.get(entry.getGene());
+        Map<String, List<ProteinMutation>> geneToEntries = new HashMap<String, List<ProteinMutation>>();
+        for (ProteinMutation entry : list) {
+            List<ProteinMutation> entries = geneToEntries.get(entry.getGene());
             if (entries == null) {
-                entries = new ArrayList<MutationObservation>();
+                entries = new ArrayList<ProteinMutation>();
                 geneToEntries.put(entry.getGene(), entries);
             }
             entries.add(entry);
         }
-        Map<String, List<MutationObservation>> rtn = new HashMap<String, List<MutationObservation>>();
+        Map<String, List<ProteinMutation>> rtn = new HashMap<String, List<ProteinMutation>>();
         for (String gene : geneToEntries.keySet()) {
-            List<MutationObservation> entries = mergeEntries(geneToEntries.get(gene));
+            List<ProteinMutation> entries = mergeEntries(geneToEntries.get(gene));
             rtn.put(gene, entries);
         }
         return rtn;
     }
 
-    private List<MutationObservation> mergeEntries(List<MutationObservation> entries) {
+    private List<ProteinMutation> mergeEntries(List<ProteinMutation> entries) {
         if (entries.size() < 2)
             return entries;
         // Duplications found in the downloaded file (e.g. BRAF, L505H),
         // use the following to remove duplications
-        Map<String, MutationObservation> keyToEntry = new HashMap<String, MutationObservation>();
-        for (MutationObservation entry : entries) {
+        Map<String, ProteinMutation> keyToEntry = new HashMap<String, ProteinMutation>();
+        for (ProteinMutation entry : entries) {
             String key = entry.getGene() + ";" + entry.getMutation() + ";" + entry.getSample();
             if (keyToEntry.containsKey(key))
                 continue;
             keyToEntry.put(key, entry);
         }
-        return new ArrayList<MutationObservation>(keyToEntry.values());
+        return new ArrayList<ProteinMutation>(keyToEntry.values());
     }
 
     @Test
@@ -187,18 +187,18 @@ public class CosmicAnalyzer {
         Set<String> mutationTypes = new HashSet<String>();
         mutationTypes.add("Substitution - Missense");
         mutationTypes.add("Substitution - Nonsense");
-        Map<String, List<MutationObservation>> geneToEntries = loadMutations(genes,
+        Map<String, List<ProteinMutation>> geneToEntries = loadMutations(genes,
                 true,
                 true,
                 mutationTypes);
-        List<MutationObservation> entries = geneToEntries.get(gene);
+        List<ProteinMutation> entries = geneToEntries.get(gene);
         System.out.println("Total entries for " + gene + ": " + entries.size());
-        Collections.sort(entries, new Comparator<MutationObservation>() {
-            public int compare(MutationObservation entry1, MutationObservation entry2) {
+        Collections.sort(entries, new Comparator<ProteinMutation>() {
+            public int compare(ProteinMutation entry1, ProteinMutation entry2) {
                 return entry1.getCoordinate().compareTo(entry2.getCoordinate());
             }
         });
-        for (MutationObservation entry : entries)
+        for (ProteinMutation entry : entries)
             System.out.println(entry);
     }
 
