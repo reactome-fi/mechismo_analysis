@@ -2,20 +2,20 @@ package org.reactome.structure.model;
 
 public class InteractionMutationProfile{
     
-    private ProteinMutationProfile gene1MutationProfile;
-    private ProteinMutationProfile gene2MutationProfile;
+    private ProteinMutationProfile profile1;
+    private ProteinMutationProfile profile2;
     private double p_value;
     private InteractionStructure structure;
     
     public InteractionMutationProfile() {
-        
     }
     
+    @Deprecated
     public InteractionMutationProfile(ProteinMutationProfile gene1MutationProfile,
                                       ProteinMutationProfile gene2MutationProfile,
                                       double p_value){
-        this.gene1MutationProfile = gene1MutationProfile;
-        this.gene2MutationProfile = gene2MutationProfile;
+        this.profile1 = gene1MutationProfile;
+        this.profile2 = gene2MutationProfile;
         this.p_value = p_value;
     }
     
@@ -27,24 +27,24 @@ public class InteractionMutationProfile{
         this.structure = structure;
     }
 
-    public ProteinMutationProfile getGene1MutationProfile(){
-        return this.gene1MutationProfile;
+    public ProteinMutationProfile getFirstProteinProfile(){
+        return this.profile1;
     }
     
-    public ProteinMutationProfile getGene2MutationProfile(){
-        return this.gene2MutationProfile;
+    public ProteinMutationProfile getSecondProteinProfile(){
+        return this.profile2;
     }
     
     public double getP_value(){
         return this.p_value;
     }
 
-    public void setGene1MutationProfile(ProteinMutationProfile gene1MutationProfile) {
-        this.gene1MutationProfile = gene1MutationProfile;
+    public void setFirstProteinProfile(ProteinMutationProfile gene1MutationProfile) {
+        this.profile1 = gene1MutationProfile;
     }
 
-    public void setGene2MutationProfile(ProteinMutationProfile gene2MutationProfile) {
-        this.gene2MutationProfile = gene2MutationProfile;
+    public void setSecondProteinProfile(ProteinMutationProfile gene2MutationProfile) {
+        this.profile2 = gene2MutationProfile;
     }
 
     public void setP_value(double p_value) {

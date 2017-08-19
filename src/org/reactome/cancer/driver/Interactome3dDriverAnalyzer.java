@@ -705,8 +705,8 @@ public class Interactome3dDriverAnalyzer {
 
                 fop.write(String.format("%s,%s,%s,%f,%f\n",
                         interactionWithInterface,
-                        interfaceMutationRatios.get(interactionWithInterface).getGene1MutationProfile(),
-                        interfaceMutationRatios.get(interactionWithInterface).getGene2MutationProfile(),
+                        interfaceMutationRatios.get(interactionWithInterface).getFirstProteinProfile(),
+                        interfaceMutationRatios.get(interactionWithInterface).getSecondProteinProfile(),
                         interfaceMutationRatios.get(interactionWithInterface).getP_value(),
                         mechismoScore).getBytes());
             }

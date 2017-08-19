@@ -99,5 +99,6 @@
 	<classpathentry kind="lib" path="lib/reactome/fiNetworkBuild.jar"/>
 	<classpathentry kind="lib" path="lib/jGraphT/jgraph-5.13.0.0.jar"/>
 	<classpathentry kind="lib" path="lib/jGraphT/jgrapht-core-1.0.0.jar"/>
+	<classpathentry kind="lib" path="lib/reactome/caBigR3.jar"/>
 	<classpathentry kind="output" path="classes"/>
 </classpath>

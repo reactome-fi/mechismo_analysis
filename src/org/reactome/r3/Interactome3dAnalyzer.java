@@ -421,10 +421,11 @@ public class Interactome3dAnalyzer {
     
     @Test
     public void checkInterfaces() throws Exception {
-        String dir = "datasets/interactome3d/2016_06/reactions_fdr_01/complete/interactions_2/";
-        String fileName = dir + "P20393-Q07869-MDL-1a6y.pdb1-B-0-A-0.pdb";
+//        String dir = "datasets/interactome3d/2016_06/reactions_fdr_01/complete/interactions_2/";
+//        String fileName = dir + "P20393-Q07869-MDL-1a6y.pdb1-B-0-A-0.pdb";
+        String fileName = "datasets/interactome3d/2017_01/representative/interactions_06/P00533-P01133-EXP-1nql.pdb1-A-0-B-0.pdb";
         setUpAtomCache();
-        fileName = "results/DriverGenes/Drivers_0816/interactome3D/reaction_69213/representative/interactions_1/P11802-P42771-MDL-1bi7.pdb1-A-0-B-0.pdb";
+//        fileName = "results/DriverGenes/Drivers_0816/interactome3D/reaction_69213/representative/interactions_1/P11802-P42771-MDL-1bi7.pdb1-A-0-B-0.pdb";
         Structure structure = StructureIO.getStructure(fileName);
         Map<Chain, List<Integer>> chainToResidues = extractContacts(structure);
         for (Chain chain : chainToResidues.keySet()) {

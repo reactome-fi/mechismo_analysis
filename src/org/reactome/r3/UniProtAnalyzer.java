@@ -320,7 +320,7 @@ public class UniProtAnalyzer {
     } 
     
     public Map<String, String> getUniProtAccessionToGeneName() throws IOException {
-        Map<String, Set<String>> geneToAcc = generateGeneNameToUniAccesssMap(false);
+        Map<String, Set<String>> geneToAcc = generateGeneNameToUniAccesssMap(true);
         Map<String, String> accToGene = new HashMap<String, String>();
         for (String gene : geneToAcc.keySet()) {
             Set<String> acces = geneToAcc.get(gene);

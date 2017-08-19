@@ -800,6 +800,16 @@ public class ProteinSequenceHandler {
         return loadUniProtSequences(fileName);
     }
     
+    @Test
+    public void testLoadSwissProtSequences() throws IOException {
+        Map<String, Sequence> proteinToSequence = loadSwissProtSequences();
+        System.out.println("Total sequences: " + proteinToSequence.size());
+        String check = "P00533";
+        String key = "UniProt:" + check;
+        if (proteinToSequence.containsKey(key))
+            System.out.println(check + ": " + proteinToSequence.get(key).getSequence());
+    }
+    
     public Map<String, Sequence> loadTremblSequences() throws IOException {
         String fileName = UNIPROT_DIR + "uniprot_trembl_human.dat";
         return loadUniProtSequences(fileName);

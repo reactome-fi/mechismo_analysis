@@ -8,6 +8,7 @@ import org.reactome.funcInt.Protein;
 public class ProteinMutation {
 
     private Protein protein;
+    
     private Integer coordinate;
     private String mutation;
     private String mutationType;

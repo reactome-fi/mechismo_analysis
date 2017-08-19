@@ -4,17 +4,22 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
+import org.apache.log4j.Logger;
 import org.biojava.nbio.structure.Chain;
 import org.biojava.nbio.structure.Group;
 import org.biojava.nbio.structure.GroupType;
 import org.biojava.nbio.structure.Structure;
 import org.biojava.nbio.structure.StructureException;
 import org.biojava.nbio.structure.StructureIO;
+import org.junit.Test;
 import org.reactome.funcInt.Protein;
 import org.reactome.r3.CosmicAnalyzer;
+import org.reactome.r3.HGNCAnalyzer;
 import org.reactome.r3.Interactome3dAnalyzer;
 import org.reactome.r3.ProteinSequenceHandler;
 import org.reactome.r3.ProteinSequenceHandler.Sequence;
@@ -26,6 +31,7 @@ import org.reactome.structure.model.PDBUniProtMatch;
 import org.reactome.structure.model.ProteinChainInfo;
 import org.reactome.structure.model.ProteinMutation;
 import org.reactome.structure.model.ProteinMutationProfile;
+import org.reactome.structure.model.ResiduleMutationProfile;
 
 /**
  * This class is used to analyze mutation enrichment in the protein interaction interface between
@@ -34,6 +40,8 @@ import org.reactome.structure.model.ProteinMutationProfile;
  *
  */
 public class InteractionInterfaceAnalyzer {
+    private static final Logger logger = Logger.getLogger(InteractionInterfaceAnalyzer.class);
+    
     // An helper object
     private Interactome3dAnalyzer interactome3dAnalyzer;
     // Cache sequence information for quick performance
@@ -49,20 +57,32 @@ public class InteractionInterfaceAnalyzer {
         if (interactome3dAnalyzer == null)
             interactome3dAnalyzer = new Interactome3dAnalyzer();
         if (accToSeq == null) {
+            logger.info("Loading UniProt accession to sequence...");
             ProteinSequenceHandler sequenceHandler = new ProteinSequenceHandler();
             accToSeq = sequenceHandler.loadSwissProtSequences();
+            logger.info("Done.");
         }
         if (accessionToGene == null) {
-            UniProtAnalyzer uniProtAnalyzer = new UniProtAnalyzer();
-            accessionToGene = uniProtAnalyzer.getUniProtAccessionToGeneName();
+            logger.info("Loading UniProt accession to gene names...");
+            UniProtAnalyzer hgncAnalyzer = new UniProtAnalyzer();
+            accessionToGene = hgncAnalyzer.getUniProtAccessionToGeneName();
+            logger.info("Done.");
         }
-        if (geneToMutations == null) {
-            // Need to load COSMIC data as the default
+        if (geneToMutations == null || geneToMutations.size() == 0) {
+            throw new IllegalStateException("geneToMutations property has not been set!");
         }
     }
     
-    public void setGeneToMuations(Map<String, List<ProteinMutation>> geneToMutations) {
+    public void setGeneToMutations(Map<String, List<ProteinMutation>> geneToMutations) {
         this.geneToMutations = geneToMutations;
+    }
+    
+    public Map<String, List<ProteinMutation>> getGeneToMutations() {
+        return this.geneToMutations;
+    }
+    
+    public InteractionMutationProfile analyze(String pdbFileName) throws IOException, StructureException {
+        return analyze(new File(pdbFileName));
     }
     
     public InteractionMutationProfile analyze(File pdbFile) throws IOException, StructureException {
@@ -83,8 +103,7 @@ public class InteractionInterfaceAnalyzer {
                     accessionToGene);
         interactome3dAnalyzer.remapCoordinates(chainToMatch, chainToCoordinates);
         InteractionMutationProfile profile = checkInterfaces(chainToCoordinates,
-                                                             chainToMatch,
-                                                             geneToMutations);
+                                                             chainToMatch);
         InteractionStructure intStructure = new InteractionStructure();
         intStructure.setStructure(structure);
         profile.setStructure(intStructure);
@@ -92,8 +111,7 @@ public class InteractionInterfaceAnalyzer {
     }
     
     private InteractionMutationProfile checkInterfaces(Map<Chain, List<Integer>> chainToContactCoordiantes,
-                                                       Map<Chain, PDBUniProtMatch> chainToMatch,
-                                                       Map<String, List<ProteinMutation>> geneToMutations) {
+                                                       Map<Chain, PDBUniProtMatch> chainToMatch) {
         // Output from the interface analysis
         // There should be only two entries in these two maps
         if (chainToContactCoordiantes.size() != 2 || chainToMatch.size() != 2)
@@ -123,7 +141,11 @@ public class InteractionInterfaceAnalyzer {
             Protein protein = new Protein();
             protein.setPrimaryAccession(match.getUniprot());
             protein.setShortName(match.getGene());
-            protein.setSequence(accToSeq.get(protein.getPrimaryAccession()).getSequence());
+            String seqKey = "UniProt:" + protein.getPrimaryAccession();
+            Sequence sequence = accToSeq.get(seqKey);
+            if (sequence == null)
+                throw new IllegalStateException("Cannot find sequence for " + protein.getPrimaryAccession());
+            protein.setSequence(sequence.getSequence());
             
             chainInfo.setProtein(protein);
             chainInfo.setInterfaceCoordinates(contactCoords);
@@ -134,15 +156,14 @@ public class InteractionInterfaceAnalyzer {
             List<Integer> remappedSeqNumbers = remapChainSeqNumbers(chain, match);
             List<ProteinMutation> mutationsInChain = cosmicHelper.filterEntries(mutations, remappedSeqNumbers);
             if (mutationsInChain.size() == 0) {
-                System.out.println(match.getGene() + " doesn't have mutations in chain!");
+                logger.info(match.getGene() + " doesn't have mutations in chain!");
                 continue;
             }
             List<ProteinMutation> interfaceMutations = cosmicHelper.filterEntries(mutations, contactCoords);
             if (interfaceMutations.size() == 0) {
-                System.out.println(match.getGene() + " dosn't have mutations in interface!");
+                logger.info(match.getGene() + " dosn't have mutations in interface!");
                 continue;
             }
-//            double mutationRatio = (double) interfaceMutations.size() / mutationsInChain.size();
             double contactRatio = (double) contactCoords.size() / chain.getAtomGroups().size();
             double pvalue = 1.0;
             if (contactRatio < 1.0d) { // Otherwise, we cannot use binomial test
@@ -151,14 +172,14 @@ public class InteractionInterfaceAnalyzer {
                         interfaceMutations.size());
                 current.setEnrichmentPValue(pvalue);
             }
-            double singleAApValue = calculatePValueForPositionMutation(interfaceMutations,
+            ResiduleMutationProfile aaProfile = calculatePValueForPositionMutation(interfaceMutations,
                                                                        mutationsInChain,
                                                                        remappedSeqNumbers);
-            current.setSingleAAPValue(singleAApValue);
+            current.setMinAAProfile(aaProfile);
         } 
         InteractionMutationProfile intMutProfile = new InteractionMutationProfile();
-        intMutProfile.setGene1MutationProfile(profile1);
-        intMutProfile.setGene2MutationProfile(profile2);
+        intMutProfile.setFirstProteinProfile(profile1);
+        intMutProfile.setSecondProteinProfile(profile2);
         return intMutProfile;
     }
     
@@ -168,11 +189,10 @@ public class InteractionInterfaceAnalyzer {
      * @param chainMutations
      * @param chainNumbers
      * @return
-     * TODO: May need to figure out which residule has the smallest p-value.
      */
-    private double calculatePValueForPositionMutation(List<ProteinMutation> interfaceMutations,
-                                                      List<ProteinMutation> chainMutations,
-                                                      List<Integer> chainNumbers) {
+    private ResiduleMutationProfile calculatePValueForPositionMutation(List<ProteinMutation> interfaceMutations,
+                                                                       List<ProteinMutation> chainMutations,
+                                                                       List<Integer> chainNumbers) {
         Map<Integer, Integer> posToMutCount = new HashMap<Integer, Integer>();
         for (ProteinMutation entry : interfaceMutations) {
             Integer count = posToMutCount.get(entry.getCoordinate());
@@ -183,18 +203,24 @@ public class InteractionInterfaceAnalyzer {
         }
         double pvalue = 1.0d; // Largest p-value
         double ratio = 1.0d / chainNumbers.size();
+        int minPos = -1;
         for (Integer pos : posToMutCount.keySet()) {
             Integer count = posToMutCount.get(pos);
             double tmpPValue = MathUtilities.calculateBinomialPValue(ratio,
                     chainMutations.size(),
                     count);
-            if (tmpPValue < pvalue)
+            if (tmpPValue < pvalue) {
                 pvalue = tmpPValue;
+                minPos = pos;
+            }
         }
-        double rtn = pvalue * posToMutCount.size(); // Perform a Bonferroni correction
-        if (rtn > 1.0d)
-            rtn = 1.0d;
-        return rtn;
+        pvalue = pvalue * posToMutCount.size(); // Perform a Bonferroni correction
+        if (pvalue > 1.0d)
+            pvalue = 1.0d;
+        ResiduleMutationProfile profile = new ResiduleMutationProfile();
+        profile.setPvalue(pvalue);
+        profile.setCoordinate(minPos);
+        return profile;
     }
 
     
@@ -213,6 +239,32 @@ public class InteractionInterfaceAnalyzer {
             list.add(old + match.getOffset());
         }
         return list;
+    }
+    
+    @Test
+    public void testAnalyze() throws Exception {
+        Set<String> targetGenes = new HashSet<>();
+        
+        // Check two genes: EGF and EGFR
+        // Cannot find anything with this example
+//        targetGenes.add("EGF");
+//        targetGenes.add("EGFR");
+//        String fileName = "datasets/interactome3d/2017_01/representative/interactions_06/P00533-P01133-EXP-1nql.pdb1-A-0-B-0.pdb";
+        
+        // Better example
+        targetGenes.add("EGFR");
+        targetGenes.add("SHC1");
+        String fileName = "datasets/interactome3d/2017_01/representative//interactions_06/P00533-P29353-EXP-5czi.pdb1-A-0-B-0.pdb";
+        
+        CosmicAnalyzer cosmicAnalyzer = new CosmicAnalyzer();
+        Map<String, List<ProteinMutation>> geneToCosmicEntries = cosmicAnalyzer.loadMutations(targetGenes);
+        System.out.println("Total mutations loaded: " + geneToCosmicEntries.size());
+        setGeneToMutations(geneToCosmicEntries);
+        InteractionMutationProfile profile = analyze(fileName);
+        ProteinMutationProfile proteinProfile = profile.getFirstProteinProfile();
+        System.out.println(proteinProfile.getGeneName() + ": " + proteinProfile.getEnrichmentPValue() + ", " + proteinProfile.getMinAAProfile());
+        proteinProfile = profile.getSecondProteinProfile();
+        System.out.println(proteinProfile.getGeneName() + ": " + proteinProfile.getEnrichmentPValue() + ", " + proteinProfile.getMinAAProfile());
     }
 
 }

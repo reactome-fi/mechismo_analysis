@@ -12,7 +12,7 @@ public class ProteinMutationProfile {
     private Collection<ProteinMutation> mutations;
     // These two p-values are related to interface enrichment results
     private Double enrichmentPValue;
-    private Double singleAAPValue;
+    private ResiduleMutationProfile minAAProfile;
     
     public ProteinMutationProfile() {
     }
@@ -37,12 +37,16 @@ public class ProteinMutationProfile {
         this.enrichmentPValue = enrichmentPValue;
     }
 
-    public Double getSingleAAPValue() {
-        return singleAAPValue;
+    public ResiduleMutationProfile getMinAAProfile() {
+        return minAAProfile;
     }
 
-    public void setSingleAAPValue(Double singleAAPValue) {
-        this.singleAAPValue = singleAAPValue;
+    /**
+     * Set the mutation profile with the minimum p-value in the interaction interface.
+     * @param profile
+     */
+    public void setMinAAProfile(ResiduleMutationProfile profile) {
+        this.minAAProfile = profile;
     }
 
     public void setGeneName(String geneName) {

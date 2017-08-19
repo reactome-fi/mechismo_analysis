@@ -21,7 +21,9 @@ import java.util.regex.Pattern;
 public class CosmicAnalyzer {
     //    private final String DIR_NAME = "datasets/COSMIC/v78/";
     // As of February 27, 2017, use v80
-    private final String DIR_NAME = "datasets/COSMIC/v80/";
+//    private final String DIR_NAME = "datasets/COSMIC/v80/";
+    // Use version v82 as of August 19, 2017
+    private final String DIR_NAME = "datasets/COSMIC/v82/";
 
     /**
      * Default constructor.
