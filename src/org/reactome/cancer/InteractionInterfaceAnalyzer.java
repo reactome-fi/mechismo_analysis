@@ -19,7 +19,6 @@ import org.biojava.nbio.structure.StructureIO;
 import org.junit.Test;
 import org.reactome.funcInt.Protein;
 import org.reactome.r3.CosmicAnalyzer;
-import org.reactome.r3.HGNCAnalyzer;
 import org.reactome.r3.Interactome3dAnalyzer;
 import org.reactome.r3.ProteinSequenceHandler;
 import org.reactome.r3.ProteinSequenceHandler.Sequence;
@@ -64,11 +63,13 @@ public class InteractionInterfaceAnalyzer {
         }
         if (accessionToGene == null) {
             logger.info("Loading UniProt accession to gene names...");
-            UniProtAnalyzer hgncAnalyzer = new UniProtAnalyzer();
-            accessionToGene = hgncAnalyzer.getUniProtAccessionToGeneName();
+            UniProtAnalyzer uniprotAnalyzer = new UniProtAnalyzer();
+            accessionToGene = uniprotAnalyzer.getUniProtAccessionToGeneName();
             logger.info("Done.");
         }
         if (geneToMutations == null || geneToMutations.size() == 0) {
+            // Avoid to load cosmic mutations to save memory. The current way is to load
+            // mutation profiles for target genes only.
             throw new IllegalStateException("geneToMutations property has not been set!");
         }
     }
@@ -102,7 +103,7 @@ public class InteractionInterfaceAnalyzer {
                     acces,
                     accessionToGene);
         interactome3dAnalyzer.remapCoordinates(chainToMatch, chainToCoordinates);
-        InteractionMutationProfile profile = checkInterfaces(chainToCoordinates,
+        InteractionMutationProfile profile = analyzeInterface(chainToCoordinates,
                                                              chainToMatch);
         InteractionStructure intStructure = new InteractionStructure();
         intStructure.setStructure(structure);
@@ -110,8 +111,8 @@ public class InteractionInterfaceAnalyzer {
         return profile;
     }
     
-    private InteractionMutationProfile checkInterfaces(Map<Chain, List<Integer>> chainToContactCoordiantes,
-                                                       Map<Chain, PDBUniProtMatch> chainToMatch) {
+    private InteractionMutationProfile analyzeInterface(Map<Chain, List<Integer>> chainToContactCoordiantes,
+                                                        Map<Chain, PDBUniProtMatch> chainToMatch) {
         // Output from the interface analysis
         // There should be only two entries in these two maps
         if (chainToContactCoordiantes.size() != 2 || chainToMatch.size() != 2)
@@ -128,6 +129,8 @@ public class InteractionInterfaceAnalyzer {
                 throw new IllegalArgumentException("Cannot find a match for chain " + chain);
             if (current == null)
                 current = profile1;
+            else
+                current = profile2;
             List<ProteinMutation> mutations = geneToMutations.get(match.getGene());
             if (mutations == null) {
                 // This should be normal. No need to print out anything here.
@@ -146,6 +149,7 @@ public class InteractionInterfaceAnalyzer {
             if (sequence == null)
                 throw new IllegalStateException("Cannot find sequence for " + protein.getPrimaryAccession());
             protein.setSequence(sequence.getSequence());
+            current.setProtein(protein);
             
             chainInfo.setProtein(protein);
             chainInfo.setInterfaceCoordinates(contactCoords);

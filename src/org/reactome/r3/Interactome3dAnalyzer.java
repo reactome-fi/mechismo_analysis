@@ -45,7 +45,6 @@ import org.reactome.px.util.InteractionUtilities;
 import org.reactome.r3.ProteinSequenceHandler.Sequence;
 import org.reactome.r3.util.FileUtility;
 import org.reactome.structure.model.PDBUniProtMatch;
-import org.reactome.structure.model.ProteinChainInfo;
 
 /**
  * This class is used to handle interaction structure data downloaded from interactome3d.
@@ -522,27 +521,6 @@ public class Interactome3dAnalyzer {
         }
     }
 
-    /**
-     * Overloaded method.
-     * @param structure
-     * @param acces
-     * @param accToSeq
-     * @param accToGene
-     * @return
-     * @throws IOException
-     */
-    public Map<Chain, PDBUniProtMatch> mapCoordinatesToUniProtInPDB(Structure structure,
-                                                                    String[] acces,
-                                                                    Map<String, Sequence> accToSeq,
-                                                                    Map<String, String> accToGene) throws IOException {
-        return mapCoordinatesToUniProtInPDB(
-                structure,
-                acces,
-                accToSeq,
-                accToGene,
-                true);
-    }
-    
     public void remapCoordinates(Map<Chain, PDBUniProtMatch> chainToMatch,
                                  Map<Chain, List<Integer>> chainToCoordinates) {
         for (Chain chain : chainToCoordinates.keySet()) {
@@ -558,11 +536,21 @@ public class Interactome3dAnalyzer {
         }
     }
 
+    /**
+     * Note: removePrintLines in the method. Don't add debug related control as the parameter. Think this is used as
+     * a public API.
+     * @param structure
+     * @param uniprotIDs
+     * @param uniprotToSeq
+     * @param uniprotToGene
+     * @param printLines
+     * @return
+     * @throws IOException
+     */
     public Map<Chain, PDBUniProtMatch> mapCoordinatesToUniProtInPDB(Structure structure,
                                                                     String[] uniprotIDs,
                                                                     Map<String, Sequence> uniprotToSeq,
-                                                                    Map<String, String> uniprotToGene,
-                                                                    boolean printLines) throws IOException {
+                                                                    Map<String, String> uniprotToGene) throws IOException {
         List<Chain> chains = structure.getChains();
         Iterator<Chain> chainIterator = chains.iterator();
         List<String> uniprotIDsList = new ArrayList<>(Arrays.asList(uniprotIDs));
@@ -570,9 +558,10 @@ public class Interactome3dAnalyzer {
         Map<Chain, PDBUniProtMatch> chainToMatch = new HashMap<>();
         while (chainIterator.hasNext()) {
             Chain chain = chainIterator.next();
-            if(printLines) {
-                System.out.println(chain.getChainID() + ": " + chain.getAtomSequence());
-            }
+            // Don't use printLines as a parameter in the public API method!
+//            if(printLines) {
+//                System.out.println(chain.getChainID() + ": " + chain.getAtomSequence());
+//            }
             while (uniprotIDiterator.hasNext()) {
                 String uniprotID = uniprotIDiterator.next();
                 Sequence seq = uniprotToSeq.get("UniProt:" + uniprotID);

@@ -11,7 +11,7 @@ public class ProteinMutationProfile {
     private ProteinChainInfo chainInfo;
     private Collection<ProteinMutation> mutations;
     // These two p-values are related to interface enrichment results
-    private Double enrichmentPValue;
+    private Double enrichmentPValue = -1.0d;
     private ResiduleMutationProfile minAAProfile;
     
     public ProteinMutationProfile() {
@@ -39,6 +39,10 @@ public class ProteinMutationProfile {
 
     public ResiduleMutationProfile getMinAAProfile() {
         return minAAProfile;
+    }
+    
+    public boolean isEmpty() {
+        return enrichmentPValue < 0.0d;
     }
 
     /**

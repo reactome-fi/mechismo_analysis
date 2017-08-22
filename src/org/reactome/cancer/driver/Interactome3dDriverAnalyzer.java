@@ -50,9 +50,9 @@ import org.reactome.r3.UniProtAnalyzer;
 import org.reactome.r3.util.FileUtility;
 import org.reactome.r3.util.MathUtilities;
 import org.reactome.structure.model.InteractionMutationProfile;
-import org.reactome.structure.model.ProteinMutation;
 import org.reactome.structure.model.PDBUniProtMatch;
 import org.reactome.structure.model.ProteinChainInfo;
+import org.reactome.structure.model.ProteinMutation;
 import org.reactome.structure.model.ProteinMutationProfile;
 
 /**
@@ -1056,8 +1056,7 @@ public class Interactome3dDriverAnalyzer {
                         structure,
                         proteinIDs2,
                         accToSeq,
-                        accessionToGene,
-                        false);
+                        accessionToGene);
             } else {
                 chainToMatch = interactome3dAnalyzer.getMatchForExpStructure(
                         structure,

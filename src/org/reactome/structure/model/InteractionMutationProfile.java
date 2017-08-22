@@ -4,7 +4,7 @@ public class InteractionMutationProfile{
     
     private ProteinMutationProfile profile1;
     private ProteinMutationProfile profile2;
-    private double p_value;
+    private double p_value = -1.0d; // Make as negative to avoid 0.0
     private InteractionStructure structure;
     
     public InteractionMutationProfile() {

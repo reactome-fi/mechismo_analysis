@@ -34,7 +34,7 @@ public class ReactomePathwayAnalyzer extends CancerDriverReactomeAnalyzer {
         GKInstance pathway = dba.fetchInstance(dbId);
         Set<GKInstance> reactions = InstanceUtilities.grepPathwayEventComponents(pathway);
         System.out.println(pathway + ": " + reactions.size());
-        reactions.forEach(System.out::println);
+        
     }
     
     @Test
