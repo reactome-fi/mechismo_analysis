@@ -90,6 +90,8 @@ public class ReactomeReactionAnalyzer {
         Long dbId = 8849032L;
         //5658435 RAS GAPs bind RAS:GTP
         dbId = 5658435L; // We should not see null from this reaction
+        // There is nothing displayed for this reaction
+        dbId = 8848751L; // [Reaction:8848751] PTK6 binds AKT1
         
         GKInstance reaction = dba.fetchInstance(dbId);
         
@@ -121,14 +123,17 @@ public class ReactomeReactionAnalyzer {
             logger.info(reaction + " cannot generate any FIs!");
             return null;
         }
+        logger.info("Extracted FIs: " + fis.size());
         InteractionInterfaceAnalyzer interfaceAnalyzer = new InteractionInterfaceAnalyzer();
         interfaceAnalyzer.setGeneToMutations(geneToMutations);
         ReactionMutationProfile mutationProfile = new ReactionMutationProfile();
         mutationProfile.setExtractFIs(fis);
         fis.forEach(fi -> {
             List<File> pdbs = ppiToPDBs.get(fi);
-            if (pdbs == null || pdbs.size() == 0)
+            if (pdbs == null || pdbs.size() == 0) {
+                logger.info(fi + ": No PDB file!");
                 return;
+            }
             // Want to pick up the result with minimum p-value
             InteractionMutationProfile intMutProfile = null;
             for (File pdbFile : pdbs) {

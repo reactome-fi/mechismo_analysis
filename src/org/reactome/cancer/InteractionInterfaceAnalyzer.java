@@ -88,6 +88,7 @@ public class InteractionInterfaceAnalyzer {
     
     public InteractionMutationProfile analyze(File pdbFile) throws IOException, StructureException {
         ensurePrecondtions();
+        logger.info("Analyzing " + pdbFile.getName());
         Structure structure = StructureIO.getStructure(pdbFile.getAbsolutePath());
         Map<Chain, List<Integer>> chainToCoordinates = interactome3dAnalyzer.extractContacts(structure);
         String[] tokens = pdbFile.getName().split("-");

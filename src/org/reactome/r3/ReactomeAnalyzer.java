@@ -207,6 +207,18 @@ public class ReactomeAnalyzer {
         return genes;
     }
     
+    public Set<String> grepGenesFromPathway(GKInstance pathway) throws Exception {
+        Set<GKInstance> reactions = InstanceUtilities.grepPathwayEventComponents(pathway);
+        Set<GKInstance> participants = new HashSet<>();
+        for (GKInstance reaction : reactions)
+            participants.addAll(InstanceUtilities.getReactionParticipants(reaction));
+        Set<String> genes = new HashSet<String>();
+        for (GKInstance participant : participants) {
+            grepGenesFromEntity(participant, genes);
+        }
+        return genes;
+    }
+    
     @Test
     public void generateFIsForOneReaction() throws Exception {
         MySQLAdaptor dba = (MySQLAdaptor) getMySQLAdaptor();

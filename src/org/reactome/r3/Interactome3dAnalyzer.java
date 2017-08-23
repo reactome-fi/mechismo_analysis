@@ -41,9 +41,9 @@ import org.biojava.nbio.structure.contact.GroupContactSet;
 import org.biojava.nbio.structure.contact.Pair;
 import org.gk.util.GKApplicationUtilities;
 import org.junit.Test;
-import org.reactome.px.util.InteractionUtilities;
 import org.reactome.r3.ProteinSequenceHandler.Sequence;
 import org.reactome.r3.util.FileUtility;
+import org.reactome.r3.util.InteractionUtilities;
 import org.reactome.structure.model.PDBUniProtMatch;
 
 /**
