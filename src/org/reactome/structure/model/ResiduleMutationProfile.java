@@ -8,9 +8,9 @@ import java.util.Collection;
  *
  */
 public class ResiduleMutationProfile {
-    private int coordinate;
+    private Integer coordinate;
     private Collection<ProteinMutation> mutations;
-    private double pvalue = -1.0d; // Give it a meaningless value to avoid 0.0d
+    private Double pvalue; // Use null to avoid using 0.0d as the default
     
     public ResiduleMutationProfile() {
     }
@@ -31,7 +31,7 @@ public class ResiduleMutationProfile {
         this.mutations = mutations;
     }
 
-    public double getPvalue() {
+    public Double getPvalue() {
         return pvalue;
     }
 

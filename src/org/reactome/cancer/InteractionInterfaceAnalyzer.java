@@ -53,8 +53,10 @@ public class InteractionInterfaceAnalyzer {
     }
     
     private void ensurePrecondtions() throws IOException {
-        if (interactome3dAnalyzer == null)
+        if (interactome3dAnalyzer == null) {
             interactome3dAnalyzer = new Interactome3dAnalyzer();
+            interactome3dAnalyzer.setUpAtomCache(); // Have to call this to avoid null exception in addCharges.
+        }
         if (accToSeq == null) {
             logger.info("Loading UniProt accession to sequence...");
             ProteinSequenceHandler sequenceHandler = new ProteinSequenceHandler();
@@ -89,6 +91,7 @@ public class InteractionInterfaceAnalyzer {
     public InteractionMutationProfile analyze(File pdbFile) throws IOException, StructureException {
         ensurePrecondtions();
         logger.info("Analyzing " + pdbFile.getName());
+        
         Structure structure = StructureIO.getStructure(pdbFile.getAbsolutePath());
         Map<Chain, List<Integer>> chainToCoordinates = interactome3dAnalyzer.extractContacts(structure);
         String[] tokens = pdbFile.getName().split("-");
@@ -135,7 +138,7 @@ public class InteractionInterfaceAnalyzer {
             List<ProteinMutation> mutations = geneToMutations.get(match.getGene());
             if (mutations == null) {
                 // This should be normal. No need to print out anything here.
-//                System.out.println(match.getGene() + " doesn't have an entry in COSMIC!");
+                logger.info(match.getGene() + " doesn't have muations!");
                 continue;
             }
             // Create a model object to store information
@@ -166,20 +169,20 @@ public class InteractionInterfaceAnalyzer {
             }
             List<ProteinMutation> interfaceMutations = cosmicHelper.filterEntries(mutations, contactCoords);
             if (interfaceMutations.size() == 0) {
-                logger.info(match.getGene() + " dosn't have mutations in interface!");
+                logger.info(match.getGene() + " doesn't have mutations in interface!");
                 continue;
             }
             double contactRatio = (double) contactCoords.size() / chain.getAtomGroups().size();
             double pvalue = 1.0;
             if (contactRatio < 1.0d) { // Otherwise, we cannot use binomial test
                 pvalue = MathUtilities.calculateBinomialPValue(contactRatio,
-                        mutationsInChain.size(),
-                        interfaceMutations.size());
+                                                               mutationsInChain.size(),
+                                                               interfaceMutations.size());
                 current.setEnrichmentPValue(pvalue);
             }
             ResiduleMutationProfile aaProfile = calculatePValueForPositionMutation(interfaceMutations,
-                                                                       mutationsInChain,
-                                                                       remappedSeqNumbers);
+                                                                                   mutationsInChain,
+                                                                                   remappedSeqNumbers);
             current.setMinAAProfile(aaProfile);
         } 
         InteractionMutationProfile intMutProfile = new InteractionMutationProfile();
@@ -257,9 +260,14 @@ public class InteractionInterfaceAnalyzer {
 //        String fileName = "datasets/interactome3d/2017_01/representative/interactions_06/P00533-P01133-EXP-1nql.pdb1-A-0-B-0.pdb";
         
         // Better example
-        targetGenes.add("EGFR");
-        targetGenes.add("SHC1");
-        String fileName = "datasets/interactome3d/2017_01/representative//interactions_06/P00533-P29353-EXP-5czi.pdb1-A-0-B-0.pdb";
+//        targetGenes.add("EGFR");
+//        targetGenes.add("SHC1");
+//        String fileName = "datasets/interactome3d/2017_01/representative//interactions_06/P00533-P29353-EXP-5czi.pdb1-A-0-B-0.pdb";
+        
+        // Check for bug: -1 is listed as coordinate
+        String fileName = "datasets/interactome3d/2017_01/representative/interactions_17/P01116-P04049-MDL-3kud.pdb1-A-0-B-0.pdb";
+        targetGenes.add("KRAS");
+        targetGenes.add("RAF1");
         
         CosmicAnalyzer cosmicAnalyzer = new CosmicAnalyzer();
         Map<String, List<ProteinMutation>> geneToCosmicEntries = cosmicAnalyzer.loadMutations(targetGenes);

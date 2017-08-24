@@ -21,13 +21,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.apache.log4j.Logger;
-import org.biojava.nbio.alignment.Alignments;
-import org.biojava.nbio.alignment.SimpleGapPenalty;
-import org.biojava.nbio.core.alignment.matrices.SubstitutionMatrixHelper;
-import org.biojava.nbio.core.alignment.template.SubstitutionMatrix;
-import org.biojava.nbio.core.exceptions.CompoundNotFoundException;
-import org.biojava.nbio.core.sequence.ProteinSequence;
-import org.biojava.nbio.core.sequence.compound.AminoAcidCompound;
 import org.biojava.nbio.structure.Chain;
 import org.biojava.nbio.structure.Group;
 import org.biojava.nbio.structure.Structure;
@@ -56,11 +49,28 @@ public class Interactome3dAnalyzer {
     private final double INTERFACE_THRESHOLD = 5.0d; // The unit is Angstrom (A)
     private FileUtility fu = new FileUtility();
     private final static Logger logger = Logger.getLogger(Interactome3dAnalyzer.class);
-
+    
     /**
      * Default constructor.
      */
     public Interactome3dAnalyzer() {
+    }
+    
+    /**
+     * If StructureIO.getSturcture() cannot work, check temp dir used by this method
+     *  private String initPdbFilePath() in biojava class, UserConfiguration, and then
+     *  deleted these two folders there: data and cheminfo.
+     * @throws Exception
+     */
+    @Test
+    public void testBioJava() throws Exception {
+        String fileName = "datasets/interactome3d/2017_01/representative/interactions_06/P00533-P01133-EXP-1nql.pdb1-A-0-B-0.pdb";
+//        setUpAtomCache();
+        Structure structure = StructureIO.getStructure(fileName);
+//        Structure structure = StructureIO.getStructure("4HHB");
+        System.out.println("Structure: " + structure.getIdentifier());
+        List<Chain> chains = structure.getChains();
+        chains.forEach(chain -> System.out.println(chain.getChainID() + ": " + chain.getAtomSequence()));
     }
     
     /**
@@ -595,22 +605,22 @@ public class Interactome3dAnalyzer {
         return chainToMatch;
     }
 
-    private double calculateGlobalAlignmentScore(String s1, String s2) throws CompoundNotFoundException {
-        List<ProteinSequence> psl = new ArrayList<>();
-        psl.add(new ProteinSequence(s1));
-        psl.add(new ProteinSequence(s2));
-        SubstitutionMatrix<AminoAcidCompound> matrix = SubstitutionMatrixHelper.getBlosum62();
-        double[] pair =
-                Alignments.getAllPairsScores(
-                        psl,
-                        Alignments.PairwiseSequenceScorerType.GLOBAL,
-                        new SimpleGapPenalty(),
-                        matrix);
-        for(int i = 0; i < pair.length; i++) {
-            System.out.println(String.format("%s vs %s: %f", s1, s2, pair[i]));
-        }
-        return -1.0;
-    }
+//    private double calculateGlobalAlignmentScore(String s1, String s2) throws CompoundNotFoundException {
+//        List<ProteinSequence> psl = new ArrayList<>();
+//        psl.add(new ProteinSequence(s1));
+//        psl.add(new ProteinSequence(s2));
+//        SubstitutionMatrix<AminoAcidCompound> matrix = SubstitutionMatrixHelper.getBlosum62();
+//        double[] pair =
+//                Alignments.getAllPairsScores(
+//                        psl,
+//                        Alignments.PairwiseSequenceScorerType.GLOBAL,
+//                        new SimpleGapPenalty(),
+//                        matrix);
+//        for(int i = 0; i < pair.length; i++) {
+//            System.out.println(String.format("%s vs %s: %f", s1, s2, pair[i]));
+//        }
+//        return -1.0;
+//    }
 
     private class InteractionPDBScore implements Comparable<InteractionPDBScore> {
         

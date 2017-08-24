@@ -91,7 +91,8 @@ public class ReactomeReactionAnalyzer {
         //5658435 RAS GAPs bind RAS:GTP
         dbId = 5658435L; // We should not see null from this reaction
         // There is nothing displayed for this reaction
-        dbId = 8848751L; // [Reaction:8848751] PTK6 binds AKT1
+//        dbId = 8848751L; // [Reaction:8848751] PTK6 binds AKT1
+        dbId = 5675431L; // [Reaction:5675431] PP2A dephosphorylates RAF1
         
         GKInstance reaction = dba.fetchInstance(dbId);
         
