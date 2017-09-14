@@ -4,14 +4,24 @@
  */
 package org.reactome.r3;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import org.junit.Test;
 import org.reactome.r3.util.FileUtility;
 import org.reactome.structure.model.ProteinMutation;
-
-import java.io.IOException;
-import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * This class is used to perform analysis on the cosmic data.
@@ -29,7 +39,28 @@ public class CosmicAnalyzer {
      * Default constructor.
      */
     public CosmicAnalyzer() {
-
+    }
+    
+    @Test
+    public void checkClassifications() throws IOException {
+        String fileName = DIR_NAME + "classification.csv";
+        Set<String> sitePrimaryCosmic = new HashSet<>();
+        Set<String> siteSubType1Cosmic = new HashSet<>();
+        Set<String> siteSubType2Cosmic = new HashSet<>();
+        Set<String> siteSubType3Cosmic = new HashSet<>();
+        Files.lines(Paths.get(fileName))
+             .skip(1)
+             .forEach(line -> {
+                 String[] tokens = line.split(",");
+                 sitePrimaryCosmic.add(tokens[9]);
+                 siteSubType1Cosmic.add(tokens[10]);
+                 siteSubType2Cosmic.add(tokens[11]);
+                 siteSubType3Cosmic.add(tokens[12]);
+             });
+        System.out.println("sitePrimaryCosmic: " + sitePrimaryCosmic.size());
+        System.out.println("siteSubType1Cosmic: " + siteSubType1Cosmic.size());
+        System.out.println("siteSubType2Cosmic: " + siteSubType2Cosmic.size());
+        System.out.println("siteSubType3Cosmic: " + siteSubType3Cosmic.size());
     }
 
     @Test

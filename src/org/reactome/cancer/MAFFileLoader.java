@@ -4,6 +4,7 @@
  */
 package org.reactome.cancer;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -16,9 +17,8 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import jdk.nashorn.internal.ir.SetSplitState;
-import org.apache.log4j.Logger;
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
+import org.apache.log4j.Logger;
 import org.junit.Test;
 import org.reactome.genome.Transcript;
 import org.reactome.r3.UCSCDataAnalyzer;
@@ -147,6 +147,136 @@ public class MAFFileLoader {
             return token;
         else
             return token.substring(0, sampleNameLength);
+    }
+    
+    @Test
+    public void testLoadGeneToMutations() throws IOException {
+        String dirName = "datasets/TCGA/";
+        dirName += "gdac.broadinstitute.org_ACC.Mutation_Packager_Oncotated_Calls.Level_3.2016012800.0.0";
+        
+        Map<String, List<ProteinMutation>> geneToMutations = loadGeneToMutations(null, dirName);
+        System.out.println("geneToMutations: " + geneToMutations.size());
+    }
+    
+    /**
+     * Load a list of mutations for a set of genes. The mutations are loaded from the firehose 
+     * TCGA mutation files, which are provided as individual files for samples (aka one sample
+     * one file). Therefore, one parameter for this method is a directory name, where all maf
+     * files are collected recursively.
+     * @return
+     * @throws Exception
+     */
+    public Map<String, List<ProteinMutation>> loadGeneToMutations(final Set<String> genes,
+                                                                  String tcgaMAFDirName) throws IOException {
+        File dir = new File(tcgaMAFDirName);
+        List<File> current = new ArrayList<>();
+        current.add(dir);
+        List<File> next = new ArrayList<>();
+        List<ProteinMutation> allMutations = new ArrayList<>();
+        while (current.size() > 0) {
+            for (File dir1 : current) {
+                File[] files = dir1.listFiles();
+                for (File file : files) {
+                    if (file.isDirectory()) {
+                        next.add(file);
+                    }
+                    else if (!file.getName().endsWith(".maf.txt"))
+                        continue;
+                    else {
+                        List<ProteinMutation> mutations = loadMutations(file, genes);
+                        allMutations.addAll(mutations);
+                    }
+                }
+            }
+            current.clear();
+            current.addAll(next);
+            next.clear();
+        }
+        Map<String, List<ProteinMutation>> geneToMutations = new HashMap<>();
+        // Re-sort the list
+        allMutations.forEach(mutation -> {
+            geneToMutations.compute(mutation.getGene(), (gene, mutations) -> {
+                if (mutations == null)
+                    mutations = new ArrayList<>();
+                mutations.add(mutation);
+                return mutations;
+            });
+        });
+        return geneToMutations;
+    }
+    
+    /**
+     * Need to check more to make sure weird mutations are meaningful and can be counted here.
+     * @param file
+     * @param targetGenes
+     * @return
+     * @throws IOException
+     */
+    private List<ProteinMutation> loadMutations(File file,
+                                                Set<String> targetGenes) throws IOException {
+//        System.out.println(file.getName());
+        List<ProteinMutation> mutations = new ArrayList<>();
+        
+        FileUtility fu = new FileUtility();
+        fu.setInput(file.getAbsolutePath());
+        String line = fu.readLine();
+        while (line.startsWith("#")) {
+            line = fu.readLine();
+        }
+        
+        //Consume header
+        List<String> headerTokens = Arrays.asList(line.split("\t"));
+        int geneSymbolIndex = headerTokens.indexOf(Hugo_Symbol);
+        int tumorSampleIndex = headerTokens.indexOf(Tumor_Sample_Barcode);
+        int variantClassifierIndex = headerTokens.indexOf(Variant_Classification);
+        int proteinChangeIndex = headerTokens.indexOf(Protein_Change);
+        Set<String> allowedTypes = getAllowedMutationTypes();
+        // To fetch aa changes
+        // fs or del may be list 
+        // Note: * is used for stop!
+        Pattern aaXtrctPattern = Pattern.compile("^p\\.[A-Z]*(?<aaCoord>[0-9_]+)[a-zA-Z\\*>]+$");
+        String groupName = "aaCoord";
+        
+        while ((line = fu.readLine()) != null) {
+//            System.out.println(line);
+            String[] tokens = line.split("\t");
+            String proteinChange = tokens[proteinChangeIndex];
+            if (proteinChange.length() == 0)
+                continue; // Nothing we can do. Just esape it!
+            String geneSymbol = tokens[geneSymbolIndex];
+            if (targetGenes != null && !targetGenes.contains(geneSymbol))
+                continue;
+            // Make sure only lower case is checked
+            if (!allowedTypes.contains(tokens[variantClassifierIndex].toLowerCase()))
+                continue;
+            Matcher matcher = aaXtrctPattern.matcher(proteinChange);
+            String proteinChangeCoord;
+            if(matcher.matches()) {
+                proteinChangeCoord = matcher.group(groupName);
+                if(proteinChangeCoord.contains("_")) {
+//                    System.out.println(file.getAbsolutePath() + ": " + proteinChangeCoord);
+                    // For this type of cases, we split the mutations into two
+                    String[] tokens1 = proteinChangeCoord.split("_");
+                    proteinChangeCoord = tokens1[0]; // We want to record only one mutation if these cases
+                }
+                Integer coord = new Integer(proteinChangeCoord);
+                ProteinMutation mut = new ProteinMutation(geneSymbol,
+                        coord,
+                        proteinChange,
+                        tokens[tumorSampleIndex]);
+                mutations.add(mut);
+            }
+            else{
+                //TODO: Investigate these
+                logger.warn(String.format("Can't find a protein change coord in proteinChange '%s', fileName = '%s', geneSymbol = '%s'",
+                            proteinChange,
+                            file.getAbsolutePath(),
+                            geneSymbol));
+            }
+        }
+        fu.close();
+        System.out.println(file.getName() + ": " + mutations.size());
+        return mutations;
     }
     
     /**
@@ -308,7 +438,7 @@ public class MAFFileLoader {
         }
 
         //Consume header
-        List<String> headerTokens = new ArrayList<>(Arrays.asList(line.split("\t")));
+        List<String> headerTokens = Arrays.asList(line.split("\t"));
         int geneSymbolIndex = headerTokens.indexOf(Hugo_Symbol);
         int tumorSampleIndex = headerTokens.indexOf(Tumor_Sample_Barcode);
         int variantClassifierIndex = headerTokens.indexOf(Variant_Classification);
@@ -362,7 +492,8 @@ public class MAFFileLoader {
                             mutationMap.put(coord2,mut2S);
                         }
                         sampleGeneMap.put(geneSymbol,mutationMap);
-                    } else {
+                    } 
+                    else {
                         mutationMap = new HashMap<>();
                         mutationMap.put(coord1,new HashSet<>(Arrays.asList(mut1)));
                         mutationMap.put(coord2,new HashSet<>(Arrays.asList(mut2)));
@@ -387,13 +518,15 @@ public class MAFFileLoader {
                             mutationMap.put(coord,mutS);
                         }
                         sampleGeneMap.put(geneSymbol,mutationMap);
-                    } else {
+                    } 
+                    else {
                         mutationMap = new HashMap<>();
                         mutationMap.put(coord,new HashSet<>(Arrays.asList(mut)));
                         sampleGeneMap.put(geneSymbol,mutationMap);
                     }
                 }
-            }else{
+            }
+            else{
                 //TODO: Investigate these
                 logger.warn(String.format("Can't find a protein change coord in proteinChange '%s', fileName = '%s', geneSymbol = '%s'",
                         proteinChange,
