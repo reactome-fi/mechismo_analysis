@@ -6,6 +6,7 @@ import org.gk.persistence.MySQLAdaptor;
 import org.junit.Test;
 import org.reactome.cancer.driver.CancerDriverReactomeAnalyzer;
 import org.reactome.cancer.driver.Interactome3dDriverAnalyzer;
+import org.reactome.cancer.driver.MechismoAnalyzer;
 import org.reactome.r3.util.Configuration;
 
 /**
@@ -52,6 +53,7 @@ public class ProcessDatasetsDriver {
                 "Mechismo/Reactome Interface Enrichment 2\n" +
                 "Prepare Heatmap Data 3\n" +
                 "Compare Known Drivers 4\n" +
+                "Map Mechismo Reactome Reactions 5\n" +
                 "Cancel <enter>\n");
         Scanner scanner = new Scanner(System.in);
         String ex = scanner.nextLine();
@@ -108,6 +110,13 @@ public class ProcessDatasetsDriver {
                 interactome3dDriverAnalyzer.compareKnownDrivers("results/knownDriverData/",
                         "datasets/firehose_data/all_oncotated_calls",
                         "datasets/guanming_known_drivers.txt");
+            }else if(Integer.parseInt(ex) == 5) {
+                new MechismoAnalyzer().mapReactomeReactions(
+                        cancerDriverReactomeAnalyzer,
+                        "/home/burkhart/Software/Ogmios/datasets/Mechismo/TCGA_mech_output.tsv",
+                        "/home/burkhart/Software/Ogmios/datasets/ReactionNetwork_070517.txt",
+                        "/home/burkhart/Software/Ogmios/results/Mechismo/"
+                );
             }
             else{
                 System.out.println("Execution Cancelled.");

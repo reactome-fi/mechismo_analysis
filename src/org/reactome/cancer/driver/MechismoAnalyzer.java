@@ -9,14 +9,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -26,9 +19,14 @@ import org.apache.commons.math.stat.correlation.PearsonsCorrelation;
 import org.apache.commons.math.stat.correlation.SpearmansCorrelation;
 import org.gk.model.GKInstance;
 import org.junit.Test;
+import java.net.*;
+import org.jgrapht.*;
+import org.jgrapht.graph.*;
 import org.reactome.annotate.AnnotationHelper;
 import org.reactome.annotate.GeneSetAnnotation;
 import org.reactome.annotate.PathwayBasedAnnotator;
+import org.reactome.cancer.MechismoOutputLoader;
+import org.reactome.cancer.ReactomeReactionGraphLoader;
 import org.reactome.px.util.InteractionUtilities;
 import org.reactome.r3.Interactome3dAnalyzer;
 import org.reactome.r3.ReactomeAnalyzer;
@@ -517,7 +515,7 @@ public class MechismoAnalyzer {
             });
         }
     }
-    
+
     @Test
     public void checkPCIContactFile() throws IOException {
         String targetGene = "AKT1";
@@ -568,5 +566,102 @@ public class MechismoAnalyzer {
         }
         fu.close();
     }
-    
+
+    public void mapReactomeReactions(CancerDriverReactomeAnalyzer cancerDriverReactomeAnalyzer,
+                                     String mechismoOutputFilePath,
+                                     String reactomeReactionNetworkFilePath,
+                                     String outputDir) throws Exception {
+        //build jgrapht network from reaction file
+        ReactomeReactionGraphLoader reactomeReactionGraphLoader = new ReactomeReactionGraphLoader(reactomeReactionNetworkFilePath);
+        DefaultDirectedGraph<Long,DefaultEdge> reactionGraph = reactomeReactionGraphLoader.getReactionGraph();
+
+        //extract FIs from Mechismo output
+        //Set<FI>
+        Set<String> fis = new MechismoOutputLoader(mechismoOutputFilePath).extractMechismoFIs();
+
+        //find reactions containing Mechismo FIs
+        //FI -> Set<Reaction Id>
+        Hashtable<String,Set<Long>> fi2ReactionSet = new Hashtable<>();
+        //Reaction Id -> Set<FIs>
+        Hashtable<Long,Set<String>> reaction2FiSet = new Hashtable<>();
+
+        Set<Long> rxns = reactomeReactionGraphLoader.getReactionSet();
+        Set<String> rxnInteractions = new HashSet<>();
+        Iterator<Long> rxnItr = rxns.iterator();
+        Set<Long> interactionRxns = new HashSet<>();
+        int itCounter = 0;
+        ReactomeAnalyzer reactomeAnalyzer = new ReactomeAnalyzer();
+        Long rxnDbId;
+        System.out.println("Processing Reactions...");
+        System.out.flush();
+        while(rxnItr.hasNext()) {
+            rxnDbId = rxnItr.next();
+            rxnInteractions.clear();
+            reactomeAnalyzer.generateFIsForReactionsWithFeatures(cancerDriverReactomeAnalyzer.getDBA(),
+                    new ArrayList<>(Arrays.asList(new Long[]{rxnDbId})),
+                    null,
+                    rxnInteractions);
+            //reaction FIs now in interactions set
+            Set<String> intersection = new HashSet<>(rxnInteractions);
+            intersection.retainAll(fis);
+            if(intersection.size() > 0) {
+                //if Mechismo FIs in reaction interactions
+                reaction2FiSet.put(rxnDbId, intersection);
+                for (String interaction :
+                        intersection) {
+                    if (fi2ReactionSet.contains(interaction)) {
+                        interactionRxns = fi2ReactionSet.get(interaction);
+                    } else {
+                        interactionRxns.clear();
+                    }
+                    interactionRxns.add(rxnDbId);
+                    fi2ReactionSet.put(interaction, interactionRxns);
+                }
+            }
+            itCounter++;
+            if(itCounter % 100 == 0){
+                System.out.println(String.format("Processed %d of %d Reactions...",
+                        itCounter,rxns.size()));
+                System.out.flush();
+            }
+        }
+
+        //search hash tables for reaction support
+        //i.e. How many Mechismo FIs point to reaction X?
+        //create a hashtable mapping FI set sizes to reaction sets
+        //sort keyset, store as List -- might all be 1?
+        int debug = 1;
+
+        //query jgrapht network to search 1 reaction downstream/upstream
+        Set<TargetReactionSummary> targetReactionSummaries = new HashSet<>();
+        //foreach SupReaction in above keyset List, starting from most supported
+        //http://jgrapht.org/javadoc/org/jgrapht/graph/DefaultDirectedGraph.html
+        //go one DnReaction downstream from SupReaction and
+        //one UpReaction from DnReaction
+        //look for intersection of (UpReaction - SupReaction) and reaction2FiSet keys
+        //targetReactionSummaries.add(xyz)
+
+        //write targetReactionSummaries to file
+
+        //print total number of FI's in Mechismo file
+        //print number of FI's in Mechismo file mapped to reactions
+        //print total number of reactions
+        //print number of reactions with Mechismo FI's
+        //print mean downstream upstream reactions
+        //print number of downstream upstream reactions with support > 0
+        //print mean support
+        //print mean support > 0
+    }
+
+    private class TargetReactionSummary{
+        private TargetReactionSummary(Long rxnId,
+                                      Integer numSupUpRxn,
+                                      Integer numUpRxn,
+                                      Double supUpRatio,
+                                      Set<Long> supRxns,
+                                      Set<Long> upRxns,
+                                      Set<String> supFIs){
+
+        }
+    }
 }
