@@ -743,6 +743,29 @@ public class MechismoAnalyzer {
                 sum));
 
         //perform pathway enrichment analysis among FI clusters
+        FileUtility fileUtility0 = new FileUtility();
+        String outFilePath0 = outputDir + "fiClusters.csv";
+        try{
+            fileUtility0.setOutput(outFilePath0);
+            Iterator<Set<String>> fiClusterItr0 =fiIntersectingSetUnionClusters.iterator();
+            while(fiClusterItr0.hasNext()) {
+                Set<String> fis0 = fiClusterItr0.next();
+                fileUtility0.printLine(
+                        fis0.size() > 1
+                            ? org.gk.util.StringUtils.join(" ",
+                                new ArrayList(fis0)).replace("\t"," ")
+                            : Arrays.asList(fis0).get(0).toString()
+                                .replace("[","")
+                                .replace("]","")
+                .replace("\t"," "));
+            }
+            fileUtility0.close();
+        }catch(IOException ioe){
+            logger.error(String.format("Couldn't use %s, %s: %s",
+                    outFilePath0.toString(),
+                    ioe.getMessage(),
+                    Arrays.toString(ioe.getStackTrace())));
+        }
 
         //write targetReactionSummaries to file
         FileUtility fileUtility = new FileUtility();
