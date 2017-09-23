@@ -25,6 +25,7 @@ import org.reactome.r3.util.FisherExact;
 import org.reactome.r3.util.MathUtilities;
 import org.reactome.r3.util.Plotter;
 
+import javax.swing.text.html.HTMLDocument;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -597,11 +598,8 @@ public class MechismoAnalyzer {
         Map<String, Set<Long>> fi2ReactionSet = new HashMap<>();
         //Reaction Id -> Set<FIs>
         Map<Long, Set<String>> reaction2FiSet = new HashMap<>();
-
         Set<Long> rxns = reactomeReactionGraphLoader.getReactionSet();
-        Set<String> rxnInteractions = new HashSet<>();
         Iterator<Long> rxnItr = rxns.iterator();
-        Set<Long> interactionRxns = new HashSet<>();
         int itCounter = 0;
         ReactomeAnalyzer reactomeAnalyzer = new ReactomeAnalyzer();
         Long rxnDbId;
@@ -609,7 +607,7 @@ public class MechismoAnalyzer {
         System.out.flush();
         while (rxnItr.hasNext()) {
             rxnDbId = rxnItr.next();
-            rxnInteractions.clear();
+            Set<String> rxnInteractions = new HashSet<>();
             reactomeAnalyzer.generateFIsForReactionsWithFeatures(cancerDriverReactomeAnalyzer.getDBA(),
                     new ArrayList<>(Arrays.asList(new Long[]{rxnDbId})),
                     null,
@@ -622,10 +620,11 @@ public class MechismoAnalyzer {
                 reaction2FiSet.put(rxnDbId, intersection);
                 for (String interaction :
                         intersection) {
+                    Set<Long> interactionRxns;
                     if (fi2ReactionSet.containsKey(interaction)) {
                         interactionRxns = fi2ReactionSet.get(interaction);
                     } else {
-                        interactionRxns.clear();
+                        interactionRxns = new HashSet<>();
                     }
                     interactionRxns.add(rxnDbId);
                     fi2ReactionSet.put(interaction, interactionRxns);
@@ -645,6 +644,7 @@ public class MechismoAnalyzer {
 
         //query jgrapht network to search 1 reaction downstream/upstream
         Set<TargetReactionSummary> targetReactionSummaries = new HashSet<>();
+        Set<Set<String>> allFIs = new HashSet<>();
         //foreach SupReaction in reaction2FiSet
         Iterator rxn2FiItr = reaction2FiSet.entrySet().iterator();
         while (rxn2FiItr.hasNext()) {
@@ -668,19 +668,20 @@ public class MechismoAnalyzer {
                 }
                 //find intersection of (dnUpReaction - SupReaction) and reaction2FiSet keys
                 Set<Long> upSupIntsct = new HashSet(dnUpRxns);
+                upSupIntsct.retainAll(reaction2FiSet.keySet());
                 if (!upSupIntsct.contains(rxnId)) {
                     throw new IllegalStateException(
                             String.format("Initial rxn ID '%d' not in downstream upstream rxns",
                                     rxnId)
                     );
                 }
-                upSupIntsct.retainAll(reaction2FiSet.keySet());
                 Set<String> supFIs = new HashSet<>();
                 Iterator<Long> upSupIntsctItr = upSupIntsct.iterator();
                 while (upSupIntsctItr.hasNext()) {
                     Long upSupRxnId = upSupIntsctItr.next();
                     supFIs.addAll(reaction2FiSet.get(upSupRxnId));
                 }
+                allFIs.add(supFIs);
 
                 targetReactionSummaries.add(new TargetReactionSummary(
                         dnVtx,
@@ -695,6 +696,53 @@ public class MechismoAnalyzer {
 
         System.out.println(String.format("Found %d supported Dn/Up reactions",
                 targetReactionSummaries.size()));
+
+        System.out.println(String.format("Found %d unique supporting FI sets",
+                allFIs.size()));
+
+        Set<Set<String>> fiIntersectingSetUnionClusters = new HashSet<>();
+        Iterator<Set<String>> allFIsItr = allFIs.iterator();
+        while(allFIsItr.hasNext()){
+            Set<String> fiSet = allFIsItr.next();
+            Set<String> union = new HashSet<>(fiSet);
+            Iterator<Set<String>> fiClusterItr = fiIntersectingSetUnionClusters.iterator();
+            while(fiClusterItr.hasNext()){
+                Set<String> fiCluster = fiClusterItr.next();
+                Set<String> intersection = new HashSet<>(fiSet);
+                intersection.retainAll(fiCluster);
+                if (!intersection.isEmpty()){
+                    union.addAll(fiCluster);
+                    fiClusterItr.remove(); //remove out-dated cluster
+                }
+            }
+            fiIntersectingSetUnionClusters.add(union);
+        }
+
+        System.out.println(String.format("Aggregated %d unique FI sets into %d intersection-unions",
+                allFIs.size(),
+                fiIntersectingSetUnionClusters.size()));
+
+        Iterator<Set<String>> fiClusterItr = fiIntersectingSetUnionClusters.iterator();
+        Double min = new Double(fiClusterItr.next().size());
+        Double max = min;
+        Double sum = max;
+        while(fiClusterItr.hasNext())
+        {
+            Double sz = new Double(fiClusterItr.next().size());
+            min = sz < min ? sz : min;
+            max = sz > max ? sz : max;
+            sum += sz;
+            System.out.println(sz);
+        }
+        Double mean = sum / new Double(fiIntersectingSetUnionClusters.size());
+
+        System.out.println(String.format("Clusters min = %f, max = %f, mean = %f, sum = %f",
+                min,
+                max,
+                mean,
+                sum));
+
+        //perform pathway enrichment analysis among FI clusters
 
         //write targetReactionSummaries to file
         FileUtility fileUtility = new FileUtility();
@@ -750,6 +798,32 @@ public class MechismoAnalyzer {
             this.supRxns = supRxns;
             this.upRxns = upRxns;
             this.supFIs = supFIs;
+        }
+
+        @Override
+        public boolean equals(Object o){
+            if(o == this) return true;
+            if(!(o instanceof TargetReactionSummary)){
+                return false;
+            }
+            TargetReactionSummary targetReactionSummary = (TargetReactionSummary)o;
+            return Objects.equals(this.rxnId,targetReactionSummary.rxnId) &&
+                    Objects.equals(this.numSupUpRxn,targetReactionSummary.numSupUpRxn) &&
+                    Objects.equals(this.numUpRxn,targetReactionSummary.numUpRxn) &&
+                    Objects.equals(this.supUpRatio,targetReactionSummary.supUpRatio) &&
+                    Objects.equals(this.supRxns,targetReactionSummary.supRxns) &&
+                    Objects.equals(this.upRxns,targetReactionSummary.upRxns) &&
+                    Objects.equals(this.supFIs,targetReactionSummary.supFIs);
+        }
+
+        @Override
+        public int hashCode(){
+            return Objects.hash(this.rxnId,
+                    this.numSupUpRxn,
+                    this.numUpRxn,
+                    this.supUpRatio,
+                    this.supRxns,
+                    this.supFIs);
         }
 
         @Override
