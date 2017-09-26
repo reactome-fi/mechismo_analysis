@@ -732,7 +732,6 @@ public class MechismoAnalyzer {
             min = sz < min ? sz : min;
             max = sz > max ? sz : max;
             sum += sz;
-            System.out.println(sz);
         }
         Double mean = sum / new Double(fiIntersectingSetUnionClusters.size());
 
@@ -763,6 +762,35 @@ public class MechismoAnalyzer {
         }catch(IOException ioe){
             logger.error(String.format("Couldn't use %s, %s: %s",
                     outFilePath0.toString(),
+                    ioe.getMessage(),
+                    Arrays.toString(ioe.getStackTrace())));
+        }
+
+        //write reaction2FIs to file
+        FileUtility fileUtility1 = new FileUtility();
+        String outFilePath1 = outputDir + "reactions2FIs.csv";
+        try{
+            fileUtility1.setOutput(outFilePath1);
+            fileUtility1.printLine("RxnId,Mapped FIs");
+            Iterator reaction2FiItr = reaction2FiSet.entrySet().iterator();
+            while(reaction2FiItr.hasNext()) {
+                Map.Entry pair = (Map.Entry) reaction2FiItr.next();
+                Long rxnId = (Long) pair.getKey();
+                Set<String> mappedFis = (Set<String>) pair.getValue();
+                fileUtility1.printLine(String.format("%d,%s",
+                        rxnId,
+                        mappedFis.size() > 1
+                                ? org.gk.util.StringUtils.join(" ",
+                                new ArrayList(mappedFis)).replace("\t"," ")
+                                : Arrays.asList(mappedFis).get(0).toString()
+                                .replace("[","")
+                                .replace("]","")
+                                .replace("\t"," ")));
+            }
+            fileUtility1.close();
+        }catch(IOException ioe){
+            logger.error(String.format("Couldn't use %s, %s: %s",
+                    outFilePath1.toString(),
                     ioe.getMessage(),
                     Arrays.toString(ioe.getStackTrace())));
         }
