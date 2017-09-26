@@ -11,6 +11,7 @@ import org.gk.model.GKInstance;
 import org.gk.persistence.MySQLAdaptor;
 import org.junit.Test;
 import org.reactome.cancer.InteractionInterfaceAnalyzer;
+import org.reactome.data.ReactomeDatabaseModifier;
 import org.reactome.r3.CosmicAnalyzer;
 import org.reactome.r3.Interactome3dAnalyzer;
 import org.reactome.r3.ReactomeAnalyzer;
@@ -75,8 +76,26 @@ public class ReactomeReactionAnalyzer {
     public Set<String> extractFIs(GKInstance reaction) throws Exception {
         if (reactomeDataAnalyzer == null)
             throw new IllegalStateException("Set ReactomeAnalyzer for the object!");
-        Set<String> fis = reactomeDataAnalyzer.generateTentativePPIsForReaction(reaction, false);
+        Set<String> fis = reactomeDataAnalyzer.generateTentativePPIsForReaction(reaction, true);
         return fis;
+    }
+    
+    @Test
+    public void testExtractFIs() throws Exception {
+        MySQLAdaptor dba = new MySQLAdaptor("localhost",
+                "reactome_59_plus_i",
+                "root",
+                "macmysql01");
+        reactomeDataAnalyzer = new ReactomeAnalyzer();
+        reactomeDataAnalyzer.setMySQLAdaptor(dba);
+        
+        Long dbId = 5672969L;
+        dbId = 171026L;
+        
+        GKInstance reaction = dba.fetchInstance(dbId);
+        Set<String> fis = extractFIs(reaction);
+        System.out.println("Total FIs: " + fis.size());
+        fis.forEach(System.out::println);
     }
     
     @Test

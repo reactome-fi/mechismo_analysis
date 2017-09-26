@@ -70,6 +70,7 @@ public class CancerDriverReactomeAnalyzer {
     @Test
     public void dumpReactionIdToName() throws Exception {
         List<GKInstance> humanReactions = loadHumanReactions();
+        System.out.println("Total human reactions: " + humanReactions.size());
         System.out.println("DB_ID\tDisplay_Name");
         humanReactions.stream().forEach(reaction -> System.out.println(reaction.getDBID() + "\t" + reaction.getDisplayName()));
     }

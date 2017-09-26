@@ -27,6 +27,7 @@ import org.gk.model.ReactomeJavaConstants;
 import org.gk.persistence.MySQLAdaptor;
 import org.gk.util.FileUtilities;
 import org.junit.Test;
+import org.reactome.r3.graph.NetworkBuilderForGeneSet;
 import org.reactome.r3.util.Configuration;
 
 /**
@@ -38,7 +39,7 @@ import org.reactome.r3.util.Configuration;
  */
 @SuppressWarnings("unchecked")
 public class ReactionMapGenerator {
-    private final String DIR_NAME = "/Users/gwu/Documents/wgm/work/reactome/ReactionNetwork/";
+    private final String DIR_NAME = "resources/";
     private final String REACTION_NETWORK_NAME = DIR_NAME + "ReactionNetwork_070517.txt";
     private Set<String> entityEscapeNames;
     
@@ -137,7 +138,6 @@ public class ReactionMapGenerator {
         fu.close();
     }
     
-    @Test
     public void generateSubNetwork(Set<String> reactionIds) throws IOException {
         try (Stream<String> stream = Files.lines(Paths.get(REACTION_NETWORK_NAME))){
             stream.forEach(line -> {
@@ -145,6 +145,32 @@ public class ReactionMapGenerator {
                 if (reactionIds.contains(tokens[0]) && reactionIds.contains(tokens[2])) {
                       System.out.println(line);
                   }
+            });
+        }
+    }
+    
+    /**
+     * Use this method to connect all reactions together. Extract reactions may be
+     * used to connect all reactions together.
+     * @param reationIds
+     * @throws IOException
+     */
+    public void generateSubNetworkForAll(Set<String> reactionIds,
+                                         Map<String, Double> reactionToScore) throws IOException {
+        try (Stream<String> stream = Files.lines(Paths.get(REACTION_NETWORK_NAME))) {
+            // Convert the reaction fis as in the format for the FI network
+            Set<String> edges = stream.map(line -> line.split(" "))
+                                      .map(tokens -> tokens[0] + "\t" + tokens[2])
+                                      .collect(Collectors.toSet());
+            NetworkBuilderForGeneSet builder = new NetworkBuilderForGeneSet();
+            builder.setAllFIs(edges);
+            Set<String> reactionEdges = builder.constructFINetworkForGeneSet(reactionIds, reactionToScore);
+            reactionEdges.forEach(edge -> {
+                String[] tokens = edge.split("\t");
+                if (edges.contains(edge))
+                    System.out.println(tokens[0] + " preceding " + tokens[1]);
+                else
+                    System.out.println(tokens[1] + " preceding " + tokens[0]);
             });
         }
     }
