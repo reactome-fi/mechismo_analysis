@@ -25,7 +25,6 @@ import org.reactome.r3.util.FisherExact;
 import org.reactome.r3.util.MathUtilities;
 import org.reactome.r3.util.Plotter;
 
-import javax.swing.text.html.HTMLDocument;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -574,6 +573,18 @@ public class MechismoAnalyzer {
         fu.close();
     }
 
+    private Set<Long[]> GenerateReactionSetPairs(Set<Long> reactionSet) {
+        Set<Long[]> reactionSetPairs = new HashSet<>();
+        List<Long> reactionList = new ArrayList<>(reactionSet);
+        for (int i = 0; i < reactionList.size() - 1; i++) { //first to second-last
+            for (int j = i + 1; j < reactionList.size(); j++) { //second to last
+                Long[] pair = {reactionList.get(i), reactionList.get(j)};
+                reactionSetPairs.add(pair);
+            }
+        }
+        return reactionSetPairs;
+    }
+
     public void mapReactomeReactions(CancerDriverReactomeAnalyzer cancerDriverReactomeAnalyzer,
                                      String mechismoOutputFilePath,
                                      String reactomeReactionNetworkFilePath,
@@ -587,11 +598,25 @@ public class MechismoAnalyzer {
                 reactionGraph.edgeSet().size()));
 
         //extract FIs from Mechismo output
+        MechismoOutputLoader mechismoOutputLoader = new MechismoOutputLoader(mechismoOutputFilePath);
+
         //Set<FI>
-        Set<String> fis = new MechismoOutputLoader(mechismoOutputFilePath).extractMechismoFIs();
+        Set<String> fis = mechismoOutputLoader.ExtractMechismoFIs();
 
         System.out.println(String.format("Loaded %d Mechismo FIs",
                 fis.size()));
+
+        //Map<Sample Barcode,Set<FI>>
+        Map<String,Set<String>> samples2FIs = mechismoOutputLoader.ExtractSamples2FIs();
+
+        System.out.println(String.format("%s samples mapped to FIs",
+                samples2FIs.keySet().size()));
+
+        //Map<FI,Set<Sample Barcode>>
+        Map<String,Set<String>> fis2Samples = mechismoOutputLoader.ExtractFIs2Samples();
+
+        System.out.println(String.format("%s FIs mapped to samples",
+                fis2Samples.keySet().size()));
 
         //find reactions containing Mechismo FIs
         //FI -> Set<Reaction Id>
@@ -771,14 +796,15 @@ public class MechismoAnalyzer {
         String outFilePath1 = outputDir + "reactions2FIs.csv";
         try{
             fileUtility1.setOutput(outFilePath1);
-            fileUtility1.printLine("RxnId,Mapped FIs");
+            fileUtility1.printLine("RxnId,Num FIs,Mapped FIs");
             Iterator reaction2FiItr = reaction2FiSet.entrySet().iterator();
             while(reaction2FiItr.hasNext()) {
                 Map.Entry pair = (Map.Entry) reaction2FiItr.next();
                 Long rxnId = (Long) pair.getKey();
                 Set<String> mappedFis = (Set<String>) pair.getValue();
-                fileUtility1.printLine(String.format("%d,%s",
+                fileUtility1.printLine(String.format("%d,%d,%s",
                         rxnId,
+                        mappedFis.size(),
                         mappedFis.size() > 1
                                 ? org.gk.util.StringUtils.join(" ",
                                 new ArrayList(mappedFis)).replace("\t"," ")
@@ -791,6 +817,65 @@ public class MechismoAnalyzer {
         }catch(IOException ioe){
             logger.error(String.format("Couldn't use %s, %s: %s",
                     outFilePath1.toString(),
+                    ioe.getMessage(),
+                    Arrays.toString(ioe.getStackTrace())));
+        }
+
+        //write samples2FIs to file
+        FileUtility fileUtility2 = new FileUtility();
+        String outFilePath2 = outputDir + "samples2FIs.csv";
+        try{
+            fileUtility2.setOutput(outFilePath2);
+            fileUtility2.printLine("Sample Barcode,Num FIs,Mapped FIs");
+            Iterator sample2FiItr = samples2FIs.entrySet().iterator();
+            while(sample2FiItr.hasNext()){
+                Map.Entry pair = (Map.Entry) sample2FiItr.next();
+                String sampleBarcode = (String) pair.getKey();
+                Set<String> mappedFis = (Set<String>) pair.getValue();
+                fileUtility2.printLine(String.format("%s,%d,%s",
+                        sampleBarcode,
+                        mappedFis.size(),
+                        mappedFis.size() > 1
+                                ? org.gk.util.StringUtils.join(" ",
+                                new ArrayList(mappedFis)).replace("\t", " ")
+                                : Arrays.asList(mappedFis).get(0).toString()
+                                .replace("[", "")
+                                .replace("]", "")
+                                .replace("\t", " ")));
+            }
+        }catch(IOException ioe){
+            logger.error(String.format("Couldn't use %s, %s: %s",
+                    outFilePath2.toString(),
+                    ioe.getMessage(),
+                    Arrays.toString(ioe.getStackTrace())));
+        }
+
+        //write fis2Samples to file
+        FileUtility fileUtility3 = new FileUtility();
+        String outFilePath3 = outputDir + "fis2Samples.csv";
+        try{
+            fileUtility3.setOutput(outFilePath3);
+            fileUtility3.printLine("FI,Num Samples,FI Frequency,Mapped Samples");
+            Iterator fi2SampleItr = fis2Samples.entrySet().iterator();
+            while(fi2SampleItr.hasNext()){
+                Map.Entry pair = (Map.Entry) fi2SampleItr.next();
+                String fi = (String) pair.getKey();
+                Set<String> mappedSamples = (Set<String>) pair.getValue();
+                fileUtility3.printLine(String.format("%s,%d,%f,%s",
+                        fi,
+                        mappedSamples.size(),
+                        new Double(mappedSamples.size()) / new Double(samples2FIs.keySet().size()),
+                        mappedSamples.size() > 1
+                                ? org.gk.util.StringUtils.join(" ",
+                                new ArrayList(mappedSamples)).replace("\t", " ")
+                                : Arrays.asList(mappedSamples).get(0).toString()
+                                .replace("[", "")
+                                .replace("]", "")
+                                .replace("\t", " ")));
+            }
+        }catch(IOException ioe){
+            logger.error(String.format("Couldn't use %s, %s: %s",
+                    outFilePath3.toString(),
                     ioe.getMessage(),
                     Arrays.toString(ioe.getStackTrace())));
         }
@@ -829,9 +914,11 @@ public class MechismoAnalyzer {
         private static final String headerLine =
                 "RxnId," +
                         "Num Sup Dn/Up Rxns," +
+                        "Num Sup Dn/Up Combos," +
                         "Num All Dn/Up Rxns," +
                         "Support Ratio," +
                         "Sup Dn/Up Rxns," +
+                        "Sup Dn/Up Combos," +
                         "All Dn/Up Rxns," +
                         "Supporting FIs";
 
@@ -879,22 +966,31 @@ public class MechismoAnalyzer {
 
         @Override
         public String toString() {
+            Set<String> supCombos = ConvertLongArysToStrings(
+                    GenerateReactionSetPairs(this.supRxns));
             return String.format(
                     "%d," + //rxnId
                             "%d," + //numSupUpRxn
+                            "%d," + //numSupUpCombos
                             "%d," + //numUpRxn
                             "%f," + //supUpRatio
                             "%s," + //supRxns
+                            "%s," + //supCombos
                             "%s," + //upRxns
                             "%s",   //supFIs
                     this.rxnId,
                     this.numSupUpRxn,
+                    supCombos.size(),
                     this.numUpRxn,
                     this.supUpRatio,
                     this.supRxns.size() > 1
                             ? org.gk.util.StringUtils.join("~",
                                 new ArrayList(this.supRxns))
                             : Arrays.asList(this.supRxns).get(0),
+                    supCombos.size() > 1
+                            ? org.gk.util.StringUtils.join("~",
+                                new ArrayList(supCombos))
+                            : Arrays.asList(supCombos).get(0),
                     this.upRxns.size() > 1
                             ? org.gk.util.StringUtils.join("~",
                                 new ArrayList(this.upRxns))
@@ -904,5 +1000,17 @@ public class MechismoAnalyzer {
                             new ArrayList(this.supFIs))
                             : Arrays.asList(this.supFIs).get(0));
         }
+    }
+
+    private Set<String> ConvertLongArysToStrings(Set<Long[]> longArys){
+        Set<String> stringSet = new HashSet<>();
+        Iterator<Long[]>  longArySetItr = longArys.iterator();
+        while(longArySetItr.hasNext()){
+            Long[] longAry = longArySetItr.next();
+            stringSet.add(String.format("%d\t%d",
+                    longAry[0],
+                    longAry[1]));
+        }
+        return stringSet;
     }
 }
