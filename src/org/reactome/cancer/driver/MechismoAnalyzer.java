@@ -578,7 +578,7 @@ public class MechismoAnalyzer {
         List<Long> reactionList = new ArrayList<>(reactionSet);
         for (int i = 0; i < reactionList.size() - 1; i++) { //first to second-last
             for (int j = i + 1; j < reactionList.size(); j++) { //second to last
-                Long[] pair = {reactionList.get(i), reactionList.get(j)};
+                Long[] pair = {new Long(reactionList.get(i)), new Long(reactionList.get(j))};
                 reactionSetPairs.add(pair);
             }
         }
@@ -802,8 +802,8 @@ public class MechismoAnalyzer {
                 Map.Entry pair = (Map.Entry) reaction2FiItr.next();
                 Long rxnId = (Long) pair.getKey();
                 Set<String> mappedFis = (Set<String>) pair.getValue();
-                fileUtility1.printLine(String.format("%d,%d,%s",
-                        rxnId,
+                fileUtility1.printLine(String.format("%s,%d,%s",
+                        rxnId.toString(),
                         mappedFis.size(),
                         mappedFis.size() > 1
                                 ? org.gk.util.StringUtils.join(" ",
@@ -843,6 +843,7 @@ public class MechismoAnalyzer {
                                 .replace("]", "")
                                 .replace("\t", " ")));
             }
+            fileUtility2.close();
         }catch(IOException ioe){
             logger.error(String.format("Couldn't use %s, %s: %s",
                     outFilePath2.toString(),
@@ -873,6 +874,7 @@ public class MechismoAnalyzer {
                                 .replace("]", "")
                                 .replace("\t", " ")));
             }
+            fileUtility3.close();
         }catch(IOException ioe){
             logger.error(String.format("Couldn't use %s, %s: %s",
                     outFilePath3.toString(),
@@ -901,6 +903,171 @@ public class MechismoAnalyzer {
 
         System.out.println(String.format("Output written to %s",
                 outFilePath));
+
+        //Map<Reaction,Set<Sample Barcode>>
+        //report reaction frequencies
+        Map<Long,Set<String>> rxn2Samples = new HashMap<>();
+        Iterator rxn2FisItr = reaction2FiSet.entrySet().iterator();
+        while(rxn2FisItr.hasNext()){
+            Map.Entry pair = (Map.Entry) rxn2FisItr.next();
+            Long rxn = new Long((Long) pair.getKey());
+            Set<String> rxnFis = (Set<String>) pair.getValue();
+            Iterator<String> rxnFisItr = rxnFis.iterator();
+            while(rxnFisItr.hasNext()){
+                String rxnFi = rxnFisItr.next();
+                Set<String> rxnSamples;
+                if(rxn2Samples.containsKey(rxn)){
+                    rxnSamples = new HashSet<>(rxn2Samples.get(rxn));
+                }else{
+                    rxnSamples = new HashSet<>();
+                }
+                rxnSamples.addAll(fis2Samples.get(rxnFi));
+                rxn2Samples.put(rxn,rxnSamples);
+            }
+        }
+
+        //write rxn2Samples to file
+        FileUtility fileUtility4 = new FileUtility();
+        String outFilePath4 = outputDir + "rxn2Samples.csv";
+        try{
+            fileUtility4.setOutput(outFilePath4);
+            fileUtility4.printLine("Rxn,Num Samples,Rxn Frequency,Mapped Samples");
+            Iterator rxn2SampleItr = rxn2Samples.entrySet().iterator();
+            while(rxn2SampleItr.hasNext()){
+                Map.Entry pair = (Map.Entry) rxn2SampleItr.next();
+                Long rxn = new Long((Long) pair.getKey());
+                Set<String> mappedSamples = (Set<String>) pair.getValue();
+                if(mappedSamples.size() != rxn2Samples.get(new Long(rxn.toString())).size() ||
+                        mappedSamples.size() < 1){
+                    throw new IllegalStateException("These should always match");
+                }
+                fileUtility4.printLine(String.format("%s,%d,%f,%s",
+                        rxn.toString(),
+                        mappedSamples.size(),
+                        new Double(mappedSamples.size()) / new Double(samples2FIs.keySet().size()),
+                        mappedSamples.size() > 1
+                                ? org.gk.util.StringUtils.join(" ",
+                                new ArrayList(mappedSamples)).replace("\t", " ")
+                                : Arrays.asList(mappedSamples).get(0).toString()
+                                .replace("[", "")
+                                .replace("]", "")
+                                .replace("\t", " ")));
+            }
+            fileUtility4.close();
+        }catch(IOException ioe){
+            logger.error(String.format("Couldn't use %s, %s: %s",
+                    outFilePath4.toString(),
+                    ioe.getMessage(),
+                    Arrays.toString(ioe.getStackTrace())));
+        }
+
+
+
+        //all combinations among target reaction summaries
+        //target reaction, IN/EX FI intersection, min, max, mean, cooccurrences, dn/up reaction combinations
+        FileUtility fileUtility5 = new FileUtility();
+        String outFilePath5 = outputDir + "rxnCooccurrence.csv";
+        try {
+            fileUtility5.setOutput(outFilePath5);
+            fileUtility5.printLine("Target Reaction," +
+                    "IN/EX FI Intersection," +
+                    "Min," +
+                    "Max," +
+                    "Max Reaction Freq,"+
+                    "Cooccurrences," +
+                    "Dn/Up Reaction Combinations");
+            Iterator<TargetReactionSummary> trsItr = targetReactionSummaries.iterator();
+            while (trsItr.hasNext()) {
+                TargetReactionSummary trs = trsItr.next();
+                Long rxn = trs.rxnId;
+                Set<Long[]> dnUpPairs = GenerateReactionSetPairs(trs.supRxns);
+                Set<String> dnUpPairsStrings = ConvertLongArysToStrings(dnUpPairs);
+                Set<Double> cooccurences = new HashSet<>();
+                Set<Double> cooccurencesExclusive = new HashSet<>();
+                for (Long[] dnUpPair : dnUpPairs) {
+                    Long dnUp1 = new Long(dnUpPair[0]);
+                    Long dnUp2 = new Long(dnUpPair[1]);
+
+                    int maxReactionFrequency =
+                            rxn2Samples.get(dnUp1).size() >
+                                    rxn2Samples.get(dnUp2).size()
+                                    ? rxn2Samples.get(dnUp1).size()
+                                    : rxn2Samples.get(dnUp2).size();
+
+                    //one row for IN
+                    Set<String> dnUpSamples = new HashSet<>(rxn2Samples.get(dnUp1));
+                    dnUpSamples.retainAll(rxn2Samples.get(dnUp2));
+                    if (maxReactionFrequency < 1 ||
+                            maxReactionFrequency < dnUpSamples.size()) {
+                        throw new IllegalStateException("Max frequency should be higher...");
+                    }
+                    cooccurences.add(new Double(dnUpSamples.size()) /
+                            new Double(maxReactionFrequency));
+
+                    //one row for EX
+                    Set<String> dnUp1FisExclusive = new HashSet<>(reaction2FiSet.get(dnUp1));
+                    dnUp1FisExclusive.removeAll(reaction2FiSet.get(dnUp2));
+
+                    Set<String> dnUp2FisExclusive = new HashSet<>(reaction2FiSet.get(dnUp2));
+                    dnUp2FisExclusive.removeAll(reaction2FiSet.get(dnUp1));
+
+                    Set<String> dnUp1SamplesExclusive = new HashSet<>();
+                    for (String dnUp1Fi : dnUp1FisExclusive) {
+                        dnUp1SamplesExclusive.addAll(fis2Samples.get(dnUp1Fi));
+                    }
+                    Set<String> dnUp2SamplesExclusive = new HashSet<>();
+                    for (String dnUp2Fi : dnUp2FisExclusive) {
+                        dnUp2SamplesExclusive.addAll(fis2Samples.get(dnUp2Fi));
+                    }
+                    dnUp1SamplesExclusive.retainAll(dnUp2SamplesExclusive);
+                    //is this right? should we be dividing by the total reaction frequency?
+                    if (maxReactionFrequency < 1 ||
+                            maxReactionFrequency < dnUp1SamplesExclusive.size()) {
+                        throw new IllegalStateException("Max frequency should be higher...");
+                    }
+                    cooccurencesExclusive.add(new Double(dnUp1SamplesExclusive.size()) /
+                            new Double(maxReactionFrequency));
+                }
+                fileUtility5.printLine(String.format("%s,IN,%f,%f,%s,%s",
+                        rxn.toString(),
+                        (cooccurences.size() > 0)
+                                ? Collections.min(cooccurences)
+                                : -1.0,
+                        (cooccurences.size() > 0)
+                                ? Collections.max(cooccurences)
+                                : -1.0,
+                        cooccurences.size() > 1
+                                ? org.gk.util.StringUtils.join("~",
+                                new ArrayList(cooccurences))
+                                : Arrays.asList(cooccurences).get(0),
+                        dnUpPairsStrings.size() > 1
+                                ? org.gk.util.StringUtils.join("~",
+                                new ArrayList(dnUpPairsStrings))
+                                : Arrays.asList(dnUpPairsStrings).get(0)));
+                fileUtility5.printLine(String.format("%d,EX,%f,%f,%s,%s",
+                        rxn,
+                        (cooccurencesExclusive.size() > 0)
+                                ? Collections.min(cooccurencesExclusive)
+                                : -1.0,
+                        (cooccurencesExclusive.size() > 0)
+                                ? Collections.max(cooccurencesExclusive)
+                                : -1.0,
+                        cooccurencesExclusive.size() > 1
+                                ? org.gk.util.StringUtils.join("~",
+                                new ArrayList(cooccurencesExclusive))
+                                : Arrays.asList(cooccurencesExclusive).get(0),
+                        dnUpPairsStrings.size() > 1
+                                ? org.gk.util.StringUtils.join("~",
+                                new ArrayList(dnUpPairsStrings))
+                                : Arrays.asList(dnUpPairsStrings).get(0)));
+            }
+            fileUtility5.close();
+        }catch(IOException ioe){
+            logger.error(String.format("Couldn't use %s, %s: %s",
+                    outFilePath5.toString(),
+                    ioe.getMessage(),
+                    Arrays.toString(ioe.getStackTrace())));
+        }
     }
 
     private class TargetReactionSummary {
