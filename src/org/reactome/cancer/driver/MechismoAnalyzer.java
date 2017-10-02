@@ -969,26 +969,34 @@ public class MechismoAnalyzer {
         String outFilePath5 = outputDir + "rxnCooccurrence.csv";
         FisherExact fisherExact = new FisherExact(samples2FIs.keySet().size());
         try {
-            fileUtility5.setOutput(outFilePath5);
-            fileUtility5.printLine("Target Reaction," +
-                    "IN/EX FI Intersection," +
-                    "Min," +
-                    "Max," +
-                    "Sum,"+
-                    "Count,"+
-                    "Mean,"+
-                    "CooccurrenceSignificance," +
-                    "Dn/Up Reaction Combinations");
+            List<String> targetReactionList = new ArrayList<>();
+            List<String> upstreamReactionList = new ArrayList<>();
+            List<Double> inPValues = new ArrayList<>();
+            List<Double> exPValues = new ArrayList<>();
+            List<Integer[]> inABCDs = new ArrayList<>();
+            List<Integer[]> exABCDs = new ArrayList<>();
             int trsCounter = 0;
+            fileUtility5.setOutput(outFilePath5);
+            fileUtility5.printLine(
+                    "Target Reaction," +
+                            "Upstream Reactions," +
+                            "IN/EX FI Set Intersection," +
+                            "A," +
+                            "B," +
+                            "C," +
+                            "D," +
+                            "Co-occurrence P-value," +
+                            "Co-occurrence BH Adjusted P-value");
             Iterator<TargetReactionSummary> trsItr = targetReactionSummaries.iterator();
             while (trsItr.hasNext()) {
                 TargetReactionSummary trs = trsItr.next();
                 Long rxn = trs.rxnId;
-                Set<Long[]> dnUpPairs = GenerateReactionSetPairs(trs.supRxns);
-                Set<String> dnUpPairsStrings = ConvertLongArysToStrings(dnUpPairs);
-                Set<Double> cooccurenceSignificance = new HashSet<>();
-                Set<Double> cooccurenceSignificanceExclusive = new HashSet<>();
-
+                List<Long[]> dnUpPairs = new ArrayList<>(GenerateReactionSetPairs(trs.supRxns));
+                List<String> dnUpPairsStrings = ConvertLongArysToStrings(dnUpPairs);
+                List<Double> cooccurrenceSignificanceList = new ArrayList<>();
+                List<Double> cooccurrenceSignificanceExclusiveList = new ArrayList<>();
+                List<Integer[]> inABCD = new ArrayList<>();
+                List<Integer[]> exABCD = new ArrayList<>();
                 for (Long[] dnUpPair : dnUpPairs) {
                     Long dnUp1 = new Long(dnUpPair[0]);
                     Long dnUp2 = new Long(dnUpPair[1]);
@@ -1006,8 +1014,6 @@ public class MechismoAnalyzer {
                             maxReactionFrequency < dnUpSamples.size()) {
                         throw new IllegalStateException("Max frequency should be higher...");
                     }
-                    //cooccurences.add(new Double(dnUpSamples.size()) /
-                    //        new Double(maxReactionFrequency));
                     Set<String> ac = new HashSet<>(samples2FIs.keySet());
                     ac.removeAll(rxn2Samples.get(dnUp1));
 
@@ -1025,7 +1031,10 @@ public class MechismoAnalyzer {
                     Set<String> d = new HashSet<>(bd);
                     d.retainAll(rxn2Samples.get(dnUp2));
 
-                    cooccurenceSignificance.add(fisherExact.getP(
+                    Integer[] abcd = {a.size(),b.size(),c.size(),d.size()};
+                    inABCD.add(abcd);
+
+                    cooccurrenceSignificanceList.add(fisherExact.getTwoTailedP(
                             a.size(),
                             b.size(),
                             c.size(),
@@ -1052,8 +1061,6 @@ public class MechismoAnalyzer {
                             maxReactionFrequency < dnUp1SamplesExclusive.size()) {
                         throw new IllegalStateException("Max frequency should be higher...");
                     }
-                    //cooccurencesExclusive.add(new Double(dnUp1SamplesExclusive.size()) /
-                    //        new Double(maxReactionFrequency));
                     Set<String> acE = new HashSet<>(samples2FIs.keySet());
                     acE.removeAll(dnUp1SamplesExclusive);
 
@@ -1071,58 +1078,67 @@ public class MechismoAnalyzer {
                     Set<String> dE = new HashSet<>(bdE);
                     dE.retainAll(dnUp2SamplesExclusive);
 
-                    cooccurenceSignificanceExclusive.add(fisherExact.getP(
+                    Integer[] abcdE = {aE.size(),bE.size(),cE.size(),dE.size()};
+                    exABCD.add(abcdE);
+
+                    cooccurrenceSignificanceExclusiveList.add(fisherExact.getTwoTailedP(
                             aE.size(),
                             bE.size(),
                             cE.size(),
                             dE.size()));
                 }
-                fileUtility5.printLine(String.format("%s,IN,%f,%f,%f,%d,%f,%s,%s",
-                        rxn.toString(),
-                        (cooccurenceSignificance.size() > 0)
-                                ? Collections.min(cooccurenceSignificance)
-                                : -1.0,
-                        (cooccurenceSignificance.size() > 0)
-                                ? Collections.max(cooccurenceSignificance)
-                                : -1.0,
-                        sumSet(cooccurenceSignificance),
-                        cooccurenceSignificance.size(),
-                        sumSet(cooccurenceSignificance) /
-                                new Double(cooccurenceSignificance.size()),
-                        cooccurenceSignificance.size() > 1
-                                ? org.gk.util.StringUtils.join("~",
-                                new ArrayList(cooccurenceSignificance))
-                                : Arrays.asList(cooccurenceSignificance).get(0),
-                        dnUpPairsStrings.size() > 1
-                                ? org.gk.util.StringUtils.join("~",
-                                new ArrayList(dnUpPairsStrings))
-                                : Arrays.asList(dnUpPairsStrings).get(0)));
-                fileUtility5.printLine(String.format("%d,EX,%f,%f,%f,%d,%f,%s,%s",
-                        rxn,
-                        (cooccurenceSignificanceExclusive.size() > 0)
-                                ? Collections.min(cooccurenceSignificanceExclusive)
-                                : -1.0,
-                        (cooccurenceSignificanceExclusive.size() > 0)
-                                ? Collections.max(cooccurenceSignificanceExclusive)
-                                : -1.0,
-                        sumSet(cooccurenceSignificanceExclusive),
-                        cooccurenceSignificanceExclusive.size(),
-                        sumSet(cooccurenceSignificanceExclusive) /
-                                new Double(cooccurenceSignificanceExclusive.size()),
-                        cooccurenceSignificanceExclusive.size() > 1
-                                ? org.gk.util.StringUtils.join("~",
-                                new ArrayList(cooccurenceSignificanceExclusive))
-                                : Arrays.asList(cooccurenceSignificanceExclusive).get(0),
-                        dnUpPairsStrings.size() > 1
-                                ? org.gk.util.StringUtils.join("~",
-                                new ArrayList(dnUpPairsStrings))
-                                : Arrays.asList(dnUpPairsStrings).get(0)));
+                if(cooccurrenceSignificanceExclusiveList.size() !=
+                        cooccurrenceSignificanceList.size() ||
+                        cooccurrenceSignificanceExclusiveList.size() !=
+                        inABCD.size() ||
+                        cooccurrenceSignificanceExclusiveList.size() !=
+                        exABCD.size()){
+                    int debug = 1;
+                }
+                for(int i = 0; i < cooccurrenceSignificanceList.size(); i++) {
+                    targetReactionList.add(rxn.toString());
+                    upstreamReactionList.add(dnUpPairsStrings.get(i));
+                    inPValues.add(cooccurrenceSignificanceList.get(i));
+                    exPValues.add(cooccurrenceSignificanceExclusiveList.get(i));
+                    inABCDs.add(inABCD.get(i));
+                    exABCDs.add(exABCD.get(i));
+                }
                 trsCounter++;
                 if (trsCounter % 100 == 0) {
                     System.out.println(String.format("Processed %d of %d Target Reactions...",
                             trsCounter, targetReactionSummaries.size()));
                     System.out.flush();
                 }
+            }
+            List<Double> inFDRs =
+                    MathUtilities.calculateFDRWithBenjaminiHochberg(inPValues);
+            List<Double> exFDRs =
+                    MathUtilities.calculateFDRWithBenjaminiHochberg(exPValues);
+
+            //check arraylist sizes match here
+
+            for(int i = 0; i < targetReactionList.size(); i++) {
+
+                //check abcd p-values match recorded p-value
+
+                fileUtility5.printLine(String.format("%s,%s,IN,%d,%d,%d,%d,%.20e,%.20e",
+                        targetReactionList.get(i),
+                        upstreamReactionList.get(i),
+                        inABCDs.get(i)[0],
+                        inABCDs.get(i)[1],
+                        inABCDs.get(i)[2],
+                        inABCDs.get(i)[3],
+                        inPValues.get(i),
+                        inFDRs.get(i)));
+                fileUtility5.printLine(String.format("%s,%s,EX,%d,%d,%d,%d,%.20e,%.20e",
+                        targetReactionList.get(i),
+                        upstreamReactionList.get(i),
+                        exABCDs.get(i)[0],
+                        exABCDs.get(i)[1],
+                        exABCDs.get(i)[2],
+                        exABCDs.get(i)[3],
+                        exPValues.get(i),
+                        exFDRs.get(i)));
             }
             fileUtility5.close();
         }catch(IOException ioe){
@@ -1204,8 +1220,8 @@ public class MechismoAnalyzer {
 
         @Override
         public String toString() {
-            Set<String> supCombos = ConvertLongArysToStrings(
-                    GenerateReactionSetPairs(this.supRxns));
+            List<String> supCombos = ConvertLongArysToStrings(
+                    new ArrayList<>(GenerateReactionSetPairs(this.supRxns)));
             return String.format(
                     "%d," + //rxnId
                             "%d," + //numSupUpRxn
@@ -1240,8 +1256,8 @@ public class MechismoAnalyzer {
         }
     }
 
-    private Set<String> ConvertLongArysToStrings(Set<Long[]> longArys){
-        Set<String> stringSet = new HashSet<>();
+    private List<String> ConvertLongArysToStrings(List<Long[]> longArys){
+        List<String> stringSet = new ArrayList<>();
         Iterator<Long[]>  longArySetItr = longArys.iterator();
         while(longArySetItr.hasNext()){
             Long[] longAry = longArySetItr.next();
