@@ -973,8 +973,8 @@ public class MechismoAnalyzer {
             List<String> upstreamReactionList = new ArrayList<>();
             List<Double> inPValues = new ArrayList<>();
             List<Double> exPValues = new ArrayList<>();
-            List<Integer[]> inABCDs = new ArrayList<>();
-            List<Integer[]> exABCDs = new ArrayList<>();
+            List<int[]> inABCDs = new ArrayList<>();
+            List<int[]> exABCDs = new ArrayList<>();
             int trsCounter = 0;
             fileUtility5.setOutput(outFilePath5);
             fileUtility5.printLine(
@@ -995,8 +995,8 @@ public class MechismoAnalyzer {
                 List<String> dnUpPairsStrings = ConvertLongArysToStrings(dnUpPairs);
                 List<Double> cooccurrenceSignificanceList = new ArrayList<>();
                 List<Double> cooccurrenceSignificanceExclusiveList = new ArrayList<>();
-                List<Integer[]> inABCD = new ArrayList<>();
-                List<Integer[]> exABCD = new ArrayList<>();
+                List<int[]> inABCD = new ArrayList<>();
+                List<int[]> exABCD = new ArrayList<>();
                 for (Long[] dnUpPair : dnUpPairs) {
                     Long dnUp1 = new Long(dnUpPair[0]);
                     Long dnUp2 = new Long(dnUpPair[1]);
@@ -1031,14 +1031,15 @@ public class MechismoAnalyzer {
                     Set<String> d = new HashSet<>(bd);
                     d.retainAll(rxn2Samples.get(dnUp2));
 
-                    Integer[] abcd = {a.size(),b.size(),c.size(),d.size()};
+                    int[] abcd = {a.size(),b.size(),c.size(),d.size()};
                     inABCD.add(abcd);
 
-                    cooccurrenceSignificanceList.add(fisherExact.getTwoTailedP(
+                    cooccurrenceSignificanceList.add(
+                            new Double(fisherExact.getTwoTailedP(
                             a.size(),
                             b.size(),
                             c.size(),
-                            d.size()));
+                            d.size())));
 
                     //one row for EX
                     Set<String> dnUp1FisExclusive = new HashSet<>(reaction2FiSet.get(dnUp1));
@@ -1078,14 +1079,15 @@ public class MechismoAnalyzer {
                     Set<String> dE = new HashSet<>(bdE);
                     dE.retainAll(dnUp2SamplesExclusive);
 
-                    Integer[] abcdE = {aE.size(),bE.size(),cE.size(),dE.size()};
+                    int[] abcdE = {aE.size(),bE.size(),cE.size(),dE.size()};
                     exABCD.add(abcdE);
 
-                    cooccurrenceSignificanceExclusiveList.add(fisherExact.getTwoTailedP(
+                    cooccurrenceSignificanceExclusiveList.add(
+                            new Double(fisherExact.getTwoTailedP(
                             aE.size(),
                             bE.size(),
                             cE.size(),
-                            dE.size()));
+                            dE.size())));
                 }
                 if(cooccurrenceSignificanceExclusiveList.size() !=
                         cooccurrenceSignificanceList.size() ||
@@ -1110,16 +1112,73 @@ public class MechismoAnalyzer {
                     System.out.flush();
                 }
             }
+            //The FDR calculation has the side effect of sorting the passed list...
+            List<Double> inPValuesSorted = new ArrayList<>(inPValues);
+            List<Double> exPValuesSorted = new ArrayList<>(exPValues);
+
             List<Double> inFDRs =
-                    MathUtilities.calculateFDRWithBenjaminiHochberg(inPValues);
+                    MathUtilities.calculateFDRWithBenjaminiHochberg(inPValuesSorted);
             List<Double> exFDRs =
-                    MathUtilities.calculateFDRWithBenjaminiHochberg(exPValues);
+                    MathUtilities.calculateFDRWithBenjaminiHochberg(exPValuesSorted);
+
+            if(inPValues.size() !=
+                    inPValuesSorted.size() ||
+                    inPValues.size() !=
+                    exPValues.size() ||
+                    inPValues.size() !=
+                    exPValuesSorted.size() ||
+                    inPValues.size() !=
+                    inFDRs.size() ||
+                    inPValues.size() !=
+                    exFDRs.size()){
+                int debug = 1;
+            }
+
+            Map<Double,Double> inPValue2FDRMap = new HashMap<>();
+            Map<Double,Double> exPValue2FDRMap = new HashMap<>();
+            for(int i = 0; i < inPValues.size(); i++){
+                inPValue2FDRMap.put(inPValuesSorted.get(i),inFDRs.get(i));
+                exPValue2FDRMap.put(exPValuesSorted.get(i),exFDRs.get(i));
+            }
 
             //check arraylist sizes match here
+            if(targetReactionList.size() !=
+                    upstreamReactionList.size() ||
+                    targetReactionList.size() !=
+                    inABCDs.size() ||
+                    targetReactionList.size() !=
+                    exABCDs.size() ||
+                    targetReactionList.size() !=
+                    inPValues.size() ||
+                    targetReactionList.size() !=
+                    exPValues.size() ||
+                    targetReactionList.size() !=
+                    inFDRs.size() ||
+                    targetReactionList.size() !=
+                    exFDRs.size()){
+                int debug = 1;
+            }
 
             for(int i = 0; i < targetReactionList.size(); i++) {
 
                 //check abcd p-values match recorded p-value
+                Double p1 = new Double(fisherExact.getTwoTailedP(inABCDs.get(i)[0],
+                        inABCDs.get(i)[1],
+                        inABCDs.get(i)[2],
+                        inABCDs.get(i)[3]));
+                Double p2 = inPValues.get(i);
+                if(!Objects.equals(p1, p2)){
+                    int debug = 1;
+                }
+                Double p3 = new Double(fisherExact.getTwoTailedP(exABCDs.get(i)[0],
+                        exABCDs.get(i)[1],
+                        exABCDs.get(i)[2],
+                        exABCDs.get(i)[3]));
+                Double p4 = exPValues.get(i);
+                if(!Objects.equals(p3, p4)){
+                    int debug = 1;
+                }
+
 
                 fileUtility5.printLine(String.format("%s,%s,IN,%d,%d,%d,%d,%.20e,%.20e",
                         targetReactionList.get(i),
@@ -1129,7 +1188,7 @@ public class MechismoAnalyzer {
                         inABCDs.get(i)[2],
                         inABCDs.get(i)[3],
                         inPValues.get(i),
-                        inFDRs.get(i)));
+                        inPValue2FDRMap.get(inPValues.get(i))));
                 fileUtility5.printLine(String.format("%s,%s,EX,%d,%d,%d,%d,%.20e,%.20e",
                         targetReactionList.get(i),
                         upstreamReactionList.get(i),
@@ -1138,7 +1197,7 @@ public class MechismoAnalyzer {
                         exABCDs.get(i)[2],
                         exABCDs.get(i)[3],
                         exPValues.get(i),
-                        exFDRs.get(i)));
+                        exPValue2FDRMap.get(exPValues.get(i))));
             }
             fileUtility5.close();
         }catch(IOException ioe){
