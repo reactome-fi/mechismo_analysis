@@ -588,7 +588,8 @@ public class MechismoAnalyzer {
     public void mapReactomeReactions(CancerDriverReactomeAnalyzer cancerDriverReactomeAnalyzer,
                                      String mechismoOutputFilePath,
                                      String reactomeReactionNetworkFilePath,
-                                     String outputDir) throws Exception {
+                                     String outputDir,
+                                     String outputFilePrefix) throws Exception {
         //build jgrapht network from reaction file
         ReactomeReactionGraphLoader reactomeReactionGraphLoader = new ReactomeReactionGraphLoader(reactomeReactionNetworkFilePath);
         DefaultDirectedGraph<Long, DefaultEdge> reactionGraph = reactomeReactionGraphLoader.getReactionGraph();
@@ -607,13 +608,13 @@ public class MechismoAnalyzer {
                 fis.size()));
 
         //Map<Sample Barcode,Set<FI>>
-        Map<String,Set<String>> samples2FIs = mechismoOutputLoader.ExtractSamples2FIs();
+        Map<String, Set<String>> samples2FIs = mechismoOutputLoader.ExtractSamples2FIs();
 
         System.out.println(String.format("%s samples mapped to FIs",
                 samples2FIs.keySet().size()));
 
         //Map<FI,Set<Sample Barcode>>
-        Map<String,Set<String>> fis2Samples = mechismoOutputLoader.ExtractFIs2Samples();
+        Map<String, Set<String>> fis2Samples = mechismoOutputLoader.ExtractFIs2Samples();
 
         System.out.println(String.format("%s FIs mapped to samples",
                 fis2Samples.keySet().size()));
@@ -727,15 +728,15 @@ public class MechismoAnalyzer {
 
         Set<Set<String>> fiIntersectingSetUnionClusters = new HashSet<>();
         Iterator<Set<String>> allFIsItr = allFIs.iterator();
-        while(allFIsItr.hasNext()){
+        while (allFIsItr.hasNext()) {
             Set<String> fiSet = allFIsItr.next();
             Set<String> union = new HashSet<>(fiSet);
             Iterator<Set<String>> fiClusterItr = fiIntersectingSetUnionClusters.iterator();
-            while(fiClusterItr.hasNext()){
+            while (fiClusterItr.hasNext()) {
                 Set<String> fiCluster = fiClusterItr.next();
                 Set<String> intersection = new HashSet<>(fiSet);
                 intersection.retainAll(fiCluster);
-                if (!intersection.isEmpty()){
+                if (!intersection.isEmpty()) {
                     union.addAll(fiCluster);
                     fiClusterItr.remove(); //remove out-dated cluster
                 }
@@ -751,8 +752,7 @@ public class MechismoAnalyzer {
         Double min = new Double(fiClusterItr.next().size());
         Double max = min;
         Double sum = max;
-        while(fiClusterItr.hasNext())
-        {
+        while (fiClusterItr.hasNext()) {
             Double sz = new Double(fiClusterItr.next().size());
             min = sz < min ? sz : min;
             max = sz > max ? sz : max;
@@ -768,23 +768,23 @@ public class MechismoAnalyzer {
 
         //perform pathway enrichment analysis among FI clusters
         FileUtility fileUtility0 = new FileUtility();
-        String outFilePath0 = outputDir + "fiClusters.csv";
-        try{
+        String outFilePath0 = outputDir + outputFilePrefix + "fiClusters.csv";
+        try {
             fileUtility0.setOutput(outFilePath0);
-            Iterator<Set<String>> fiClusterItr0 =fiIntersectingSetUnionClusters.iterator();
-            while(fiClusterItr0.hasNext()) {
+            Iterator<Set<String>> fiClusterItr0 = fiIntersectingSetUnionClusters.iterator();
+            while (fiClusterItr0.hasNext()) {
                 Set<String> fis0 = fiClusterItr0.next();
                 fileUtility0.printLine(
                         fis0.size() > 1
-                            ? org.gk.util.StringUtils.join(" ",
-                                new ArrayList(fis0)).replace("\t"," ")
-                            : Arrays.asList(fis0).get(0).toString()
-                                .replace("[","")
-                                .replace("]","")
-                .replace("\t"," "));
+                                ? org.gk.util.StringUtils.join(" ",
+                                new ArrayList(fis0)).replace("\t", " ")
+                                : Arrays.asList(fis0).get(0).toString()
+                                .replace("[", "")
+                                .replace("]", "")
+                                .replace("\t", " "));
             }
             fileUtility0.close();
-        }catch(IOException ioe){
+        } catch (IOException ioe) {
             logger.error(String.format("Couldn't use %s, %s: %s",
                     outFilePath0.toString(),
                     ioe.getMessage(),
@@ -793,12 +793,12 @@ public class MechismoAnalyzer {
 
         //write reaction2FIs to file
         FileUtility fileUtility1 = new FileUtility();
-        String outFilePath1 = outputDir + "reactions2FIs.csv";
-        try{
+        String outFilePath1 = outputDir + outputFilePrefix + "reactions2FIs.csv";
+        try {
             fileUtility1.setOutput(outFilePath1);
             fileUtility1.printLine("RxnId,Num FIs,Mapped FIs");
             Iterator reaction2FiItr = reaction2FiSet.entrySet().iterator();
-            while(reaction2FiItr.hasNext()) {
+            while (reaction2FiItr.hasNext()) {
                 Map.Entry pair = (Map.Entry) reaction2FiItr.next();
                 Long rxnId = (Long) pair.getKey();
                 Set<String> mappedFis = (Set<String>) pair.getValue();
@@ -807,14 +807,14 @@ public class MechismoAnalyzer {
                         mappedFis.size(),
                         mappedFis.size() > 1
                                 ? org.gk.util.StringUtils.join(" ",
-                                new ArrayList(mappedFis)).replace("\t"," ")
+                                new ArrayList(mappedFis)).replace("\t", " ")
                                 : Arrays.asList(mappedFis).get(0).toString()
-                                .replace("[","")
-                                .replace("]","")
-                                .replace("\t"," ")));
+                                .replace("[", "")
+                                .replace("]", "")
+                                .replace("\t", " ")));
             }
             fileUtility1.close();
-        }catch(IOException ioe){
+        } catch (IOException ioe) {
             logger.error(String.format("Couldn't use %s, %s: %s",
                     outFilePath1.toString(),
                     ioe.getMessage(),
@@ -823,12 +823,12 @@ public class MechismoAnalyzer {
 
         //write samples2FIs to file
         FileUtility fileUtility2 = new FileUtility();
-        String outFilePath2 = outputDir + "samples2FIs.csv";
-        try{
+        String outFilePath2 = outputDir + outputFilePrefix + "samples2FIs.csv";
+        try {
             fileUtility2.setOutput(outFilePath2);
             fileUtility2.printLine("Sample Barcode,Num FIs,Mapped FIs");
             Iterator sample2FiItr = samples2FIs.entrySet().iterator();
-            while(sample2FiItr.hasNext()){
+            while (sample2FiItr.hasNext()) {
                 Map.Entry pair = (Map.Entry) sample2FiItr.next();
                 String sampleBarcode = (String) pair.getKey();
                 Set<String> mappedFis = (Set<String>) pair.getValue();
@@ -844,7 +844,7 @@ public class MechismoAnalyzer {
                                 .replace("\t", " ")));
             }
             fileUtility2.close();
-        }catch(IOException ioe){
+        } catch (IOException ioe) {
             logger.error(String.format("Couldn't use %s, %s: %s",
                     outFilePath2.toString(),
                     ioe.getMessage(),
@@ -853,12 +853,12 @@ public class MechismoAnalyzer {
 
         //write fis2Samples to file
         FileUtility fileUtility3 = new FileUtility();
-        String outFilePath3 = outputDir + "fis2Samples.csv";
-        try{
+        String outFilePath3 = outputDir + outputFilePrefix + "fis2Samples.csv";
+        try {
             fileUtility3.setOutput(outFilePath3);
             fileUtility3.printLine("FI,Num Samples,FI Frequency,Mapped Samples");
             Iterator fi2SampleItr = fis2Samples.entrySet().iterator();
-            while(fi2SampleItr.hasNext()){
+            while (fi2SampleItr.hasNext()) {
                 Map.Entry pair = (Map.Entry) fi2SampleItr.next();
                 String fi = (String) pair.getKey();
                 Set<String> mappedSamples = (Set<String>) pair.getValue();
@@ -875,7 +875,7 @@ public class MechismoAnalyzer {
                                 .replace("\t", " ")));
             }
             fileUtility3.close();
-        }catch(IOException ioe){
+        } catch (IOException ioe) {
             logger.error(String.format("Couldn't use %s, %s: %s",
                     outFilePath3.toString(),
                     ioe.getMessage(),
@@ -884,7 +884,7 @@ public class MechismoAnalyzer {
 
         //write targetReactionSummaries to file
         FileUtility fileUtility = new FileUtility();
-        String outFilePath = outputDir + "dnUpReactions.csv";
+        String outFilePath = outputDir + outputFilePrefix + "dnUpReactions.csv";
         try {
             fileUtility.setOutput(outFilePath);
             fileUtility.printLine(TargetReactionSummary.headerLine);
@@ -894,7 +894,7 @@ public class MechismoAnalyzer {
                 fileUtility.printLine(targetReactionSummary.toString());
             }
             fileUtility.close();
-        }catch(IOException ioe){
+        } catch (IOException ioe) {
             logger.error(String.format("Couldn't use %s, %s: %s",
                     outFilePath.toString(),
                     ioe.getMessage(),
@@ -906,39 +906,39 @@ public class MechismoAnalyzer {
 
         //Map<Reaction,Set<Sample Barcode>>
         //report reaction frequencies
-        Map<Long,Set<String>> rxn2Samples = new HashMap<>();
+        Map<Long, Set<String>> rxn2Samples = new HashMap<>();
         Iterator rxn2FisItr = reaction2FiSet.entrySet().iterator();
-        while(rxn2FisItr.hasNext()){
+        while (rxn2FisItr.hasNext()) {
             Map.Entry pair = (Map.Entry) rxn2FisItr.next();
             Long rxn = new Long((Long) pair.getKey());
             Set<String> rxnFis = (Set<String>) pair.getValue();
             Iterator<String> rxnFisItr = rxnFis.iterator();
-            while(rxnFisItr.hasNext()){
+            while (rxnFisItr.hasNext()) {
                 String rxnFi = rxnFisItr.next();
                 Set<String> rxnSamples;
-                if(rxn2Samples.containsKey(rxn)){
+                if (rxn2Samples.containsKey(rxn)) {
                     rxnSamples = new HashSet<>(rxn2Samples.get(rxn));
-                }else{
+                } else {
                     rxnSamples = new HashSet<>();
                 }
                 rxnSamples.addAll(fis2Samples.get(rxnFi));
-                rxn2Samples.put(rxn,rxnSamples);
+                rxn2Samples.put(rxn, rxnSamples);
             }
         }
 
         //write rxn2Samples to file
         FileUtility fileUtility4 = new FileUtility();
-        String outFilePath4 = outputDir + "rxn2Samples.csv";
-        try{
+        String outFilePath4 = outputDir + outputFilePrefix + "rxn2Samples.csv";
+        try {
             fileUtility4.setOutput(outFilePath4);
             fileUtility4.printLine("Rxn,Num Samples,Rxn Frequency,Mapped Samples");
             Iterator rxn2SampleItr = rxn2Samples.entrySet().iterator();
-            while(rxn2SampleItr.hasNext()){
+            while (rxn2SampleItr.hasNext()) {
                 Map.Entry pair = (Map.Entry) rxn2SampleItr.next();
                 Long rxn = new Long((Long) pair.getKey());
                 Set<String> mappedSamples = (Set<String>) pair.getValue();
-                if(mappedSamples.size() != rxn2Samples.get(new Long(rxn.toString())).size() ||
-                        mappedSamples.size() < 1){
+                if (mappedSamples.size() != rxn2Samples.get(new Long(rxn.toString())).size() ||
+                        mappedSamples.size() < 1) {
                     throw new IllegalStateException("These should always match");
                 }
                 fileUtility4.printLine(String.format("%s,%d,%f,%s",
@@ -954,7 +954,7 @@ public class MechismoAnalyzer {
                                 .replace("\t", " ")));
             }
             fileUtility4.close();
-        }catch(IOException ioe){
+        } catch (IOException ioe) {
             logger.error(String.format("Couldn't use %s, %s: %s",
                     outFilePath4.toString(),
                     ioe.getMessage(),
@@ -962,11 +962,10 @@ public class MechismoAnalyzer {
         }
 
 
-
         //all combinations among target reaction summaries
         //target reaction, IN/EX FI intersection, min, max, mean, cooccurrences, dn/up reaction combinations
         FileUtility fileUtility5 = new FileUtility();
-        String outFilePath5 = outputDir + "rxnCooccurrence.csv";
+        String outFilePath5 = outputDir + outputFilePrefix + "rxnCooccurrence.csv";
         FisherExact fisherExact = new FisherExact(samples2FIs.keySet().size());
         try {
             List<String> targetReactionList = new ArrayList<>();
@@ -1001,103 +1000,94 @@ public class MechismoAnalyzer {
                     Long dnUp1 = new Long(dnUpPair[0]);
                     Long dnUp2 = new Long(dnUpPair[1]);
 
-                    int maxReactionFrequency =
-                            rxn2Samples.get(dnUp1).size() >
-                                    rxn2Samples.get(dnUp2).size()
-                                    ? rxn2Samples.get(dnUp1).size()
-                                    : rxn2Samples.get(dnUp2).size();
+                    //ignore interdependent pairs
+                    if (reactionGraph.getAllEdges(dnUp1, dnUp2).isEmpty() &&
+                            reactionGraph.getAllEdges(dnUp2, dnUp1).isEmpty()) {
 
-                    //one row for IN
-                    Set<String> dnUpSamples = new HashSet<>(rxn2Samples.get(dnUp1));
-                    dnUpSamples.retainAll(rxn2Samples.get(dnUp2));
-                    if (maxReactionFrequency < 1 ||
-                            maxReactionFrequency < dnUpSamples.size()) {
-                        throw new IllegalStateException("Max frequency should be higher...");
+                        //one row for IN
+                        Set<String> ac = new HashSet<>(samples2FIs.keySet());
+                        ac.removeAll(rxn2Samples.get(dnUp1));
+
+                        Set<String> bd = new HashSet<>(rxn2Samples.get(dnUp1));
+
+                        Set<String> a = new HashSet<>(ac);
+                        a.removeAll(rxn2Samples.get(dnUp2));
+
+                        Set<String> c = new HashSet<>(ac);
+                        c.retainAll(rxn2Samples.get(dnUp2));
+
+                        Set<String> b = new HashSet<>(bd);
+                        b.removeAll(rxn2Samples.get(dnUp2));
+
+                        Set<String> d = new HashSet<>(bd);
+                        d.retainAll(rxn2Samples.get(dnUp2));
+
+                        int[] abcd = {a.size(), b.size(), c.size(), d.size()};
+                        inABCD.add(abcd);
+
+                        cooccurrenceSignificanceList.add(
+                                new Double(fisherExact.getTwoTailedP(
+                                        a.size(),
+                                        b.size(),
+                                        c.size(),
+                                        d.size())));
+
+                        //one row for EX
+                        Set<String> dnUp1FisExclusive = new HashSet<>(reaction2FiSet.get(dnUp1));
+                        dnUp1FisExclusive.removeAll(reaction2FiSet.get(dnUp2));
+
+                        Set<String> dnUp2FisExclusive = new HashSet<>(reaction2FiSet.get(dnUp2));
+                        dnUp2FisExclusive.removeAll(reaction2FiSet.get(dnUp1));
+
+                        Set<String> dnUp1SamplesExclusive = new HashSet<>();
+                        for (String dnUp1Fi : dnUp1FisExclusive) {
+                            dnUp1SamplesExclusive.addAll(fis2Samples.get(dnUp1Fi));
+                        }
+                        Set<String> dnUp2SamplesExclusive = new HashSet<>();
+                        for (String dnUp2Fi : dnUp2FisExclusive) {
+                            dnUp2SamplesExclusive.addAll(fis2Samples.get(dnUp2Fi));
+                        }
+
+                        Set<String> acE = new HashSet<>(samples2FIs.keySet());
+                        acE.removeAll(dnUp1SamplesExclusive);
+
+                        Set<String> bdE = new HashSet<>(dnUp1SamplesExclusive);
+
+                        Set<String> aE = new HashSet<>(acE);
+                        aE.removeAll(dnUp2SamplesExclusive);
+
+                        Set<String> cE = new HashSet<>(acE);
+                        cE.retainAll(dnUp2SamplesExclusive);
+
+                        Set<String> bE = new HashSet<>(bdE);
+                        bE.removeAll(dnUp2SamplesExclusive);
+
+                        Set<String> dE = new HashSet<>(bdE);
+                        dE.retainAll(dnUp2SamplesExclusive);
+
+                        int[] abcdE = {aE.size(), bE.size(), cE.size(), dE.size()};
+                        exABCD.add(abcdE);
+
+                        cooccurrenceSignificanceExclusiveList.add(
+                                new Double(fisherExact.getTwoTailedP(
+                                        aE.size(),
+                                        bE.size(),
+                                        cE.size(),
+                                        dE.size())));
+                    } else {
+                        System.out.println(String.format("Ignoring interdependent upstream reaction pair %s-%s",
+                                dnUp1,dnUp2));
                     }
-                    Set<String> ac = new HashSet<>(samples2FIs.keySet());
-                    ac.removeAll(rxn2Samples.get(dnUp1));
-
-                    Set<String> bd = new HashSet<>(rxn2Samples.get(dnUp1));
-
-                    Set<String> a = new HashSet<>(ac);
-                    a.removeAll(rxn2Samples.get(dnUp2));
-
-                    Set<String> c = new HashSet<>(ac);
-                    c.retainAll(rxn2Samples.get(dnUp2));
-
-                    Set<String> b = new HashSet<>(bd);
-                    b.removeAll(rxn2Samples.get(dnUp2));
-
-                    Set<String> d = new HashSet<>(bd);
-                    d.retainAll(rxn2Samples.get(dnUp2));
-
-                    int[] abcd = {a.size(),b.size(),c.size(),d.size()};
-                    inABCD.add(abcd);
-
-                    cooccurrenceSignificanceList.add(
-                            new Double(fisherExact.getTwoTailedP(
-                            a.size(),
-                            b.size(),
-                            c.size(),
-                            d.size())));
-
-                    //one row for EX
-                    Set<String> dnUp1FisExclusive = new HashSet<>(reaction2FiSet.get(dnUp1));
-                    dnUp1FisExclusive.removeAll(reaction2FiSet.get(dnUp2));
-
-                    Set<String> dnUp2FisExclusive = new HashSet<>(reaction2FiSet.get(dnUp2));
-                    dnUp2FisExclusive.removeAll(reaction2FiSet.get(dnUp1));
-
-                    Set<String> dnUp1SamplesExclusive = new HashSet<>();
-                    for (String dnUp1Fi : dnUp1FisExclusive) {
-                        dnUp1SamplesExclusive.addAll(fis2Samples.get(dnUp1Fi));
-                    }
-                    Set<String> dnUp2SamplesExclusive = new HashSet<>();
-                    for (String dnUp2Fi : dnUp2FisExclusive) {
-                        dnUp2SamplesExclusive.addAll(fis2Samples.get(dnUp2Fi));
-                    }
-                    dnUp1SamplesExclusive.retainAll(dnUp2SamplesExclusive);
-                    //is this right? should we be dividing by the total reaction frequency?
-                    if (maxReactionFrequency < 1 ||
-                            maxReactionFrequency < dnUp1SamplesExclusive.size()) {
-                        throw new IllegalStateException("Max frequency should be higher...");
-                    }
-                    Set<String> acE = new HashSet<>(samples2FIs.keySet());
-                    acE.removeAll(dnUp1SamplesExclusive);
-
-                    Set<String> bdE = new HashSet<>(dnUp1SamplesExclusive);
-
-                    Set<String> aE = new HashSet<>(acE);
-                    aE.removeAll(dnUp2SamplesExclusive);
-
-                    Set<String> cE = new HashSet<>(acE);
-                    cE.retainAll(dnUp2SamplesExclusive);
-
-                    Set<String> bE = new HashSet<>(bdE);
-                    bE.removeAll(dnUp2SamplesExclusive);
-
-                    Set<String> dE = new HashSet<>(bdE);
-                    dE.retainAll(dnUp2SamplesExclusive);
-
-                    int[] abcdE = {aE.size(),bE.size(),cE.size(),dE.size()};
-                    exABCD.add(abcdE);
-
-                    cooccurrenceSignificanceExclusiveList.add(
-                            new Double(fisherExact.getTwoTailedP(
-                            aE.size(),
-                            bE.size(),
-                            cE.size(),
-                            dE.size())));
                 }
-                if(cooccurrenceSignificanceExclusiveList.size() !=
+                if (cooccurrenceSignificanceExclusiveList.size() !=
                         cooccurrenceSignificanceList.size() ||
                         cooccurrenceSignificanceExclusiveList.size() !=
-                        inABCD.size() ||
+                                inABCD.size() ||
                         cooccurrenceSignificanceExclusiveList.size() !=
-                        exABCD.size()){
+                                exABCD.size()) {
                     int debug = 1;
                 }
-                for(int i = 0; i < cooccurrenceSignificanceList.size(); i++) {
+                for (int i = 0; i < cooccurrenceSignificanceList.size(); i++) {
                     targetReactionList.add(rxn.toString());
                     upstreamReactionList.add(dnUpPairsStrings.get(i));
                     inPValues.add(cooccurrenceSignificanceList.get(i));
@@ -1121,45 +1111,45 @@ public class MechismoAnalyzer {
             List<Double> exFDRs =
                     MathUtilities.calculateFDRWithBenjaminiHochberg(exPValuesSorted);
 
-            if(inPValues.size() !=
+            if (inPValues.size() !=
                     inPValuesSorted.size() ||
                     inPValues.size() !=
-                    exPValues.size() ||
+                            exPValues.size() ||
                     inPValues.size() !=
-                    exPValuesSorted.size() ||
+                            exPValuesSorted.size() ||
                     inPValues.size() !=
-                    inFDRs.size() ||
+                            inFDRs.size() ||
                     inPValues.size() !=
-                    exFDRs.size()){
+                            exFDRs.size()) {
                 int debug = 1;
             }
 
-            Map<Double,Double> inPValue2FDRMap = new HashMap<>();
-            Map<Double,Double> exPValue2FDRMap = new HashMap<>();
-            for(int i = 0; i < inPValues.size(); i++){
-                inPValue2FDRMap.put(inPValuesSorted.get(i),inFDRs.get(i));
-                exPValue2FDRMap.put(exPValuesSorted.get(i),exFDRs.get(i));
+            Map<Double, Double> inPValue2FDRMap = new HashMap<>();
+            Map<Double, Double> exPValue2FDRMap = new HashMap<>();
+            for (int i = 0; i < inPValues.size(); i++) {
+                inPValue2FDRMap.put(inPValuesSorted.get(i), inFDRs.get(i));
+                exPValue2FDRMap.put(exPValuesSorted.get(i), exFDRs.get(i));
             }
 
             //check arraylist sizes match here
-            if(targetReactionList.size() !=
+            if (targetReactionList.size() !=
                     upstreamReactionList.size() ||
                     targetReactionList.size() !=
-                    inABCDs.size() ||
+                            inABCDs.size() ||
                     targetReactionList.size() !=
-                    exABCDs.size() ||
+                            exABCDs.size() ||
                     targetReactionList.size() !=
-                    inPValues.size() ||
+                            inPValues.size() ||
                     targetReactionList.size() !=
-                    exPValues.size() ||
+                            exPValues.size() ||
                     targetReactionList.size() !=
-                    inFDRs.size() ||
+                            inFDRs.size() ||
                     targetReactionList.size() !=
-                    exFDRs.size()){
+                            exFDRs.size()) {
                 int debug = 1;
             }
 
-            for(int i = 0; i < targetReactionList.size(); i++) {
+            for (int i = 0; i < targetReactionList.size(); i++) {
 
                 //check abcd p-values match recorded p-value
                 Double p1 = new Double(fisherExact.getTwoTailedP(inABCDs.get(i)[0],
@@ -1167,7 +1157,7 @@ public class MechismoAnalyzer {
                         inABCDs.get(i)[2],
                         inABCDs.get(i)[3]));
                 Double p2 = inPValues.get(i);
-                if(!Objects.equals(p1, p2)){
+                if (!Objects.equals(p1, p2)) {
                     int debug = 1;
                 }
                 Double p3 = new Double(fisherExact.getTwoTailedP(exABCDs.get(i)[0],
@@ -1175,7 +1165,7 @@ public class MechismoAnalyzer {
                         exABCDs.get(i)[2],
                         exABCDs.get(i)[3]));
                 Double p4 = exPValues.get(i);
-                if(!Objects.equals(p3, p4)){
+                if (!Objects.equals(p3, p4)) {
                     int debug = 1;
                 }
 
@@ -1200,7 +1190,7 @@ public class MechismoAnalyzer {
                         exPValue2FDRMap.get(exPValues.get(i))));
             }
             fileUtility5.close();
-        }catch(IOException ioe){
+        } catch (IOException ioe) {
             logger.error(String.format("Couldn't use %s, %s: %s",
                     outFilePath5.toString(),
                     ioe.getMessage(),
@@ -1208,9 +1198,9 @@ public class MechismoAnalyzer {
         }
     }
 
-    private Double sumSet(Set<Double> doubleSet){
+    private Double sumSet(Set<Double> doubleSet) {
         Double sum = 0.0;
-        for(Double dbl : doubleSet){
+        for (Double dbl : doubleSet) {
             sum += dbl;
         }
         return sum;
@@ -1252,23 +1242,23 @@ public class MechismoAnalyzer {
         }
 
         @Override
-        public boolean equals(Object o){
-            if(o == this) return true;
-            if(!(o instanceof TargetReactionSummary)){
+        public boolean equals(Object o) {
+            if (o == this) return true;
+            if (!(o instanceof TargetReactionSummary)) {
                 return false;
             }
-            TargetReactionSummary targetReactionSummary = (TargetReactionSummary)o;
-            return Objects.equals(this.rxnId,targetReactionSummary.rxnId) &&
-                    Objects.equals(this.numSupUpRxn,targetReactionSummary.numSupUpRxn) &&
-                    Objects.equals(this.numUpRxn,targetReactionSummary.numUpRxn) &&
-                    Objects.equals(this.supUpRatio,targetReactionSummary.supUpRatio) &&
-                    Objects.equals(this.supRxns,targetReactionSummary.supRxns) &&
-                    Objects.equals(this.upRxns,targetReactionSummary.upRxns) &&
-                    Objects.equals(this.supFIs,targetReactionSummary.supFIs);
+            TargetReactionSummary targetReactionSummary = (TargetReactionSummary) o;
+            return Objects.equals(this.rxnId, targetReactionSummary.rxnId) &&
+                    Objects.equals(this.numSupUpRxn, targetReactionSummary.numSupUpRxn) &&
+                    Objects.equals(this.numUpRxn, targetReactionSummary.numUpRxn) &&
+                    Objects.equals(this.supUpRatio, targetReactionSummary.supUpRatio) &&
+                    Objects.equals(this.supRxns, targetReactionSummary.supRxns) &&
+                    Objects.equals(this.upRxns, targetReactionSummary.upRxns) &&
+                    Objects.equals(this.supFIs, targetReactionSummary.supFIs);
         }
 
         @Override
-        public int hashCode(){
+        public int hashCode() {
             return Objects.hash(this.rxnId,
                     this.numSupUpRxn,
                     this.numUpRxn,
@@ -1298,15 +1288,15 @@ public class MechismoAnalyzer {
                     this.supUpRatio,
                     this.supRxns.size() > 1
                             ? org.gk.util.StringUtils.join("~",
-                                new ArrayList(this.supRxns))
+                            new ArrayList(this.supRxns))
                             : Arrays.asList(this.supRxns).get(0),
                     supCombos.size() > 1
                             ? org.gk.util.StringUtils.join("~",
-                                new ArrayList(supCombos))
+                            new ArrayList(supCombos))
                             : Arrays.asList(supCombos).get(0),
                     this.upRxns.size() > 1
                             ? org.gk.util.StringUtils.join("~",
-                                new ArrayList(this.upRxns))
+                            new ArrayList(this.upRxns))
                             : Arrays.asList(this.upRxns).get(0),
                     this.supFIs.size() > 1
                             ? org.gk.util.StringUtils.join("~",
@@ -1315,10 +1305,10 @@ public class MechismoAnalyzer {
         }
     }
 
-    private List<String> ConvertLongArysToStrings(List<Long[]> longArys){
+    private List<String> ConvertLongArysToStrings(List<Long[]> longArys) {
         List<String> stringSet = new ArrayList<>();
-        Iterator<Long[]>  longArySetItr = longArys.iterator();
-        while(longArySetItr.hasNext()){
+        Iterator<Long[]> longArySetItr = longArys.iterator();
+        while (longArySetItr.hasNext()) {
             Long[] longAry = longArySetItr.next();
             stringSet.add(String.format("%d\t%d",
                     longAry[0],

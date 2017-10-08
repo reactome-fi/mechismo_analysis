@@ -113,9 +113,11 @@ public class ProcessDatasetsDriver {
             }else if(Integer.parseInt(ex) == 5) {
                 new MechismoAnalyzer().mapReactomeReactions(
                         cancerDriverReactomeAnalyzer,
-                        "/home/burkhart/Software/Ogmios/datasets/Mechismo/TCGA_mech_output.tsv",
+                      //  "/home/burkhart/Software/Ogmios/datasets/Mechismo/TCGA_mech_output.tsv",
+                       "/home/burkhart/Software/Ogmios/datasets/Mechismo/TCGA_mech_random_output.tsv",
                         "/home/burkhart/Software/Ogmios/datasets/ReactionNetwork_070517.txt",
-                        "/home/burkhart/Software/Ogmios/results/Mechismo/"
+                        "/home/burkhart/Software/Ogmios/results/Mechismo/",
+                        "random_"
                 );
             }
             else{
