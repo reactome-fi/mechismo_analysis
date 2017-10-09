@@ -9,6 +9,9 @@ import org.apache.commons.math.stat.correlation.PearsonsCorrelation;
 import org.apache.commons.math.stat.correlation.SpearmansCorrelation;
 import org.apache.log4j.Logger;
 import org.gk.model.GKInstance;
+import org.jgrapht.Graph;
+import org.jgrapht.alg.*;
+import org.jgrapht.Graphs;
 import org.jgrapht.graph.DefaultDirectedGraph;
 import org.jgrapht.graph.DefaultEdge;
 import org.junit.Test;
@@ -585,6 +588,36 @@ public class MechismoAnalyzer {
         return reactionSetPairs;
     }
 
+    private DefaultDirectedGraph<Long,DefaultEdge> RewireReactionGraph(
+            DefaultDirectedGraph<Long,DefaultEdge> reactionGraph){
+        return RewireReactionGraph(reactionGraph,100000,88L);
+    }
+
+    private DefaultDirectedGraph<Long,DefaultEdge> RewireReactionGraph(
+            DefaultDirectedGraph<Long,DefaultEdge> reactionGraph,
+            int iterations,
+            long randomSeed){
+        DefaultDirectedGraph<Long,DefaultEdge> rewiredReactionGraph = new DefaultDirectedGraph<>(DefaultEdge.class);
+        Graphs.addGraph(rewiredReactionGraph,reactionGraph);
+
+        Random random = new Random(randomSeed);
+        Object[] edgeAry = rewiredReactionGraph.edgeSet().toArray();
+        Object[] vertexAry = rewiredReactionGraph.vertexSet().toArray();
+
+        for(int i = 0; i < iterations; i++){
+            //remove an edge
+            DefaultEdge randEdge = (DefaultEdge) edgeAry[random.nextInt(edgeAry.length)];
+            rewiredReactionGraph.removeEdge(randEdge);
+
+            //add an edge
+            Long randVtx1 = (Long) vertexAry[random.nextInt(vertexAry.length)];
+            Long randVtx2 = (Long) vertexAry[random.nextInt(vertexAry.length)];
+            rewiredReactionGraph.addEdge(randVtx1,randVtx2);
+        }
+
+        return rewiredReactionGraph;
+    }
+
     public void mapReactomeReactions(CancerDriverReactomeAnalyzer cancerDriverReactomeAnalyzer,
                                      String mechismoOutputFilePath,
                                      String reactomeReactionNetworkFilePath,
@@ -594,9 +627,18 @@ public class MechismoAnalyzer {
         ReactomeReactionGraphLoader reactomeReactionGraphLoader = new ReactomeReactionGraphLoader(reactomeReactionNetworkFilePath);
         DefaultDirectedGraph<Long, DefaultEdge> reactionGraph = reactomeReactionGraphLoader.getReactionGraph();
 
-        System.out.println(String.format("Created reaction graph with %d vertices and %d edges",
+        reactionGraph = RewireReactionGraph(reactionGraph);
+
+        ConnectivityInspector<Long,DefaultEdge> connectivityInspector = new ConnectivityInspector<Long, DefaultEdge>(reactionGraph);
+
+        System.out.println(String.format("Created reaction graph with %d vertices, %d edges, %d components",
                 reactionGraph.vertexSet().size(),
-                reactionGraph.edgeSet().size()));
+                reactionGraph.edgeSet().size(),
+                connectivityInspector.connectedSets().size()));
+
+        //for(Set<Long> component : connectivityInspector.connectedSets()){
+        //    System.out.println(component.size());
+        //}
 
         //extract FIs from Mechismo output
         MechismoOutputLoader mechismoOutputLoader = new MechismoOutputLoader(mechismoOutputFilePath);
