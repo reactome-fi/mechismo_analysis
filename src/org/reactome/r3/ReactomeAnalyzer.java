@@ -405,11 +405,11 @@ public class ReactomeAnalyzer {
         }
         return uniProtToGene;
     }
-    
+
     public void generateFIsForReactionsWithFeatures(MySQLAdaptor dba,
                                                     Collection<Long> dbIds,
-                                                    String fileName) throws Exception, IOException {
-        Set<String> interactions = new HashSet<String>();
+                                                    String fileName,
+                                                    Set<String> interactions) throws Exception {
         Set<String> rxtFIs = new HashSet<String>();
         Set<GKInstance> interactors = new HashSet<GKInstance>();
         Map<String, Set<Long>> fiToRxtIDs = new HashMap<String, Set<Long>>();
@@ -423,18 +423,18 @@ public class ReactomeAnalyzer {
             interactions.addAll(rxtFIs);
             for (String fi : rxtFIs) {
                 InteractionUtilities.addElementToSet(fiToRxtIDs,
-                                                     fi, 
-                                                     dbId);
+                        fi,
+                        dbId);
             }
         }
-        
+
 //        // Feature handler
 //        FeatureHandlerForV3 featureHandler = new FeatureHandlerForV3();
 //        List<String> featureList = featureHandler.getFeatureList();
 //        Map<String, Value> fiToValue = featureHandler.convertPairsToValues(interactions, true);
-//        
+//
 //        Map<String, String> idToGene = getUniProtToGeneMap(dba);
-//        
+//
 ////        for (String fi : interactions)
 ////            System.out.println(fi.replace('\t', ' '));
 //        FileUtility fu = new FileUtility();
@@ -453,19 +453,26 @@ public class ReactomeAnalyzer {
 //            String gene2 = idToGene.get(fi.substring(index + 1));
 //            String rxtIds = fiToRxtIDs.get(fi).toString();
 //            rxtIds = rxtIds.substring(1, rxtIds.length() - 1);
-//            fu.printLine(fi + "\t" + 
-//                               gene1 + "\t" + 
+//            fu.printLine(fi + "\t" +
+//                               gene1 + "\t" +
 //                               gene2 + "\t" +
-//                               posFeature + "\t" + 
-//                               value.humanInteraction + "\t" + 
-//                               value.mousePPI + "\t" + 
-//                               value.dmePPI + "\t" + 
-//                               value.celPPI + "\t" + 
+//                               posFeature + "\t" +
+//                               value.humanInteraction + "\t" +
+//                               value.mousePPI + "\t" +
+//                               value.dmePPI + "\t" +
+//                               value.celPPI + "\t" +
 //                               value.scePPI + "\t" +
-//                               value.pfamDomainInt + "\t" + 
+//                               value.pfamDomainInt + "\t" +
 //                               rxtIds);
 //        }
 //        fu.close();
+    }
+
+    public void generateFIsForReactionsWithFeatures(MySQLAdaptor dba,
+                                                    Collection<Long> dbIds,
+                                                    String fileName) throws Exception, IOException {
+        Set<String> interactions = new HashSet<String>();
+        generateFIsForReactionsWithFeatures(dba,dbIds,fileName,interactions);
     }
     
     private void generateFIsForSingleReaction(Set<GKInstance> interactors,

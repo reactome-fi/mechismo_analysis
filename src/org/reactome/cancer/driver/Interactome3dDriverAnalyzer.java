@@ -747,6 +747,8 @@ public class Interactome3dDriverAnalyzer {
         // TCGA-AY-4070-01.hg19.oncotator.hugo_entrez_remapped.maf.txt
         // TCGA-AY-4071-01.hg19.oncotator.hugo_entrez_remapped.maf.txt
         String mafFileNamePattern = "^.+\\.maf\\.txt$";
+        Map<String, Integer> proteinLengthMap = new UniProtAnalyzer().loadGeneToProteinLength();
+        assert proteinLengthMap != null;
         for (String firehoseCancerTypeDir : firehoseCancerTypeDirs) {
 
             /**
@@ -802,7 +804,7 @@ public class Interactome3dDriverAnalyzer {
             //slide window
             //----------------------------------
             System.out.println("Sliding window...");
-            int windowSize = 300;
+            int windowSize = 5;
             //<gene symbol> -> ArrayList<Integer[<AA Coord>, <sample support>]>
             Map<String,List<Integer[]>> cancerTypeMutatedGenesListMap = convertToListMap(cancerTypeMutatedGenesMap);
 
@@ -810,29 +812,47 @@ public class Interactome3dDriverAnalyzer {
             Map<String,List<Integer[]>> cancerTypeMutatedGenesWindowSupport = slideWindow(cancerTypeMutatedGenesListMap,windowSize);
 
             //<gene symnbol -> Double[<max support Window Start AA Coord>, <max support Window sample support>]
-            Map<String,Double[]> cancerTypeMutatedGenesMaxDensity = calculateMaxWindowDensity(cancerTypeMutatedGenesWindowSupport,windowSize);
+            Map<String,Double[]> cancerTypeMutatedGenesMaxSignificance = calculateMaxWindowSignificance(cancerTypeMutatedGenesWindowSupport,
+                    cancerTypeMutatedGenesListMap,
+                    proteinLengthMap,
+                    windowSize);
 
             //--------------
             //calculate FDRs
             //--------------
 
+            List<Double> pValues = new ArrayList<>();
+            for (String geneSymbol : cancerTypeMutatedGenesMaxSignificance.keySet()) {
+                pValues.add(cancerTypeMutatedGenesMaxSignificance.get(geneSymbol)[1]);
+            }
+            List<Double> fdrs = MathUtilities.calculateFDRWithBenjaminiHochberg(pValues);
+            Map<Double, Double> pValueFDRMap = new HashMap<>();
+            for (int i = 0; i < pValues.size(); i++) {
+                pValueFDRMap.put(pValues.get(i), fdrs.get(i));
+            }
+            for (String geneSymbol : cancerTypeMutatedGenesMaxSignificance.keySet()) {
+                double pValue = cancerTypeMutatedGenesMaxSignificance.get(geneSymbol)[1];
+                cancerTypeMutatedGenesMaxSignificance.get(geneSymbol)[2] = pValueFDRMap.get(pValue);
+            }
+
             //----------------------
             //write all genes to csv
             //----------------------
-            System.out.println("Writing window densities...");
-            String mutationDensityOutFilePath = String.format("%s/firehose_%s_mutationDensity.csv",
+            System.out.println("Writing window significances...");
+            String mutationDensityOutFilePath = String.format("%s/firehose_%s_mutationSignificance.csv",
                     outputDir,
                     firehoseCancerTypeDir);
             fos = null;
             try{
                 fos = new FileOutputStream(mutationDensityOutFilePath);
-                String header = String.format("Gene Symbol,%s AA Window Start Position,Mutation Density\n",windowSize);
+                String header = String.format("Gene Symbol,%s AA Window Start Position,PValue,FDR\n",windowSize);
                 fos.write(header.getBytes());
-                for(String geneSymbol : cancerTypeMutatedGenesMaxDensity.keySet()){
-                    fos.write(String.format("%s,%d,%.3f\n",
+                for(String geneSymbol : cancerTypeMutatedGenesMaxSignificance.keySet()){
+                    fos.write(String.format("%s,%d,%f,%f\n",
                             geneSymbol,
-                            cancerTypeMutatedGenesMaxDensity.get(geneSymbol)[0].intValue(),
-                            cancerTypeMutatedGenesMaxDensity.get(geneSymbol)[1]).getBytes());
+                            cancerTypeMutatedGenesMaxSignificance.get(geneSymbol)[0].intValue(),
+                            cancerTypeMutatedGenesMaxSignificance.get(geneSymbol)[1],
+                            cancerTypeMutatedGenesMaxSignificance.get(geneSymbol)[2]).getBytes());
                 }
             }catch(IOException ioe){
                 logger.error(String.format("%s: %s",
@@ -856,7 +876,7 @@ public class Interactome3dDriverAnalyzer {
         //slide window
         //----------------------------------
         System.out.println("Sliding window...");
-        int windowSize = 300;
+        int windowSize = 5;
         //<gene symbol> -> ArrayList<Integer[<AA Coord>, <sample support>]>
         Map<String,List<Integer[]>> allMutatedGenesListMap = convertToListMap(allMutatedGenesMap);
 
@@ -864,27 +884,45 @@ public class Interactome3dDriverAnalyzer {
         Map<String,List<Integer[]>> allMutatedGenesWindowSupport = slideWindow(allMutatedGenesListMap,windowSize);
 
         //<gene symnbol -> Double[<max support Window Start AA Coord>, <max support Window sample support>]
-        Map<String,Double[]> allMutatedGenesMaxDensity = calculateMaxWindowDensity(allMutatedGenesWindowSupport,windowSize);
+        Map<String,Double[]> allMutatedGenesMaxSignificance = calculateMaxWindowSignificance(allMutatedGenesWindowSupport,
+                allMutatedGenesListMap,
+                proteinLengthMap,
+                windowSize);
 
         //--------------
         //calculate FDRs
         //--------------
 
+        List<Double> pValues = new ArrayList<>();
+        for (String geneSymbol : allMutatedGenesMaxSignificance.keySet()) {
+            pValues.add(allMutatedGenesMaxSignificance.get(geneSymbol)[1]);
+        }
+        List<Double> fdrs = MathUtilities.calculateFDRWithBenjaminiHochberg(pValues);
+        Map<Double, Double> pValueFDRMap = new HashMap<>();
+        for (int i = 0; i < pValues.size(); i++) {
+            pValueFDRMap.put(pValues.get(i), fdrs.get(i));
+        }
+        for (String geneSymbol : allMutatedGenesMaxSignificance.keySet()) {
+            double pValue = allMutatedGenesMaxSignificance.get(geneSymbol)[1];
+            allMutatedGenesMaxSignificance.get(geneSymbol)[2] = pValueFDRMap.get(pValue);
+        }
+
         //----------------------
         //write all genes to csv
         //----------------------
-        System.out.println("Writing window densities...");
-        String mutationDensityOutFilePath = String.format("%s/firehose_mutationDensity.csv",outputDir);
+        System.out.println("Writing window significances...");
+        String mutationDensityOutFilePath = String.format("%s/firehose_mutationSignificance.csv",outputDir);
         FileOutputStream fos = null;
         try{
             fos = new FileOutputStream(mutationDensityOutFilePath);
-            String header = String.format("Gene Symbol,%s AA Window Start Position,Mutation Density\n",windowSize);
+            String header = String.format("Gene Symbol,%s AA Window Start Position,PValue,FDR\n",windowSize);
             fos.write(header.getBytes());
-            for(String geneSymbol : allMutatedGenesMaxDensity.keySet()){
-                fos.write(String.format("%s,%d,%.3f\n",
+            for(String geneSymbol : allMutatedGenesMaxSignificance.keySet()){
+                fos.write(String.format("%s,%d,%f,%f\n",
                         geneSymbol,
-                        allMutatedGenesMaxDensity.get(geneSymbol)[0].intValue(),
-                        allMutatedGenesMaxDensity.get(geneSymbol)[1]).getBytes());
+                        allMutatedGenesMaxSignificance.get(geneSymbol)[0].intValue(),
+                        allMutatedGenesMaxSignificance.get(geneSymbol)[1],
+                        allMutatedGenesMaxSignificance.get(geneSymbol)[2]).getBytes());
             }
         }catch(IOException ioe){
             logger.error(String.format("%s: %s",
@@ -904,25 +942,67 @@ public class Interactome3dDriverAnalyzer {
         }
     }
 
-    Map<String,Double[]> calculateMaxWindowDensity(Map<String,List<Integer[]>> geneWindowSupport,int windowSize){
-        Map<String,Double[]> genesMaxDensity = new HashMap<>();
+    Map<String,Double[]> calculateMaxWindowSignificance(Map<String,List<Integer[]>> geneWindowSupport,
+                                                        Map<String,List<Integer[]>> cancerTypeMutatedGenesListMap,
+                                                        Map<String,Integer> proteinLengthMap,
+                                                        int windowSize){
+        Map<String,Double[]> genesMaxSignificance = new HashMap<>();
 
         for(String geneSymbol : geneWindowSupport.keySet()){
-            double maxDensityAACoord = -1.0;
-            double maxDensity = 0.0;
+            double maxSignificanceAACoord = -1.0;
+            double  minPValue = 1.0;
             for(int supportListIdx = 0; supportListIdx < geneWindowSupport.get(geneSymbol).size(); supportListIdx++){
                 int curAACoord = geneWindowSupport.get(geneSymbol).get(supportListIdx)[0];
                 int curSupport = geneWindowSupport.get(geneSymbol).get(supportListIdx)[1];
-                double curDensity = (double) curSupport / (double) windowSize;
-                if(curDensity > maxDensity){
-                    maxDensityAACoord = curAACoord;
-                    maxDensity = curDensity;
+                if(proteinLengthMap.containsKey(geneSymbol)) {
+                    double geneSize = (double) proteinLengthMap.get(geneSymbol);
+                    double ratio = (double) windowSize / geneSize;
+                    int mutationCount = sumGeneMutations(cancerTypeMutatedGenesListMap.get(geneSymbol));
+
+                    double curPValue = 1.0;
+                    if (ratio > 0.0 &&
+                            mutationCount > 0 &&
+                            curSupport > 0) {
+                        try {
+                            curPValue = MathUtilities.calculateBinomialPValue(ratio, mutationCount, curSupport);
+                        } catch (IllegalArgumentException iae) {
+                            logger.error(String.format("Could not compute p-value for window: " +
+                                            "geneSymbol = %s, " +
+                                            "curAACoord = %d, " +
+                                            "curSupport = %d, " +
+                                            "ratio = %.3f, " +
+                                            "mutationCount = %d: " +
+                                            "%s: %s",
+                                    geneSymbol,
+                                    curAACoord,
+                                    curSupport,
+                                    ratio,
+                                    mutationCount,
+                                    iae.getMessage(),
+                                    Arrays.toString(iae.getStackTrace())));
+                        }
+                    }
+
+                    if (curPValue < minPValue) {
+                        maxSignificanceAACoord = curAACoord;
+                        minPValue = curPValue;
+                    }
+                }else{
+                    logger.error(String.format("'%s' not found in proteinLengthMap",geneSymbol));
                 }
             }
-            genesMaxDensity.put(geneSymbol,new Double[]{maxDensityAACoord,maxDensity});
+            genesMaxSignificance.put(geneSymbol,new Double[]{maxSignificanceAACoord, minPValue, 1.0});
         }
 
-        return genesMaxDensity;
+        return genesMaxSignificance;
+    }
+
+    int sumGeneMutations(List<Integer[]> geneMutations){
+        int mutationSum = 0;
+        for(int i = 0; i < geneMutations.size(); i++){
+            mutationSum += geneMutations.get(i)[1];
+        }
+        return mutationSum;
     }
 
     Map<String,List<Integer[]>> slideWindow(Map<String,List<Integer[]>> listMap, Integer windowSize){
