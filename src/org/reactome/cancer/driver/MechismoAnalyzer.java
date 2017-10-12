@@ -627,7 +627,7 @@ public class MechismoAnalyzer {
         ReactomeReactionGraphLoader reactomeReactionGraphLoader = new ReactomeReactionGraphLoader(reactomeReactionNetworkFilePath);
         DefaultDirectedGraph<Long, DefaultEdge> reactionGraph = reactomeReactionGraphLoader.getReactionGraph();
 
-        reactionGraph = RewireReactionGraph(reactionGraph);
+        reactionGraph = RewireReactionGraph(reactionGraph,100000,outputFilePrefix.hashCode());
 
         ConnectivityInspector<Long,DefaultEdge> connectivityInspector = new ConnectivityInspector<Long, DefaultEdge>(reactionGraph);
 
@@ -700,9 +700,9 @@ public class MechismoAnalyzer {
             }
             itCounter++;
             if (itCounter % 100 == 0) {
-                System.out.println(String.format("Processed %d of %d Reactions...",
-                        itCounter, rxns.size()));
-                System.out.flush();
+                //System.out.println(String.format("Processed %d of %d Reactions...",
+                //        itCounter, rxns.size()));
+                //System.out.flush();
             }
         }
 
@@ -1117,8 +1117,8 @@ public class MechismoAnalyzer {
                                         cE.size(),
                                         dE.size())));
                     } else {
-                        System.out.println(String.format("Ignoring interdependent upstream reaction pair %s-%s",
-                                dnUp1,dnUp2));
+                        //System.out.println(String.format("Ignoring interdependent upstream reaction pair %s-%s",
+                        //        dnUp1,dnUp2));
                     }
                 }
                 if (cooccurrenceSignificanceExclusiveList.size() !=
@@ -1139,9 +1139,9 @@ public class MechismoAnalyzer {
                 }
                 trsCounter++;
                 if (trsCounter % 100 == 0) {
-                    System.out.println(String.format("Processed %d of %d Target Reactions...",
-                            trsCounter, targetReactionSummaries.size()));
-                    System.out.flush();
+                    //System.out.println(String.format("Processed %d of %d Target Reactions...",
+                    //        trsCounter, targetReactionSummaries.size()));
+                    //System.out.flush();
                 }
             }
             //The FDR calculation has the side effect of sorting the passed list...

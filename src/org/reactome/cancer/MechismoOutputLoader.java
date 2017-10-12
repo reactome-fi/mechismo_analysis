@@ -108,8 +108,8 @@ public class MechismoOutputLoader {
                         fis.add(backwardFI);
                     }
                     else{
-                        System.out.println(String.format("Ignoring FI %s-%s with mechScore = %.3f",
-                                protA,protB,mechScore));
+                        //System.out.println(String.format("Ignoring FI %s-%s with mechScore = %.3f",
+                        //        protA,protB,mechScore));
                     }
                 }
             }
