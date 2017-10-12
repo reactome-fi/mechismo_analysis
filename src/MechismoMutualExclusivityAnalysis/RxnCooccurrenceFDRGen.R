@@ -16,6 +16,10 @@ REW8_RXN_COOCCURR_PATH <- "/home/burkhart/Software/Ogmios/results/Mechismo/rewir
 REW9_RXN_COOCCURR_PATH <- "/home/burkhart/Software/Ogmios/results/Mechismo/rewired_9rxnCooccurrence.csv"
 REW10_RXN_COOCCURR_PATH <- "/home/burkhart/Software/Ogmios/results/Mechismo/rewired_10rxnCooccurrence.csv"
 
+IMAGES_AS_SVG = TRUE
+
+FIGURES_DIR <- "/home/burkhart/Software/Ogmios/results/Mechismo/Figs/"
+
 realRxnCooccurr <- read.table(REAL_RXN_COOCCURR_PATH,
                               header = TRUE,
                               sep = ",") %>%
@@ -104,12 +108,21 @@ z <- rbind(realRxnCooccurr,
            rew10RxnCooccurr
            )
 
+if(IMAGES_AS_SVG){
+  svg(filename=paste(FIGURES_DIR,"relative_density.svg",sep=""),
+      width=8,
+      height=8,
+      pointsize=20)
+}
 z %>%
   ggplot(aes(x=negLog10FDR,color=rxn)) +
   geom_step(aes(y=1 - (..y..)),
             stat="ecdf") +
   xlab("-log10(FDR)") +
   ylab("relative density")
+if(IMAGES_AS_SVG){
+  dev.off()
+}
 
 # https://stackoverflow.com/questions/17832608/how-to-use-earlier-declared-variables-within-aes-in-ggplot-with-special-operator
 ding <- nrow(realRxnCooccurr)
@@ -126,6 +139,12 @@ b9 <- nrow(rew9RxnCooccurr)
 b10 <- nrow(rew10RxnCooccurr)
 
 # https://stackoverflow.com/questions/18379933/plotting-cumulative-counts-in-ggplot2
+if(IMAGES_AS_SVG){
+  svg(filename=paste(FIGURES_DIR,"rxnCooccurrence.svg",sep=""),
+      width=8,
+      height=8,
+      pointsize=20)
+}
 z %>% ggplot(aes(x=negLog10FDR,
                  color=rxn)) +
   stat_bin(data=subset(z,as.character(rxn)=="real"),
@@ -166,7 +185,16 @@ z %>% ggplot(aes(x=negLog10FDR,
            geom="step") +
   xlab("-log10(FDR)") +
   ylab("co-occurring reaction pairs")
+if(IMAGES_AS_SVG){
+  dev.off()
+}
 
+if(IMAGES_AS_SVG){
+  svg(filename=paste(FIGURES_DIR,"rxnCooccurrenceZoom.svg",sep=""),
+      width=8,
+      height=8,
+      pointsize=20)
+}
 z %>% ggplot(aes(x=negLog10FDR,
                  color=rxn)) +
   stat_bin(data=subset(z,as.character(rxn)=="real"),
@@ -209,17 +237,23 @@ z %>% ggplot(aes(x=negLog10FDR,
   #xlim(low = 0, high = 125) +
   xlab("-log10(FDR)") +
   ylab("co-occurring reaction pairs")
+if(IMAGES_AS_SVG){
+  dev.off()
+}
 
 sum(realRxnCooccurr$negLog10FDR) / (ding * max(realRxnCooccurr$negLog10FDR))
-sum(randRxnCooccurr$negLog10FDR) / dong
-sum(rew1RxnCooccurr$negLog10FDR) / thiz
-sum(rew2RxnCooccurr$negLog10FDR) / b2
-sum(rew3RxnCooccurr$negLog10FDR) / b3
-sum(rew4RxnCooccurr$negLog10FDR) / b4
-sum(rew5RxnCooccurr$negLog10FDR) / b5
-sum(rew6RxnCooccurr$negLog10FDR) / b6
-sum(rew7RxnCooccurr$negLog10FDR) / b7
-sum(rew8RxnCooccurr$negLog10FDR) / b8
-sum(rew9RxnCooccurr$negLog10FDR) / b9
-sum(rew10RxnCooccurr$negLog10FDR) / b10
+sum(randRxnCooccurr$negLog10FDR) / (ding * max(realRxnCooccurr$negLog10FDR))
+sum(rew1RxnCooccurr$negLog10FDR) / (ding * max(realRxnCooccurr$negLog10FDR))
+sum(rew2RxnCooccurr$negLog10FDR) / (ding * max(realRxnCooccurr$negLog10FDR))
+sum(rew3RxnCooccurr$negLog10FDR) / (ding * max(realRxnCooccurr$negLog10FDR))
+sum(rew4RxnCooccurr$negLog10FDR) / (ding * max(realRxnCooccurr$negLog10FDR))
+sum(rew5RxnCooccurr$negLog10FDR) / (ding * max(realRxnCooccurr$negLog10FDR))
+sum(rew6RxnCooccurr$negLog10FDR) / (ding * max(realRxnCooccurr$negLog10FDR))
+sum(rew7RxnCooccurr$negLog10FDR) / (ding * max(realRxnCooccurr$negLog10FDR))
+sum(rew8RxnCooccurr$negLog10FDR) / (ding * max(realRxnCooccurr$negLog10FDR))
+sum(rew9RxnCooccurr$negLog10FDR) / (ding * max(realRxnCooccurr$negLog10FDR))
+sum(rew10RxnCooccurr$negLog10FDR) / (ding * max(realRxnCooccurr$negLog10FDR))
+
+system_command = paste("qlmanage -t -s 1000 -o ", FIGURES_DIR, " ",FIGURES_DIR,"*.svg",sep="")
+system(paste(system_command))
            
