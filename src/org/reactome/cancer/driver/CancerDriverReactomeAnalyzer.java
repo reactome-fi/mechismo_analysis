@@ -7,15 +7,7 @@ package org.reactome.cancer.driver;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -984,17 +976,32 @@ public class CancerDriverReactomeAnalyzer {
     }
     
     private Map<String, String> loadReactionDBIDToName() throws Exception {
+       Map<Long, String> longDbIdToName = loadReactionLongDBIDToName();
+       Map<String,String> dbIdToName = new HashMap<>();
+        Iterator<Long> longDbIdToNameItr = longDbIdToName.keySet().iterator();
+        while(longDbIdToNameItr.hasNext()){
+            Long dbId = longDbIdToNameItr.next();
+            dbIdToName.put(dbId.toString(),longDbIdToName.get(dbId));
+        }
+        if(longDbIdToName.size() != dbIdToName.size()){
+            throw new IllegalStateException("Map sizes should be equal.");
+        }
+        return dbIdToName;
+    }
+
+    public Map<Long, String> loadReactionLongDBIDToName() throws Exception {
         MySQLAdaptor dba = getDBA();
         // Load instances
-        Collection<GKInstance> reactions = dba.fetchInstanceByAttribute(ReactomeJavaConstants.ReactionlikeEvent,
-                                                                        ReactomeJavaConstants.species,
-                                                                        "=",
-                                                                        48887L);
-        Map<String, String> dbIdToName = new HashMap<String, String>();
+        Collection<GKInstance> reactions = dba.fetchInstanceByAttribute(
+                ReactomeJavaConstants.ReactionlikeEvent,
+                ReactomeJavaConstants.species,
+                "=",
+                48887L);
+        Map<Long, String> longDbIdToName = new HashMap<>();
         for (GKInstance rxt : reactions)
-            dbIdToName.put(rxt.getDBID().toString(),
-                           rxt.getDisplayName());
-        return dbIdToName;
+            longDbIdToName.put(rxt.getDBID(),
+                    rxt.getDisplayName());
+        return longDbIdToName;
     }
     
 }

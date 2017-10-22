@@ -10,9 +10,8 @@ import java.util.regex.Pattern;
 
 public class MechismoOutputLoader {
     private final static Logger logger = Logger.getLogger(MechismoOutputLoader.class);
-    private final double mechScoreThresh = 3.0;
+    private final double mechScoreThresh = 2.0;
     private final double eThresh = 1e-10;
-    private final int mismatchThresh = 1;
     private final int primaryIdA1Idx = 1;
     private final int userInputIdx = 6;
     private final int mismatchIdx = 8;
@@ -23,7 +22,6 @@ public class MechismoOutputLoader {
     private final int eaIdx = 35;
     private final int ebIdx = 43;
     private final String rxnKlass = "hetero";
-    private final String confKlass = "high";
     private final String sampleIDPatternString = "(TCGA-[0-9A-Z-]+)";
     private String mechismoOuputFilePath = null;
     private Set<String> fis = null;
@@ -57,9 +55,7 @@ public class MechismoOutputLoader {
             while ((line = fileUtility.readLine()) != null) {
                 tokens = line.split("\t");
                 if(tokens.length > ebIdx &&
-                        confKlass.equals(tokens[confIdx]) &&
                         rxnKlass.equals(tokens[rxnKlassIdx]) &&
-                        new Integer(tokens[mismatchIdx]) < mismatchThresh &&
                         new Double(tokens[eaIdx]) < eThresh &&
                         new Double(tokens[ebIdx]) < eThresh){
                     String protA = tokens[primaryIdA1Idx];

@@ -2,93 +2,96 @@
 library(magrittr)
 library(dplyr)
 library(ggplot2)
+library(pander)
 
-REAL_RXN_COOCCURR_PATH <- "/home/burkhart/Software/Ogmios/results/Mechismo/rxnCooccurrence.csv"
-RAND_RXN_COOCCURR_PATH <- "/home/burkhart/Software/Ogmios/results/Mechismo/random_rxnCooccurrence.csv"
-REW1_RXN_COOCCURR_PATH <- "/home/burkhart/Software/Ogmios/results/Mechismo/rewired_1rxnCooccurrence.csv"
-REW2_RXN_COOCCURR_PATH <- "/home/burkhart/Software/Ogmios/results/Mechismo/rewired_2rxnCooccurrence.csv"
-REW3_RXN_COOCCURR_PATH <- "/home/burkhart/Software/Ogmios/results/Mechismo/rewired_3rxnCooccurrence.csv"
-REW4_RXN_COOCCURR_PATH <- "/home/burkhart/Software/Ogmios/results/Mechismo/rewired_4rxnCooccurrence.csv"
-REW5_RXN_COOCCURR_PATH <- "/home/burkhart/Software/Ogmios/results/Mechismo/rewired_5rxnCooccurrence.csv"
-REW6_RXN_COOCCURR_PATH <- "/home/burkhart/Software/Ogmios/results/Mechismo/rewired_6rxnCooccurrence.csv"
-REW7_RXN_COOCCURR_PATH <- "/home/burkhart/Software/Ogmios/results/Mechismo/rewired_7rxnCooccurrence.csv"
-REW8_RXN_COOCCURR_PATH <- "/home/burkhart/Software/Ogmios/results/Mechismo/rewired_8rxnCooccurrence.csv"
-REW9_RXN_COOCCURR_PATH <- "/home/burkhart/Software/Ogmios/results/Mechismo/rewired_9rxnCooccurrence.csv"
-REW10_RXN_COOCCURR_PATH <- "/home/burkhart/Software/Ogmios/results/Mechismo/rewired_10rxnCooccurrence.csv"
+panderOptions('table.alignment.default',function(df) ifelse(sapply(df,is.numeric),'right','left'))
+
+REAL_RXN_COOCCURR_PATH <- "/home/burkhart/Software/Ogmios/results/Mechismo/EXrxnCooccurrence.csv"
+RAND_RXN_COOCCURR_PATH <- "/home/burkhart/Software/Ogmios/results/Mechismo/random_EXrxnCooccurrence.csv"
+REW1_RXN_COOCCURR_PATH <- "/home/burkhart/Software/Ogmios/results/Mechismo/rewired_1EXrxnCooccurrence.csv"
+REW2_RXN_COOCCURR_PATH <- "/home/burkhart/Software/Ogmios/results/Mechismo/rewired_2EXrxnCooccurrence.csv"
+REW3_RXN_COOCCURR_PATH <- "/home/burkhart/Software/Ogmios/results/Mechismo/rewired_3EXrxnCooccurrence.csv"
+REW4_RXN_COOCCURR_PATH <- "/home/burkhart/Software/Ogmios/results/Mechismo/rewired_4EXrxnCooccurrence.csv"
+REW5_RXN_COOCCURR_PATH <- "/home/burkhart/Software/Ogmios/results/Mechismo/rewired_5EXrxnCooccurrence.csv"
+REW6_RXN_COOCCURR_PATH <- "/home/burkhart/Software/Ogmios/results/Mechismo/rewired_6EXrxnCooccurrence.csv"
+REW7_RXN_COOCCURR_PATH <- "/home/burkhart/Software/Ogmios/results/Mechismo/rewired_7EXrxnCooccurrence.csv"
+REW8_RXN_COOCCURR_PATH <- "/home/burkhart/Software/Ogmios/results/Mechismo/rewired_8EXrxnCooccurrence.csv"
+REW9_RXN_COOCCURR_PATH <- "/home/burkhart/Software/Ogmios/results/Mechismo/rewired_9EXrxnCooccurrence.csv"
+REW10_RXN_COOCCURR_PATH <- "/home/burkhart/Software/Ogmios/results/Mechismo/rewired_10EXrxnCooccurrence.csv"
 
 IMAGES_AS_SVG = TRUE
 
 FIGURES_DIR <- "/home/burkhart/Software/Ogmios/results/Mechismo/Figs/"
 
-realRxnCooccurr <- read.table(REAL_RXN_COOCCURR_PATH,
+realRxnCooccurr <- read.csv(REAL_RXN_COOCCURR_PATH,
                               header = TRUE,
                               sep = ",") %>%
   dplyr::mutate(negLog10FDR = -log10(Co.occurrence.BH.Adjusted.P.value),
                 rxn = as.factor("real"))
 
-randRxnCooccurr <- read.table(RAND_RXN_COOCCURR_PATH,
+randRxnCooccurr <- read.csv(RAND_RXN_COOCCURR_PATH,
                               header = TRUE,
                               sep = ",") %>%
   dplyr::mutate(negLog10FDR = -log10(Co.occurrence.BH.Adjusted.P.value),
                 rxn = as.factor("random"))
 
-rew1RxnCooccurr <- read.table(REW1_RXN_COOCCURR_PATH,
+rew1RxnCooccurr <- read.csv(REW1_RXN_COOCCURR_PATH,
                               header = TRUE,
                               sep = ",") %>%
   dplyr::mutate(negLog10FDR = -log10(Co.occurrence.BH.Adjusted.P.value),
                 rxn = as.factor("rew1"))
 
 
-rew2RxnCooccurr <- read.table(REW2_RXN_COOCCURR_PATH,
+rew2RxnCooccurr <- read.csv(REW2_RXN_COOCCURR_PATH,
                               header = TRUE,
                               sep = ",") %>%
   dplyr::mutate(negLog10FDR = -log10(Co.occurrence.BH.Adjusted.P.value),
                 rxn = as.factor("rew2"))
 
-rew3RxnCooccurr <- read.table(REW3_RXN_COOCCURR_PATH,
+rew3RxnCooccurr <- read.csv(REW3_RXN_COOCCURR_PATH,
                               header = TRUE,
                               sep = ",") %>%
   dplyr::mutate(negLog10FDR = -log10(Co.occurrence.BH.Adjusted.P.value),
                 rxn = as.factor("rew3"))
 
-rew4RxnCooccurr <- read.table(REW4_RXN_COOCCURR_PATH,
+rew4RxnCooccurr <- read.csv(REW4_RXN_COOCCURR_PATH,
                               header = TRUE,
                               sep = ",") %>%
   dplyr::mutate(negLog10FDR = -log10(Co.occurrence.BH.Adjusted.P.value),
                 rxn = as.factor("rew4"))
 
-rew5RxnCooccurr <- read.table(REW5_RXN_COOCCURR_PATH,
+rew5RxnCooccurr <- read.csv(REW5_RXN_COOCCURR_PATH,
                               header = TRUE,
                               sep = ",") %>%
   dplyr::mutate(negLog10FDR = -log10(Co.occurrence.BH.Adjusted.P.value),
                 rxn = as.factor("rew5"))
 
-rew6RxnCooccurr <- read.table(REW6_RXN_COOCCURR_PATH,
+rew6RxnCooccurr <- read.csv(REW6_RXN_COOCCURR_PATH,
                               header = TRUE,
                               sep = ",") %>%
   dplyr::mutate(negLog10FDR = -log10(Co.occurrence.BH.Adjusted.P.value),
                 rxn = as.factor("rew6"))
 
 
-rew7RxnCooccurr <- read.table(REW7_RXN_COOCCURR_PATH,
+rew7RxnCooccurr <- read.csv(REW7_RXN_COOCCURR_PATH,
                               header = TRUE,
                               sep = ",") %>%
   dplyr::mutate(negLog10FDR = -log10(Co.occurrence.BH.Adjusted.P.value),
                 rxn = as.factor("rew7"))
 
-rew8RxnCooccurr <- read.table(REW8_RXN_COOCCURR_PATH,
+rew8RxnCooccurr <- read.csv(REW8_RXN_COOCCURR_PATH,
                               header = TRUE,
                               sep = ",") %>%
   dplyr::mutate(negLog10FDR = -log10(Co.occurrence.BH.Adjusted.P.value),
                 rxn = as.factor("rew8"))
 
-rew9RxnCooccurr <- read.table(REW9_RXN_COOCCURR_PATH,
+rew9RxnCooccurr <- read.csv(REW9_RXN_COOCCURR_PATH,
                               header = TRUE,
                               sep = ",") %>%
   dplyr::mutate(negLog10FDR = -log10(Co.occurrence.BH.Adjusted.P.value),
                 rxn = as.factor("rew9"))
 
-rew10RxnCooccurr <- read.table(REW10_RXN_COOCCURR_PATH,
+rew10RxnCooccurr <- read.csv(REW10_RXN_COOCCURR_PATH,
                               header = TRUE,
                               sep = ",") %>%
   dplyr::mutate(negLog10FDR = -log10(Co.occurrence.BH.Adjusted.P.value),
@@ -233,26 +236,43 @@ z %>% ggplot(aes(x=negLog10FDR,
   stat_bin(data=subset(z,as.character(rxn)=="rew10"),
            aes(thiz = b10,y=thiz-cumsum(..count..)),
            geom="step") +
-  ylim(low = 0, high = 2200) +
-  #xlim(low = 0, high = 125) +
+  ylim(low = 0, high = 1100) +
+  #xlim(low = 0, high = 5) +
   xlab("-log10(FDR)") +
   ylab("co-occurring reaction pairs")
 if(IMAGES_AS_SVG){
   dev.off()
 }
 
-sum(realRxnCooccurr$negLog10FDR) / (ding * max(realRxnCooccurr$negLog10FDR))
-sum(randRxnCooccurr$negLog10FDR) / (ding * max(realRxnCooccurr$negLog10FDR))
-sum(rew1RxnCooccurr$negLog10FDR) / (ding * max(realRxnCooccurr$negLog10FDR))
-sum(rew2RxnCooccurr$negLog10FDR) / (ding * max(realRxnCooccurr$negLog10FDR))
-sum(rew3RxnCooccurr$negLog10FDR) / (ding * max(realRxnCooccurr$negLog10FDR))
-sum(rew4RxnCooccurr$negLog10FDR) / (ding * max(realRxnCooccurr$negLog10FDR))
-sum(rew5RxnCooccurr$negLog10FDR) / (ding * max(realRxnCooccurr$negLog10FDR))
-sum(rew6RxnCooccurr$negLog10FDR) / (ding * max(realRxnCooccurr$negLog10FDR))
-sum(rew7RxnCooccurr$negLog10FDR) / (ding * max(realRxnCooccurr$negLog10FDR))
-sum(rew8RxnCooccurr$negLog10FDR) / (ding * max(realRxnCooccurr$negLog10FDR))
-sum(rew9RxnCooccurr$negLog10FDR) / (ding * max(realRxnCooccurr$negLog10FDR))
-sum(rew10RxnCooccurr$negLog10FDR) / (ding * max(realRxnCooccurr$negLog10FDR))
+analysisNames <- c("Real",
+                   "Random",
+                   "Rewire 1",
+                   "Rewire 2",
+                   "Rewire 3",
+                   "Rewire 4",
+                   "Rewire 5",
+                   "Rewire 6",
+                   "Rewire 7",
+                   "Rewire 8",
+                   "Rewire 9",
+                   "Rewire 10")
+
+analysisFDRs <- c(sum(realRxnCooccurr$negLog10FDR) / (ding * max(realRxnCooccurr$negLog10FDR)),
+sum(randRxnCooccurr$negLog10FDR) / (ding * max(realRxnCooccurr$negLog10FDR)),
+sum(rew1RxnCooccurr$negLog10FDR) / (ding * max(realRxnCooccurr$negLog10FDR)),
+sum(rew2RxnCooccurr$negLog10FDR) / (ding * max(realRxnCooccurr$negLog10FDR)),
+sum(rew3RxnCooccurr$negLog10FDR) / (ding * max(realRxnCooccurr$negLog10FDR)),
+sum(rew4RxnCooccurr$negLog10FDR) / (ding * max(realRxnCooccurr$negLog10FDR)),
+sum(rew5RxnCooccurr$negLog10FDR) / (ding * max(realRxnCooccurr$negLog10FDR)),
+sum(rew6RxnCooccurr$negLog10FDR) / (ding * max(realRxnCooccurr$negLog10FDR)),
+sum(rew7RxnCooccurr$negLog10FDR) / (ding * max(realRxnCooccurr$negLog10FDR)),
+sum(rew8RxnCooccurr$negLog10FDR) / (ding * max(realRxnCooccurr$negLog10FDR)),
+sum(rew9RxnCooccurr$negLog10FDR) / (ding * max(realRxnCooccurr$negLog10FDR)),
+sum(rew10RxnCooccurr$negLog10FDR) / (ding * max(realRxnCooccurr$negLog10FDR)))
+
+data.frame(Analysis = analysisNames,
+           FDR = analysisFDRs) %>%
+  pander(split.cells = 50, split.table = Inf)
 
 system_command = paste("qlmanage -t -s 1000 -o ", FIGURES_DIR, " ",FIGURES_DIR,"*.svg",sep="")
 system(paste(system_command))
