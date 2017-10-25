@@ -13,6 +13,9 @@ public class MechismoOutputLoader {
     private final double mechScoreThresh = 2.0;
     private final double eThresh = 1e-10;
     private final int primaryIdA1Idx = 1;
+    private final int posA1Idx = 3;
+    private final int resA1Idx = 4;
+    private final int mutA1Idx = 5;
     private final int userInputIdx = 6;
     private final int mismatchIdx = 8;
     private final int mechScoreIdx = 17;
@@ -20,6 +23,8 @@ public class MechismoOutputLoader {
     private final int rxnKlassIdx = 21;
     private final int confIdx = 26;
     private final int eaIdx = 35;
+    private final int posB1Idx = 37;
+    private final int resB1Idx = 38;
     private final int ebIdx = 43;
     private final String rxnKlass = "hetero";
     private final String sampleIDPatternString = "(TCGA-[0-9A-Z-]+)";
@@ -27,6 +32,8 @@ public class MechismoOutputLoader {
     private Set<String> fis = null;
     private Map<String,Set<String>> samples2fis = null;
     private Map<String,Set<String>> fis2Samples = null;
+    //TODO: decide whether or not to add protein B pos/res info to muts?
+    private Map<String,Map<String,Set<String>>> samples2fis2muts = null;
     private Pattern sampleIDPattern = null;
     private Matcher sampleIDMatcher = null;
 
@@ -47,6 +54,7 @@ public class MechismoOutputLoader {
         this.fis = new HashSet<>();
         this.samples2fis = new HashMap<>();
         this.fis2Samples = new HashMap<>();
+        this.samples2fis2muts = new HashMap<>();
         FileUtility fileUtility = new FileUtility();
         try {
             fileUtility.setInput(mechismoOuputFilePath);
@@ -69,6 +77,11 @@ public class MechismoOutputLoader {
                                 protB,
                                 protA);
                         String userInput = tokens[userInputIdx];
+                        String mutString = String.format("%s:pos%s-res%s-mut%s",
+                                tokens[primaryIdA1Idx],
+                                tokens[posA1Idx],
+                                tokens[resA1Idx],
+                                tokens[mutA1Idx]);
                         this.sampleIDMatcher = this.sampleIDPattern.matcher(userInput);
                         while (this.sampleIDMatcher.find()) {
                             String sampleID = this.sampleIDMatcher.group();
@@ -99,6 +112,24 @@ public class MechismoOutputLoader {
                             fiSamples.add(sampleID);
                             fis2Samples.put(forwardFI, fiSamples);
                             fis2Samples.put(backwardFI, fiSamples);
+
+                            //update samples2fis2muts
+                            Map<String,Set<String>> fis2muts;
+                            if(samples2fis2muts.containsKey(sampleID)){
+                                fis2muts = samples2fis2muts.get(sampleID);
+                            }else{
+                                fis2muts = new HashMap<>();
+                            }
+                            Set<String> muts;
+                            if(fis2muts.containsKey(forwardFI)){
+                                muts = fis2muts.get(forwardFI);
+                            }else{
+                                muts = new HashSet<>();
+                            }
+                            muts.add(mutString);
+                            fis2muts.put(forwardFI,muts);
+                            fis2muts.put(backwardFI,muts);
+                            samples2fis2muts.put(sampleID,fis2muts);
                         }
                         fis.add(forwardFI);
                         fis.add(backwardFI);
@@ -116,6 +147,17 @@ public class MechismoOutputLoader {
                     ioe.getMessage(),
                     Arrays.toString(ioe.getStackTrace())));
         }
+    }
+
+    public Map<String,Map<String,Set<String>>> ExtractSamples2FIs2Muts(){
+        return this.ExtractSamples2FIs2Muts(this.mechismoOuputFilePath);
+    }
+
+    public Map<String,Map<String,Set<String>>> ExtractSamples2FIs2Muts(String mechismoOuputFilePath){
+        if(this.samples2fis2muts == null){
+            this.ParseMechismoOutputFile(mechismoOuputFilePath);
+        }
+        return this.samples2fis2muts;
     }
 
     public Map<String,Set<String>> ExtractFIs2Samples(){
