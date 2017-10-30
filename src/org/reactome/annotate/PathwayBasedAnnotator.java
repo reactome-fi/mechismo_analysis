@@ -292,7 +292,7 @@ public class PathwayBasedAnnotator {
                                        permutationNumber);
     }
     
-    private double calculateFDR(int randomLessThan,
+    public static double calculateFDR(int randomLessThan,
                                 int realLessThan,
                                 int randomTotal,
                                 int realTotal) {

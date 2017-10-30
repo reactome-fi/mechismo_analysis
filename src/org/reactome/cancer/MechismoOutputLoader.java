@@ -10,8 +10,8 @@ import java.util.regex.Pattern;
 
 public class MechismoOutputLoader {
     private final static Logger logger = Logger.getLogger(MechismoOutputLoader.class);
-    private final double mechScoreThresh = 2.0;
-    private final double eThresh = 1e-10;
+    private double mechScoreThresh;
+    private double eThresh;
     private final int primaryIdA1Idx = 1;
     private final int posA1Idx = 3;
     private final int resA1Idx = 4;
@@ -30,27 +30,33 @@ public class MechismoOutputLoader {
     private final String sampleIDPatternString = "(TCGA-[0-9A-Z-]+)";
     private String mechismoOuputFilePath = null;
     private Set<String> fis = null;
-    private Map<String,Set<String>> samples2fis = null;
-    private Map<String,Set<String>> fis2Samples = null;
+    private Map<String, Set<String>> samples2fis = null;
+    private Map<String, Set<String>> fis2Samples = null;
     //TODO: decide whether or not to add protein B pos/res info to muts?
-    private Map<String,Map<String,Set<String>>> samples2fis2muts = null;
+    private Map<String, Map<String, Set<String>>> samples2fis2muts = null;
     private Pattern sampleIDPattern = null;
     private Matcher sampleIDMatcher = null;
 
-    public MechismoOutputLoader(){
-        this(null);
+    public MechismoOutputLoader() {
+        this(null,
+                1.0,
+                1e-5);
     }
 
-    public MechismoOutputLoader(String mechismoOutputFilePath){
+    public MechismoOutputLoader(String mechismoOutputFilePath,
+                                double mechScoreThresh,
+                                double eThresh) {
         this.mechismoOuputFilePath = mechismoOutputFilePath;
+        this.mechScoreThresh = mechScoreThresh;
+        this.eThresh = eThresh;
         this.sampleIDPattern = Pattern.compile(this.sampleIDPatternString);
     }
 
-    private void ParseMechismoOutputFile(){
+    private void ParseMechismoOutputFile() {
         this.ParseMechismoOutputFile(this.mechismoOuputFilePath);
     }
 
-    private void ParseMechismoOutputFile(String mechismoOuputFilePath){
+    private void ParseMechismoOutputFile(String mechismoOuputFilePath) {
         this.fis = new HashSet<>();
         this.samples2fis = new HashMap<>();
         this.fis2Samples = new HashMap<>();
@@ -62,14 +68,14 @@ public class MechismoOutputLoader {
             String[] tokens = null;
             while ((line = fileUtility.readLine()) != null) {
                 tokens = line.split("\t");
-                if(tokens.length > ebIdx &&
+                if (tokens.length > ebIdx &&
                         rxnKlass.equals(tokens[rxnKlassIdx]) &&
                         new Double(tokens[eaIdx]) < eThresh &&
-                        new Double(tokens[ebIdx]) < eThresh){
+                        new Double(tokens[ebIdx]) < eThresh) {
                     String protA = tokens[primaryIdA1Idx];
                     String protB = tokens[primaryIdB1Idx];
                     Double mechScore = Math.abs(new Double(tokens[mechScoreIdx]));
-                    if(mechScore > mechScoreThresh) {
+                    if (mechScore > mechScoreThresh) {
                         String forwardFI = String.format("%s\t%s",
                                 protA,
                                 protB);
@@ -114,34 +120,33 @@ public class MechismoOutputLoader {
                             fis2Samples.put(backwardFI, fiSamples);
 
                             //update samples2fis2muts
-                            Map<String,Set<String>> fis2muts;
-                            if(samples2fis2muts.containsKey(sampleID)){
+                            Map<String, Set<String>> fis2muts;
+                            if (samples2fis2muts.containsKey(sampleID)) {
                                 fis2muts = samples2fis2muts.get(sampleID);
-                            }else{
+                            } else {
                                 fis2muts = new HashMap<>();
                             }
                             Set<String> muts;
-                            if(fis2muts.containsKey(forwardFI)){
+                            if (fis2muts.containsKey(forwardFI)) {
                                 muts = fis2muts.get(forwardFI);
-                            }else{
+                            } else {
                                 muts = new HashSet<>();
                             }
                             muts.add(mutString);
-                            fis2muts.put(forwardFI,muts);
-                            fis2muts.put(backwardFI,muts);
-                            samples2fis2muts.put(sampleID,fis2muts);
+                            fis2muts.put(forwardFI, muts);
+                            fis2muts.put(backwardFI, muts);
+                            samples2fis2muts.put(sampleID, fis2muts);
                         }
                         fis.add(forwardFI);
                         fis.add(backwardFI);
-                    }
-                    else{
+                    } else {
                         //System.out.println(String.format("Ignoring FI %s-%s with mechScore = %.3f",
                         //        protA,protB,mechScore));
                     }
                 }
             }
             fileUtility.close();
-        }catch(IOException ioe){
+        } catch (IOException ioe) {
             logger.error(String.format("Couldn't use %s, %s: %s",
                     mechismoOuputFilePath.toString(),
                     ioe.getMessage(),
@@ -149,45 +154,45 @@ public class MechismoOutputLoader {
         }
     }
 
-    public Map<String,Map<String,Set<String>>> ExtractSamples2FIs2Muts(){
+    public Map<String, Map<String, Set<String>>> ExtractSamples2FIs2Muts() {
         return this.ExtractSamples2FIs2Muts(this.mechismoOuputFilePath);
     }
 
-    public Map<String,Map<String,Set<String>>> ExtractSamples2FIs2Muts(String mechismoOuputFilePath){
-        if(this.samples2fis2muts == null){
+    public Map<String, Map<String, Set<String>>> ExtractSamples2FIs2Muts(String mechismoOuputFilePath) {
+        if (this.samples2fis2muts == null) {
             this.ParseMechismoOutputFile(mechismoOuputFilePath);
         }
         return this.samples2fis2muts;
     }
 
-    public Map<String,Set<String>> ExtractFIs2Samples(){
+    public Map<String, Set<String>> ExtractFIs2Samples() {
         return this.ExtractFIs2Samples(this.mechismoOuputFilePath);
     }
 
-    public Map<String,Set<String>> ExtractFIs2Samples(String mechismoOuputFilePath){
-        if(this.fis2Samples == null){
+    public Map<String, Set<String>> ExtractFIs2Samples(String mechismoOuputFilePath) {
+        if (this.fis2Samples == null) {
             this.ParseMechismoOutputFile(mechismoOuputFilePath);
         }
         return this.fis2Samples;
     }
 
-    public Map<String,Set<String>> ExtractSamples2FIs(){
+    public Map<String, Set<String>> ExtractSamples2FIs() {
         return this.ExtractSamples2FIs(this.mechismoOuputFilePath);
     }
 
-    public Map<String,Set<String>> ExtractSamples2FIs(String mechismoOuputFilePath){
-        if(this.samples2fis == null){
+    public Map<String, Set<String>> ExtractSamples2FIs(String mechismoOuputFilePath) {
+        if (this.samples2fis == null) {
             this.ParseMechismoOutputFile(mechismoOuputFilePath);
         }
         return this.samples2fis;
     }
 
-    public Set<String> ExtractMechismoFIs(){
+    public Set<String> ExtractMechismoFIs() {
         return this.ExtractMechismoFIs(this.mechismoOuputFilePath);
     }
 
-    public Set<String> ExtractMechismoFIs(String mechismoOuputFilePath)  {
-        if(this.fis == null){
+    public Set<String> ExtractMechismoFIs(String mechismoOuputFilePath) {
+        if (this.fis == null) {
             this.ParseMechismoOutputFile(mechismoOuputFilePath);
         }
         return this.fis;

@@ -112,16 +112,20 @@ public class ProcessDatasetsDriver {
                         "datasets/firehose_data/all_oncotated_calls",
                         "datasets/guanming_known_drivers.txt");
             } else if (Integer.parseInt(ex) == 5) {
-                for(int i = 1; i <= 10; i++) {
-                    new MechismoAnalyzer().mapReactomeReactions(
-                            cancerDriverReactomeAnalyzer,
-                            "/home/burkhart/Software/Ogmios/datasets/Mechismo/TCGA_mech_output.tsv",
-                            //"/home/burkhart/Software/Ogmios/datasets/Mechismo/TCGA_mech_random_output.tsv",
-                            "/home/burkhart/Software/Ogmios/datasets/ReactionNetwork_070517.txt",
-                            "/home/burkhart/Software/Ogmios/results/Mechismo/",
-                            "rewired_" + i + ""
-                    );
-                }
+                new MechismoAnalyzer().mapReactomeReactions(
+                        cancerDriverReactomeAnalyzer,
+                        "/home/burkhart/Software/Ogmios/datasets/Mechismo/TCGA_mech_output.tsv",
+                        "/home/burkhart/Software/Ogmios/datasets/ReactionNetwork_070517.txt",
+                        "/home/burkhart/Software/Ogmios/results/Mechismo/",
+                        "",
+                        1,
+                        10,
+                        1.0,
+                        1e-5,
+                        true,
+                        false,
+                        false
+                );
             } else {
                 System.out.println("An error occurred.");
             }
