@@ -14,6 +14,8 @@ import org.jgrapht.Graphs;
 import org.jgrapht.alg.ConnectivityInspector;
 import org.jgrapht.graph.DefaultDirectedGraph;
 import org.jgrapht.graph.DefaultEdge;
+import org.jgrapht.graph.DirectedSubgraph;
+import org.jgrapht.DirectedGraph;
 import org.junit.Test;
 import org.reactome.annotate.AnnotationHelper;
 import org.reactome.annotate.GeneSetAnnotation;
@@ -591,21 +593,45 @@ public class MechismoAnalyzer {
         return reactionSetPairs;
     }
 
-    private DefaultDirectedGraph<Long, DefaultEdge> RewireReactionGraph(
+    private DirectedGraph<Long, DefaultEdge> RewireReactionGraph(
             DefaultDirectedGraph<Long, DefaultEdge> reactionGraph) {
         return RewireReactionGraph(reactionGraph, 88L);
     }
 
 
-    private DefaultDirectedGraph<Long, DefaultEdge> RewireReactionGraph(
+    private DirectedGraph<Long, DefaultEdge> RewireReactionGraph(
             DefaultDirectedGraph<Long, DefaultEdge> reactionGraph,
             long randomSeed) {
         DefaultDirectedGraph<Long, DefaultEdge> rewiredReactionGraph = new DefaultDirectedGraph<>(DefaultEdge.class);
         Graphs.addGraph(rewiredReactionGraph, reactionGraph);
 
+        ConnectivityInspector connectivityInspector = new ConnectivityInspector(rewiredReactionGraph);
+        List<Set<Long>> connectedSets = connectivityInspector.connectedSets();
+
+        Set<Long> largestComponentVertexSet = new HashSet();
+        for(Set<Long> connectedSet : connectedSets){
+            if(connectedSet.size() > largestComponentVertexSet.size()){
+                largestComponentVertexSet = connectedSet;
+            }
+        }
+
+        Set<DefaultEdge> largestComponentEdges = new HashSet<>();
+        for(Long vertex : largestComponentVertexSet){
+            largestComponentEdges.addAll(rewiredReactionGraph.incomingEdgesOf(vertex));
+            largestComponentEdges.addAll(rewiredReactionGraph.outgoingEdgesOf(vertex));
+        }
+
+        DirectedSubgraph largestComponentSubgraph = new DirectedSubgraph(
+                rewiredReactionGraph,
+                largestComponentVertexSet,
+                largestComponentEdges);
+
+        //DefaultDirectedGraph<Long, DefaultEdge> largestComponentOnly = new DefaultDirectedGraph<>(DefaultEdge.class);
+        //Graphs.addGraph(largestComponentOnly,largestComponentSubgraph);
+
         Random random = new Random(randomSeed);
 
-        int E = reactionGraph.edgeSet().size();
+        int E = largestComponentSubgraph.edgeSet().size();
         //from https://en.wikipedia.org/wiki/Degree-preserving_randomization
         int rewires = (int) (E / 2.0 * Math.log(1 / 10 ^ 7));
 
@@ -691,7 +717,7 @@ public class MechismoAnalyzer {
 
     private void SearchUpstreamReactions(int depth,
                                          Set<DefaultEdge> incomingEdges,
-                                         DefaultDirectedGraph<Long, DefaultEdge> reactionGraph,
+                                         DirectedGraph<Long, DefaultEdge> reactionGraph,
                                          Map<Long, Set<String>> reaction2FiSet,
                                          Long currentReactionId,
                                          Set<Set<String>> allFIs,
@@ -756,7 +782,7 @@ public class MechismoAnalyzer {
     private void SearchRxnNetwork(Set<TargetReactionSummary> targetReactionSummaries,
                                   Set<Set<String>> allFIs,
                                   Map<Long, Set<String>> reaction2FiSet,
-                                  DefaultDirectedGraph<Long, DefaultEdge> reactionGraph,
+                                  DirectedGraph<Long, DefaultEdge> reactionGraph,
                                   Map<Long, String> longRxnDbIdToName,
                                   int depth) {
         //foreach SupReaction in reaction2FiSet
@@ -1118,11 +1144,11 @@ public class MechismoAnalyzer {
                 reactomeReactionGraphLoader.getReactionGraph();
 
         Map<String, Map<String, Set<String>>> samples2FIs2Muts = mechismoOutputLoader.ExtractSamples2FIs2Muts();
-        double maxMemUsed = CalculateJavaMemFootprintGB();
+        double maxMemUsed = CalculateJavaMemFootprintGiB();
         for (int i = 0; i < numPermutations; i++) {
             long startLoopTime = System.currentTimeMillis();
 
-            DefaultDirectedGraph<Long, DefaultEdge> rewiredReactionGraph =
+            DirectedGraph<Long, DefaultEdge> rewiredReactionGraph =
                     RewireReactionGraph(reactionGraph, i);
 
             ConnectivityInspector<Long, DefaultEdge> connectivityInspector =
@@ -1154,7 +1180,7 @@ public class MechismoAnalyzer {
 
             rewiredNetworkResults.add(rewiredNetworkResult);
 
-            double curMemUsed = CalculateJavaMemFootprintGB();
+            double curMemUsed = CalculateJavaMemFootprintGiB();
             maxMemUsed = curMemUsed > maxMemUsed ?
                     curMemUsed :
                     maxMemUsed;
@@ -1162,7 +1188,7 @@ public class MechismoAnalyzer {
             long endLoopTime = System.currentTimeMillis();
             System.out.println(String.format("Completed permutation iteration %d in %.2f minutes\n" +
                             "Total running time: %.2f minutes\n" +
-                            "Max memory footprint: %.2f GB",
+                            "Max memory footprint: %.2f GiB",
                     i,
                     (endLoopTime - startLoopTime) / 60000.0,
                     (endLoopTime - startMethodTime) / 60000.0,
@@ -1190,7 +1216,7 @@ public class MechismoAnalyzer {
                 outputFilePrefix,
                 longRxnDbIdToName);
 
-        double curMemUsed = CalculateJavaMemFootprintGB();
+        double curMemUsed = CalculateJavaMemFootprintGiB();
         maxMemUsed = curMemUsed > maxMemUsed ?
                 curMemUsed :
                 maxMemUsed;
@@ -1198,7 +1224,7 @@ public class MechismoAnalyzer {
         long endMethodTime = System.currentTimeMillis();
 
         System.out.println(String.format("Completed after %.2f minutes\n" +
-                        "Max memory footprint: %.2f GB",
+                        "Max memory footprint: %.2f GiB",
                 (endMethodTime - startMethodTime) / 60000.0,
                 maxMemUsed));
     }
@@ -1207,8 +1233,8 @@ public class MechismoAnalyzer {
         return Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
     }
 
-    private double CalculateJavaMemFootprintGB() {
-        return CalculateJavaMemFootprint() / 1e9;
+    private double CalculateJavaMemFootprintGiB() {
+        return CalculateJavaMemFootprint() / Math.pow(2.0,30);
     }
 
     private void WriteCooccurrenceToFile(CooccurrenceResult cooccurrenceResult,
@@ -1321,7 +1347,7 @@ public class MechismoAnalyzer {
 
     private CooccurrenceResult CalculateCooccurrencePValues(
             Map<Long, String> longRxnDbIdToName,
-            DefaultDirectedGraph<Long, DefaultEdge> reactionGraph,
+            DirectedGraph<Long, DefaultEdge> reactionGraph,
             Map<String, Set<String>> samples2FIs,
             Map<Long, Set<String>> reaction2FiSet,
             Map<String, Set<String>> fis2Samples,
@@ -1410,7 +1436,7 @@ public class MechismoAnalyzer {
 
     private void CalculateCooccurrence(Set<TargetReactionSummary> targetReactionSummaries,
                                        Map<Long, String> longRxnDbIdToName,
-                                       DefaultDirectedGraph<Long, DefaultEdge> reactionGraph,
+                                       DirectedGraph<Long, DefaultEdge> reactionGraph,
                                        Map<Long, Set<String>> rxn2Samples,
                                        Map<String, Set<String>> samples2FIs,
                                        Map<Long, Set<String>> reaction2FiSet,
