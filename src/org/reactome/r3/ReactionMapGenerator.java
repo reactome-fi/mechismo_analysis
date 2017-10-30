@@ -27,6 +27,7 @@ import org.gk.model.ReactomeJavaConstants;
 import org.gk.persistence.MySQLAdaptor;
 import org.gk.util.FileUtilities;
 import org.junit.Test;
+import org.reactome.r3.graph.GraphAnalyzer;
 import org.reactome.r3.graph.NetworkBuilderForGeneSet;
 import org.reactome.r3.util.Configuration;
 
@@ -194,6 +195,27 @@ public class ReactionMapGenerator {
                     .collect(Collectors.toSet());
             return pairs;
         }
+    }
+    
+    @Test
+    public void analyzeGraphCompoennts() throws Exception {
+        Set<String> network = loadSimpleNetwork();
+        GraphAnalyzer graphAnalyzer = new GraphAnalyzer();
+        List<Set<String>> components = graphAnalyzer.calculateGraphComponents(network);
+        System.out.println("Total components: " + components.size());
+        components.forEach(comp -> System.out.println(comp.size()));
+    }
+    
+    public Set<String> loadLargestComponents() throws IOException {
+        Set<String> network = loadSimpleNetwork();
+        GraphAnalyzer graphAnalyzer = new GraphAnalyzer();
+        List<Set<String>> components = graphAnalyzer.calculateGraphComponents(network);
+        // Filter network so that both reactions are in the largest component
+        Set<String> largest = components.get(0);
+        Set<String> rtn = network.stream()
+                                 .filter(pair -> largest.contains(pair.split("\t")[0]))
+                                 .collect(Collectors.toSet());
+        return rtn;
     }
     
     @Test
