@@ -10,12 +10,11 @@ import org.apache.commons.math.stat.correlation.SpearmansCorrelation;
 import org.apache.log4j.Logger;
 import org.gk.model.GKInstance;
 import org.gk.persistence.MySQLAdaptor;
+import org.jgrapht.DirectedGraph;
 import org.jgrapht.Graphs;
 import org.jgrapht.alg.ConnectivityInspector;
 import org.jgrapht.graph.DefaultDirectedGraph;
 import org.jgrapht.graph.DefaultEdge;
-import org.jgrapht.graph.DirectedSubgraph;
-import org.jgrapht.DirectedGraph;
 import org.junit.Test;
 import org.reactome.annotate.AnnotationHelper;
 import org.reactome.annotate.GeneSetAnnotation;
@@ -608,63 +607,138 @@ public class MechismoAnalyzer {
         ConnectivityInspector connectivityInspector = new ConnectivityInspector(rewiredReactionGraph);
         List<Set<Long>> connectedSets = connectivityInspector.connectedSets();
 
-        Set<Long> largestComponentVertexSet = new HashSet();
-        for(Set<Long> connectedSet : connectedSets){
-            if(connectedSet.size() > largestComponentVertexSet.size()){
+        int initialComponentCount = connectedSets.size();
+        int initialEdgeCount = rewiredReactionGraph.edgeSet().size();
+        int initialVtxCount = rewiredReactionGraph.vertexSet().size();
+
+        Set<Long> largestComponentVertexSet = new HashSet<>();
+        for (Set<Long> connectedSet : connectedSets) {
+            if (connectedSet.size() > largestComponentVertexSet.size()) {
                 largestComponentVertexSet = connectedSet;
             }
         }
 
+        if (largestComponentVertexSet.size() >= initialVtxCount) {
+            throw new IllegalStateException(String.format(
+                    "largest component vtx size (%d) should be no less than initial (%d)",
+                    largestComponentVertexSet.size(),
+                    initialVtxCount));
+        }
+
         Set<DefaultEdge> largestComponentEdges = new HashSet<>();
-        for(Long vertex : largestComponentVertexSet){
+        for (Long vertex : largestComponentVertexSet) {
             largestComponentEdges.addAll(rewiredReactionGraph.incomingEdgesOf(vertex));
             largestComponentEdges.addAll(rewiredReactionGraph.outgoingEdgesOf(vertex));
         }
 
-        DirectedSubgraph largestComponentSubgraph = new DirectedSubgraph(
-                rewiredReactionGraph,
-                largestComponentVertexSet,
-                largestComponentEdges);
-
-        //DefaultDirectedGraph<Long, DefaultEdge> largestComponentOnly = new DefaultDirectedGraph<>(DefaultEdge.class);
-        //Graphs.addGraph(largestComponentOnly,largestComponentSubgraph);
+        if (largestComponentEdges.size() >= initialEdgeCount) {
+            throw new IllegalStateException(String.format(
+                    "largest component edge size (%d) should be no larger than initial (%d)",
+                    largestComponentEdges.size(),
+                    initialEdgeCount));
+        }
 
         Random random = new Random(randomSeed);
 
-        int E = largestComponentSubgraph.edgeSet().size();
-        //from https://en.wikipedia.org/wiki/Degree-preserving_randomization
-        int rewires = (int) (E / 2.0 * Math.log(1 / 10 ^ 7));
+        int E = largestComponentEdges.size();
+        int Em = E - 1;
+        int rand1, rand2;
+        DefaultEdge randEdge1, randEdge2;
+        ArrayList<DefaultEdge> largestComponentEdgesAry = new ArrayList<>(largestComponentEdges);
+        Long sourceVtx1, sourceVtx2, targetVtx1, targetVtx2;
 
+        //from https://en.wikipedia.org/wiki/Degree-preserving_randomization
+        int rewires = (int) ((E / 2.0) * Math.log(1 / Math.pow(10, -7)));
         for (int i = 0; i < rewires; i++) {
 
             //remove edge 1
-            int rand1 = random.nextInt(E);
-            DefaultEdge randEdge1 = (DefaultEdge) rewiredReactionGraph.edgeSet().toArray()[rand1];
-            Long sourceVtx1 = rewiredReactionGraph.getEdgeSource(randEdge1);
-            Long targetVtx1 = rewiredReactionGraph.getEdgeTarget(randEdge1);
-            rewiredReactionGraph.removeEdge(randEdge1);
+            rand1 = random.nextInt(E);
+            randEdge1 = largestComponentEdgesAry.get(rand1);
+            sourceVtx1 = rewiredReactionGraph.getEdgeSource(randEdge1);
+            targetVtx1 = rewiredReactionGraph.getEdgeTarget(randEdge1);
+            boolean success = rewiredReactionGraph.removeEdge(randEdge1);
+            largestComponentEdgesAry.remove(rand1);
+
+            int curEdgeCount = rewiredReactionGraph.edgeSet().size();
+            if (curEdgeCount != (initialEdgeCount - 1)) {
+                throw new IllegalStateException(String.format(
+                        "current edge count (%d) should not differ from initial - 1 (%d)",
+                        curEdgeCount,
+                        initialEdgeCount - 1));
+            }
 
             //remove edge2
-            int rand2 = random.nextInt(E - 1);
-            DefaultEdge randEdge2 = (DefaultEdge) rewiredReactionGraph.edgeSet().toArray()[rand2];
-            Long sourceVtx2 = rewiredReactionGraph.getEdgeSource(randEdge2);
-            Long targetVtx2 = rewiredReactionGraph.getEdgeTarget(randEdge2);
+            rand2 = random.nextInt(Em);
+            randEdge2 = largestComponentEdgesAry.get(rand2);
+            sourceVtx2 = rewiredReactionGraph.getEdgeSource(randEdge2);
+            targetVtx2 = rewiredReactionGraph.getEdgeTarget(randEdge2);
 
             //otherwise we lose edges & degrees
             while (rewiredReactionGraph.getEdge(sourceVtx1, targetVtx2) != null ||
                     rewiredReactionGraph.getEdge(sourceVtx2, targetVtx1) != null) {
-                rand2 = random.nextInt(E - 1);
-                randEdge2 = (DefaultEdge) rewiredReactionGraph.edgeSet().toArray()[rand2];
+                rand2 = random.nextInt(Em);
+                randEdge2 = largestComponentEdgesAry.get(rand2);
                 sourceVtx2 = rewiredReactionGraph.getEdgeSource(randEdge2);
                 targetVtx2 = rewiredReactionGraph.getEdgeTarget(randEdge2);
             }
-            rewiredReactionGraph.removeEdge(randEdge2);
+            success = rewiredReactionGraph.removeEdge(randEdge2);
+            largestComponentEdgesAry.remove(rand2);
+
+            curEdgeCount = rewiredReactionGraph.edgeSet().size();
+            if (curEdgeCount != (initialEdgeCount - 2)) {
+                throw new IllegalStateException(String.format(
+                        "current edge count (%d) should not differ from initial - 2 (%d)",
+                        curEdgeCount,
+                        initialEdgeCount - 2));
+            }
 
             //rewire edge 1
             rewiredReactionGraph.addEdge(sourceVtx1, targetVtx2);
+            largestComponentEdgesAry.add(
+                    rewiredReactionGraph.getEdge(sourceVtx1, targetVtx2));
 
             //rewire edge 2
             rewiredReactionGraph.addEdge(sourceVtx2, targetVtx1);
+            largestComponentEdgesAry.add(
+                    rewiredReactionGraph.getEdge(sourceVtx2, targetVtx1));
+
+            curEdgeCount = rewiredReactionGraph.edgeSet().size();
+            if (curEdgeCount != initialEdgeCount) {
+                throw new IllegalStateException(String.format(
+                        "current edge count (%d) should not differ from initial (%d)",
+                        curEdgeCount,
+                        initialEdgeCount));
+            }
+
+            //if (i % 10000 == 0) {
+            //    System.out.println(String.format("Rewired %d of %d Edges...",
+            //            i, rewires));
+            //}
+        }
+
+        int finalComponentCount = connectivityInspector.connectedSets().size();
+        int finalEdgeCount = rewiredReactionGraph.edgeSet().size();
+        int finalVtxCount = rewiredReactionGraph.vertexSet().size();
+
+        if (initialComponentCount > finalComponentCount) {
+            throw new IllegalStateException(String.format(
+                    "Final component count (%d) should be no greater than initial (%d)",
+                    finalComponentCount,
+                    initialComponentCount));
+        }
+
+        if (initialEdgeCount != finalEdgeCount) {
+            throw new IllegalStateException(String.format(
+                    "Final edge count (%d) should not differ from initial (%d)",
+                    finalEdgeCount,
+                    initialEdgeCount));
+        }
+
+        if (initialVtxCount != finalVtxCount) {
+            throw new IllegalStateException(String.format(
+                    "Final vertex count (%d) should not differ from initial (%d)",
+                    finalVtxCount,
+                    initialVtxCount));
         }
 
         return rewiredReactionGraph;
@@ -1084,7 +1158,7 @@ public class MechismoAnalyzer {
                                      String outputFilePrefix,
                                      int depth,
                                      int numPermutations,
-                                     double mechScoreThresh,
+                                     double mechScoreLowerBoundInclusive,
                                      double eThresh,
                                      boolean ignoreDependentUpstreamReactions,
                                      boolean ignoreIndependentUpstreamReactions,
@@ -1099,7 +1173,7 @@ public class MechismoAnalyzer {
         //extract FIs from Mechismo output
         MechismoOutputLoader mechismoOutputLoader =
                 new MechismoOutputLoader(mechismoOutputFilePath,
-                        mechScoreThresh,
+                        mechScoreLowerBoundInclusive,
                         eThresh);
 
         //Set<FI>
@@ -1138,6 +1212,11 @@ public class MechismoAnalyzer {
         Map<Long, String> longRxnDbIdToName =
                 cancerDriverReactomeAnalyzer.loadReactionLongDBIDToName();
 
+        Map<Long, Set<String>> rxn2Samples = new HashMap<>();
+        MapReactionsToSamples(reaction2FiSet,
+                rxn2Samples,
+                fis2Samples);
+
         List<CooccurrenceResult> rewiredNetworkResults = new ArrayList<>();
 
         DefaultDirectedGraph<Long, DefaultEdge> reactionGraph =
@@ -1168,7 +1247,7 @@ public class MechismoAnalyzer {
                     rewiredReactionGraph,
                     samples2FIs,
                     reaction2FiSet,
-                    fis2Samples,
+                    rxn2Samples,
                     samples2FIs2Muts,
                     depth,
                     false,
@@ -1200,7 +1279,7 @@ public class MechismoAnalyzer {
                 reactionGraph,
                 samples2FIs,
                 reaction2FiSet,
-                fis2Samples,
+                rxn2Samples,
                 samples2FIs2Muts,
                 depth,
                 true,
@@ -1209,6 +1288,11 @@ public class MechismoAnalyzer {
                 excludeMultipleImmediateUpstreamReactions);
 
         realResult.CalculateNetworkPermutationFDR(rewiredNetworkResults);
+
+        WriteRxn2SamplesToFile(outputDir,
+                outputFilePrefix,
+                rxn2Samples,
+                samples2FIs);
 
         WriteCooccurrenceToFile(
                 realResult,
@@ -1234,7 +1318,7 @@ public class MechismoAnalyzer {
     }
 
     private double CalculateJavaMemFootprintGiB() {
-        return CalculateJavaMemFootprint() / Math.pow(2.0,30);
+        return CalculateJavaMemFootprint() / Math.pow(2.0, 30);
     }
 
     private void WriteCooccurrenceToFile(CooccurrenceResult cooccurrenceResult,
@@ -1350,7 +1434,7 @@ public class MechismoAnalyzer {
             DirectedGraph<Long, DefaultEdge> reactionGraph,
             Map<String, Set<String>> samples2FIs,
             Map<Long, Set<String>> reaction2FiSet,
-            Map<String, Set<String>> fis2Samples,
+            Map<Long, Set<String>> rxn2Samples,
             Map<String, Map<String, Set<String>>> samples2fis2muts,
             int depth,
             boolean rememberEverything,
@@ -1387,10 +1471,6 @@ public class MechismoAnalyzer {
 
         //Map<Reaction,Set<Sample Barcode>>
         //report reaction frequencies
-        Map<Long, Set<String>> rxn2Samples = new HashMap<>();
-        MapReactionsToSamples(reaction2FiSet,
-                rxn2Samples,
-                fis2Samples);
 
         System.gc();
 
@@ -1460,8 +1540,7 @@ public class MechismoAnalyzer {
             Long targetReactionId = trs.rxnId;
             List<Long[]> upstreamReactionPairs =
                     new ArrayList<>(GenerateReactionSetPairs(trs.supRxns));
-            List<String> upstreamReactionPairStrings =
-                    ConvertLongArysToStrings(upstreamReactionPairs, longRxnDbIdToName);
+            List<String> upstreamReactionPairStrings = new ArrayList<>();
             List<Double> cooccurrencePvalues = new ArrayList<>();
             List<int[]> inABCD = new ArrayList<>();
             List<Set<String>[]> inBCDSample = new ArrayList<>();
@@ -1470,6 +1549,11 @@ public class MechismoAnalyzer {
             for (Long[] upstreamReactionPair : upstreamReactionPairs) {
                 Long upstreamReaction1Id = upstreamReactionPair[0];
                 Long upstreamReaction2Id = upstreamReactionPair[1];
+
+                if(upstreamReaction1Id == 114548L ||
+                        upstreamReaction2Id == 114548L){
+                    int debug = 1;
+                }
 
                 if (ignoreDependentUpstreamReactions &&
                         !reactionGraph.getAllEdges(upstreamReaction1Id, upstreamReaction2Id).isEmpty() ||
@@ -1483,39 +1567,53 @@ public class MechismoAnalyzer {
                     continue;
                 }
 
-                if(excludeMultipleImmediateUpstreamReactions &&
+                if (excludeMultipleImmediateUpstreamReactions &&
                         !reactionGraph.getAllEdges(upstreamReaction1Id, targetReactionId).isEmpty() &&
-                        !reactionGraph.getAllEdges(upstreamReaction2Id, targetReactionId).isEmpty()){
+                        !reactionGraph.getAllEdges(upstreamReaction2Id, targetReactionId).isEmpty()) {
                     continue;
                 }
 
-                //one row for IN
-                Set<String> ac = new HashSet<>(samples2FIs.keySet());
-                ac.removeAll(rxn2Samples.get(upstreamReaction1Id));
 
-                Set<String> bd = new HashSet<>(rxn2Samples.get(upstreamReaction1Id));
+                upstreamReactionPairStrings.add(
+                        ConvertReactionPairToString(upstreamReaction1Id,
+                                upstreamReaction2Id
+                                , longRxnDbIdToName));
 
-                Set<String> a = new HashSet<>(ac);
-                a.removeAll(rxn2Samples.get(upstreamReaction2Id));
+                //one row
+                Set<String> A = new HashSet<>(samples2FIs.keySet());
+                Set<String> B = new HashSet<>(samples2FIs.keySet());
+                Set<String> C = new HashSet<>(samples2FIs.keySet());
+                Set<String> D = new HashSet<>(samples2FIs.keySet());
+                Set<String> upstreamRxn1Samples = new HashSet<>(rxn2Samples.get(upstreamReaction1Id));
+                Set<String> upstreamRxn2Samples = new HashSet<>(rxn2Samples.get(upstreamReaction2Id));
 
-                Set<String> c = new HashSet<>(ac);
-                c.retainAll(rxn2Samples.get(upstreamReaction2Id));
+                D.retainAll(upstreamRxn1Samples);
+                D.retainAll(upstreamRxn2Samples);
 
-                Set<String> b = new HashSet<>(bd);
-                b.removeAll(rxn2Samples.get(upstreamReaction2Id));
+                C.removeAll(D);
+                C.retainAll(upstreamRxn2Samples);
 
-                Set<String> d = new HashSet<>(bd);
-                d.retainAll(rxn2Samples.get(upstreamReaction2Id));
+                B.removeAll(D);
+                B.retainAll(upstreamRxn1Samples);
+
+                A.removeAll(B);
+                A.removeAll(C);
+                A.removeAll(D);
+
+                if ((A.size() + B.size() + C.size() + D.size()) != samples2FIs.keySet().size()) {
+                    int debug = 1;
+                }
 
                 Set<String> largeD = new HashSet<>();
                 Set<String> largeDMuts = new HashSet<>();
 
                 //TODO:filter d by mutation
-                Iterator<String> dSampleItr = d.iterator();
+                Iterator<String> dSampleItr = D.iterator();
                 while (dSampleItr.hasNext()) {
                     String sample = dSampleItr.next();
                     Set<String> rxn1muts = new HashSet<>();
-                    Set<String> sampleFIsSupportingRxn1 = findSampleFIsSupportingRxn(sample,
+                    Set<String> sampleFIsSupportingRxn1 = findSampleFIsSupportingRxn(
+                            sample,
                             samples2FIs,
                             reaction2FiSet,
                             upstreamReaction1Id);
@@ -1525,7 +1623,8 @@ public class MechismoAnalyzer {
                         );
                     }
                     Set<String> rxn2muts = new HashSet<>();
-                    Set<String> sampleFIsSupportingRxn2 = findSampleFIsSupportingRxn(sample,
+                    Set<String> sampleFIsSupportingRxn2 = findSampleFIsSupportingRxn(
+                            sample,
                             samples2FIs,
                             reaction2FiSet,
                             upstreamReaction2Id);
@@ -1545,28 +1644,28 @@ public class MechismoAnalyzer {
                     }
                 }
 
-                int[] abcd = {a.size(), b.size(), c.size(), d.size(), largeD.size(), largeDMuts.size()};
+                int[] abcd = {A.size(), B.size(), C.size(), D.size(), largeD.size(), largeDMuts.size()};
                 inABCD.add(abcd);
 
-                Set[] bcdSample = new Set[]{b, c, d};
+                Set[] bcdSample = new Set[]{B, C, D};
                 inBCDSample.add(bcdSample);
 
-                inDSampleFI1.add(findSampleFIsSupportingRxn(d,
+                inDSampleFI1.add(findSampleFIsSupportingRxn(D,
                         samples2FIs,
                         reaction2FiSet,
                         upstreamReaction1Id));
 
-                inDSampleFI2.add(findSampleFIsSupportingRxn(d,
+                inDSampleFI2.add(findSampleFIsSupportingRxn(D,
                         samples2FIs,
                         reaction2FiSet,
                         upstreamReaction2Id));
 
                 cooccurrencePvalues.add(
                         fisherExact.getTwoTailedP(
-                                a.size(),
-                                b.size(),
-                                c.size(),
-                                d.size()));
+                                A.size(),
+                                B.size(),
+                                C.size(),
+                                D.size()));
 
             }
             if (rememberEverything) {
@@ -1589,7 +1688,7 @@ public class MechismoAnalyzer {
                         inPValues);
             }
             trsCounter++;
-            if (trsCounter % 100 == 0) {
+            if (trsCounter % 500 == 0) {
                 System.out.println(String.format("Processed %d of %d Target Reactions...",
                         trsCounter, targetReactionSummaries.size()));
                 System.out.flush();
@@ -1597,6 +1696,33 @@ public class MechismoAnalyzer {
         }
     }
 
+    private Set<String> findSampleFIsSupportingRxn(Set<String> samples,
+                                                   Map<String, Set<String>> samples2FIs,
+                                                   Map<Long, Set<String>> reaction2FiSet,
+                                                   Long upstreamReactionId) {
+        Set<String> sampleFIsSupportingRxn = new HashSet<>();
+        for (String sample : samples) {
+            Set<String> sampleFIs = new HashSet<>(samples2FIs.get(sample));
+            Set<String> supportingFIs = new HashSet<>(reaction2FiSet.get(upstreamReactionId));
+            sampleFIs.retainAll(supportingFIs);
+            sampleFIsSupportingRxn.addAll(sampleFIs);
+        }
+        return sampleFIsSupportingRxn;
+    }
+
+    private Set<String> findSampleFIsSupportingRxn(String sample,
+                                                   Map<String, Set<String>> samples2FIs,
+                                                   Map<Long, Set<String>> reaction2FiSet,
+                                                   Long upstreamReactionId) {
+        Set<String> sampleSet = new HashSet<>();
+        sampleSet.add(sample);
+        return findSampleFIsSupportingRxn(sampleSet,
+                samples2FIs,
+                reaction2FiSet,
+                upstreamReactionId);
+    }
+
+    /*
     private void CalculateEXCooccurrence(Set<TargetReactionSummary> targetReactionSummaries,
                                          Map<Long, String> longRxnDbIdToName,
                                          DefaultDirectedGraph<Long, DefaultEdge> reactionGraph,
@@ -1620,7 +1746,7 @@ public class MechismoAnalyzer {
             List<Long[]> upstreamReactionPairs =
                     new ArrayList<>(GenerateReactionSetPairs(trs.supRxns));
             List<String> upstreamReactionPairStrings =
-                    ConvertLongArysToStrings(upstreamReactionPairs, longRxnDbIdToName);
+                    ConvertReactionPairToString(upstreamReactionPairs, longRxnDbIdToName);
             List<Double> cooccurrencePvalues = new ArrayList<>();
             List<int[]> exABCD = new ArrayList<>();
             List<Set<String>[]> exBCDSample = new ArrayList<>();
@@ -1629,6 +1755,8 @@ public class MechismoAnalyzer {
             for (Long[] upstreamReactionPair : upstreamReactionPairs) {
                 Long upstreamReaction1Id = upstreamReactionPair[0];
                 Long upstreamReaction2Id = upstreamReactionPair[1];
+
+
 
                 //ignore interdependent pairs
                 if (reactionGraph.getAllEdges(upstreamReaction1Id, upstreamReaction2Id).isEmpty() &&
@@ -1746,6 +1874,7 @@ public class MechismoAnalyzer {
             }
         }
     }
+    */
 
     private void fillAccumulators(List<Double> cooccurrencePvalues,
                                   List<String> targetReactionList,
@@ -1761,6 +1890,16 @@ public class MechismoAnalyzer {
                                   List<Set<String>> DSampleRxn1FI,
                                   List<Set<String>> DSampleRxn2FIs,
                                   List<Set<String>> DSampleRxn2FI) {
+
+        if (cooccurrencePvalues.size() != upstreamReactionPairStrings.size() ||
+                cooccurrencePvalues.size() != ABCD.size() ||
+                cooccurrencePvalues.size() != BCDSample.size() ||
+                cooccurrencePvalues.size() != DSampleRxn1FI.size() ||
+                cooccurrencePvalues.size() != DSampleRxn2FI.size()) {
+            throw new IllegalStateException(String.format("These should all have size == %d",
+                    cooccurrencePvalues.size()));
+        }
+
         for (int i = 0; i < cooccurrencePvalues.size(); i++) {
             targetReactionList.add(targetReactionId.toString());
             upstreamReactionList.add(upstreamReactionPairStrings.get(i));
@@ -1776,32 +1915,6 @@ public class MechismoAnalyzer {
         for (Double pValue : cooccurrencePvalues) {
             pValues.add(pValue);
         }
-    }
-
-    private Set<String> findSampleFIsSupportingRxn(String sample,
-                                                   Map<String, Set<String>> samples2FIs,
-                                                   Map<Long, Set<String>> reaction2FiSet,
-                                                   Long upstreamReactionId) {
-        Set<String> sampleSet = new HashSet<>();
-        sampleSet.add(sample);
-        return findSampleFIsSupportingRxn(sampleSet,
-                samples2FIs,
-                reaction2FiSet,
-                upstreamReactionId);
-    }
-
-    private Set<String> findSampleFIsSupportingRxn(Set<String> samples,
-                                                   Map<String, Set<String>> samples2FIs,
-                                                   Map<Long, Set<String>> reaction2FiSet,
-                                                   Long upstreamReactionId) {
-        Set<String> sampleFIsSupportingRxn = new HashSet<>();
-        for (String sample : samples) {
-            Set<String> sampleFIs = new HashSet<>(samples2FIs.get(sample));
-            Set<String> supportingFIs = new HashSet<>(reaction2FiSet.get(upstreamReactionId));
-            sampleFIs.retainAll(supportingFIs);
-            sampleFIsSupportingRxn.addAll(sampleFIs);
-        }
-        return sampleFIsSupportingRxn;
     }
 
     private Map<Double, Double> CalculateFDRs(List<Double> pValues) {
@@ -1826,21 +1939,16 @@ public class MechismoAnalyzer {
         return sum;
     }
 
-    private List<String> ConvertLongArysToStrings(List<Long[]> longArys,
-                                                  Map<Long, String> longRxnDbIdToName) {
-        List<String> stringSet = new ArrayList<>();
-        Iterator<Long[]> longArySetItr = longArys.iterator();
-        while (longArySetItr.hasNext()) {
-            Long[] longAry = longArySetItr.next();
-            stringSet.add(String.format("%d:%s|%d:%s",
-                    longAry[0],
+    private String ConvertReactionPairToString(Long reaction1Id,
+                                                Long reaction2Id,
+                                               Map<Long, String> longRxnDbIdToName) {
+        return String.format("%d:%s|%d:%s",
+                    reaction1Id,
                     longRxnDbIdToName.get(
-                            longAry[0]).replace(",", "~"),
-                    longAry[1],
+                            reaction1Id).replace(",", "~"),
+                    reaction2Id,
                     longRxnDbIdToName.get(
-                            longAry[1]).replace(",", "~")));
-        }
-        return stringSet;
+                            reaction2Id).replace(",", "~"));
     }
 
     private class CooccurrenceResult {
@@ -1885,12 +1993,25 @@ public class MechismoAnalyzer {
             //loop over pValues
             for (Double pValue : this.pValues) {
                 this.pValue2FDRMap.put(pValue,
-                        PathwayBasedAnnotator.calculateFDR(
+                        calculateFDR(
                                 NumValsBelowThresh(rewiredNetworkPvalues, pValue),
                                 NumValsBelowThresh(this.pValues, pValue),
                                 rewiredNetworkPvalues.size(),
                                 this.pValues.size()));
             }
+        }
+
+        private double calculateFDR(int randomLessThan,
+                                    int realLessThan,
+                                    int randomTotal,
+                                    int realTotal) {
+            double fdr = ((double) randomLessThan /
+                    (double) randomTotal) /
+                    ((double) realLessThan /
+                            (double) realTotal);
+            if (fdr > 1.0)
+                fdr = 1.0;
+            return fdr;
         }
 
         private int NumValsBelowThresh(List<Double> vals, Double threshold) {
@@ -1980,9 +2101,10 @@ public class MechismoAnalyzer {
                     this.supFIs);
         }
 
+        /*
         @Override
         public String toString() {
-            List<String> supCombos = ConvertLongArysToStrings(
+            List<String> supCombos = ConvertReactionPairToString(
                     new ArrayList<>(GenerateReactionSetPairs(this.supRxns)),
                     this.longRxnDbIdToName);
             return String.format(
@@ -2017,5 +2139,6 @@ public class MechismoAnalyzer {
                             new ArrayList<>(this.supFIs))
                             : Arrays.asList(this.supFIs).get(0));
         }
+        */
     }
 }

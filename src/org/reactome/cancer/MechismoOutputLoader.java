@@ -10,7 +10,7 @@ import java.util.regex.Pattern;
 
 public class MechismoOutputLoader {
     private final static Logger logger = Logger.getLogger(MechismoOutputLoader.class);
-    private double mechScoreThresh;
+    private double mechScoreLowerBoundInclusive;
     private double eThresh;
     private final int primaryIdA1Idx = 1;
     private final int posA1Idx = 3;
@@ -44,10 +44,10 @@ public class MechismoOutputLoader {
     }
 
     public MechismoOutputLoader(String mechismoOutputFilePath,
-                                double mechScoreThresh,
+                                double mechScoreLowerBoundInclusive,
                                 double eThresh) {
         this.mechismoOuputFilePath = mechismoOutputFilePath;
-        this.mechScoreThresh = mechScoreThresh;
+        this.mechScoreLowerBoundInclusive = mechScoreLowerBoundInclusive;
         this.eThresh = eThresh;
         this.sampleIDPattern = Pattern.compile(this.sampleIDPatternString);
     }
@@ -74,8 +74,8 @@ public class MechismoOutputLoader {
                         new Double(tokens[ebIdx]) < eThresh) {
                     String protA = tokens[primaryIdA1Idx];
                     String protB = tokens[primaryIdB1Idx];
-                    Double mechScore = Math.abs(new Double(tokens[mechScoreIdx]));
-                    if (mechScore > mechScoreThresh) {
+                    Double mechScore = new Double(tokens[mechScoreIdx]);
+                    if (mechScore >= mechScoreLowerBoundInclusive) {
                         String forwardFI = String.format("%s\t%s",
                                 protA,
                                 protB);

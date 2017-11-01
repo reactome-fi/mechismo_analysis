@@ -118,13 +118,13 @@ public class ProcessDatasetsDriver {
                         "/home/burkhart/Software/Ogmios/datasets/ReactionNetwork_070517.txt",
                         "/home/burkhart/Software/Ogmios/results/Mechismo/",
                         "",
-                        3,
+                        1,
                         10,
-                        1.0,
+                        2.0,
                         1e-5,
                         false,
                         true,
-                        true
+                        false
                 );
             } else {
                 System.out.println("An error occurred.");
