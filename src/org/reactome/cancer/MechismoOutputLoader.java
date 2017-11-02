@@ -70,11 +70,11 @@ public class MechismoOutputLoader {
                 while ((line = fileUtility.readLine()) != null) {
                     tokens = line.split("\t");
                     this.fiFilter.add(String.format("%s\t%s",
-                            tokens[1],
-                            tokens[2]));
-                    this.fiFilter.add(String.format("%s\t%s",
-                            tokens[2],
+                            tokens[0],
                             tokens[1]));
+                    this.fiFilter.add(String.format("%s\t%s",
+                            tokens[1],
+                            tokens[0]));
                 }
                 fileUtility.close();
             } catch (IOException ioe) {

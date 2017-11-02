@@ -1998,6 +1998,66 @@ public class MechismoAnalyzer {
             this.BCDSamples = inBCDSamples;
             this.DSampleFI1s = inDSampleFI1s;
             this.DSampleFI2s = inDSampleFI2s;
+
+            //CollapseReactionPairs();
+        }
+
+        private void CollapseReactionPairs(){
+
+            Map<String,String> targetReactionMap = new HashMap<>();
+            Map<String,Double> pValueMap = new HashMap<>();
+            Map<String,int[]> ABCDsMap = new HashMap<>();
+            Map<String,Set<String>[]> BCDSamplesMap = new HashMap<>();
+            Map<String,Set<String>> DSampleFI1sMap = new HashMap<>();
+            Map<String,Set<String>> DSampleFI2sMap = new HashMap<>();
+
+            for(int i = 0; i < this.pValues.size(); i++){
+                String targetReaction = this.targetReactionList.get(i);
+                String upstreamReactions = this.upstreamReactionList.get(i);
+                Double pValue = this.pValues.get(i);
+                int[] ABCDs = this.ABCDs.get(i);
+                Set<String>[] BCDSamples = this.BCDSamples.get(i);
+                Set<String> DSampleFI1s = this.DSampleFI1s.get(i);
+                Set<String> DSampleFI2s = this.DSampleFI2s.get(i);
+
+                String targetReactionString;
+                if(targetReactionMap.containsKey(upstreamReactions)){
+                    targetReactionString = String.format("%s|%s",
+                            targetReactionMap.get(upstreamReactions),
+                            targetReaction);
+                    assert pValueMap.get(upstreamReactions).equals(pValue);
+                    assert Arrays.equals(ABCDsMap.get(upstreamReactions), ABCDs);
+                    assert Arrays.equals(BCDSamplesMap.get(upstreamReactions), BCDSamples);
+                    assert DSampleFI1sMap.get(upstreamReactions).equals(DSampleFI1s);
+                    assert DSampleFI2sMap.get(upstreamReactions).equals(DSampleFI2s);
+                }else{
+                    targetReactionString = targetReaction;
+                    pValueMap.put(upstreamReactions,pValue);
+                    ABCDsMap.put(upstreamReactions,ABCDs);
+                    BCDSamplesMap.put(upstreamReactions,BCDSamples);
+                    DSampleFI1sMap.put(upstreamReactions,DSampleFI1s);
+                    DSampleFI2sMap.put(upstreamReactions,DSampleFI2s);
+                }
+                targetReactionMap.put(upstreamReactions,targetReactionString);
+            }
+
+            this.targetReactionList.clear();
+            this.upstreamReactionList.clear();
+            this.pValues.clear();
+            this.ABCDs.clear();
+            this.BCDSamples.clear();
+            this.DSampleFI1s.clear();
+            this.DSampleFI2s.clear();
+
+            targetReactionMap.keySet().forEach(upstreamReactions -> {
+                this.targetReactionList.add(targetReactionMap.get(upstreamReactions));
+                this.upstreamReactionList.add(upstreamReactions);
+                this.pValues.add(pValueMap.get(upstreamReactions));
+                this.ABCDs.add(ABCDsMap.get(upstreamReactions));
+                this.BCDSamples.add(BCDSamplesMap.get(upstreamReactions));
+                this.DSampleFI1s.add(DSampleFI1sMap.get(upstreamReactions));
+                this.DSampleFI2s.add(DSampleFI2sMap.get(upstreamReactions));
+            });
         }
 
         private void CalculateBHAdjustedPValues() {
@@ -2019,14 +2079,14 @@ public class MechismoAnalyzer {
 
             List<Double> rewiredNetworkPvalues = new ArrayList<>();
 
-            double p3 = this.pValues.size() * 1.3;
-            double m3 = this.pValues.size() * 0.3;
+            double p5 = this.pValues.size() * 1.5;
+            double m5 = this.pValues.size() * 0.5;
             //loop over rewirings
             for (CooccurrenceResult rewiredNetworkResult : rewiredNetworkResults) {
 
-                if (rewiredNetworkResult.pValues.size() > p3 ||
-                        rewiredNetworkResult.pValues.size() < m3) {
-                    throw new IllegalStateException(String.format(
+                if (rewiredNetworkResult.pValues.size() > p5 ||
+                        rewiredNetworkResult.pValues.size() < m5) {
+                    System.out.println(String.format(
                             "The number of p values from this permutation was %d but should be closer to %d",
                             rewiredNetworkResult.pValues.size(),
                             this.pValues.size()));
