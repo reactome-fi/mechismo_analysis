@@ -8,6 +8,7 @@ library(igraph)
 library(pheatmap)
 
 SIG_RXN_FILEPATH <- "/Users/joshuaburkhart/SoftwareProjects/Ogmios/datasets/MechismoSamplesToReactions_103017.txt"
+OUT_DIR <- "/Users/joshuaburkhart/SoftwareProjects/Ogmios/results/Mechismo/"
 
 sig_rxn_df <- read.csv(SIG_RXN_FILEPATH,header = TRUE,sep="\t")
 
@@ -48,4 +49,19 @@ plot(g)
 
 cols_to_keep = colSums(v) > 1000
 v <- v[cols_to_keep,cols_to_keep]
+
+svg(filename=paste(OUT_DIR,"SigRxnCooccurrence.svg",sep=""),
+    width=11,
+    height=11,
+    pointsize=10)
 v %>% pheatmap::pheatmap()
+dev.off()
+
+
+system_command = paste("qlmanage -t -s 1366 -o ",
+                       OUT_DIR,
+                       " ",
+                       OUT_DIR,
+                       "*.svg", 
+                       sep="")
+system(paste(system_command))
