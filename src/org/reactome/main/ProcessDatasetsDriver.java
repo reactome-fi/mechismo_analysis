@@ -116,15 +116,18 @@ public class ProcessDatasetsDriver {
                         cancerDriverReactomeAnalyzer,
                         "/home/burkhart/Software/Ogmios/datasets/Mechismo/TCGA_mech_output.tsv",
                         "/home/burkhart/Software/Ogmios/datasets/ReactionNetwork_070517.txt",
+                        "/home/burkhart/Software/Ogmios/datasets/Mechismo/MechismoSamplesToReactions_103017.txt",
+                        null,//"/home/burkhart/Software/Ogmios/datasets/Mechismo/tcga_mechismo_stat_cancer_wise.tsv",
                         "/home/burkhart/Software/Ogmios/results/Mechismo/",
                         "",
                         1,
                         10,
-                        2.0,
-                        1e-5,
+                        0.0,
+                        1.0,
+                        true, // Ignore Dependent
                         false,
-                        true,
-                        false
+                        false,
+                        "No" // Rxn Filter
                 );
             } else {
                 System.out.println("An error occurred.");
