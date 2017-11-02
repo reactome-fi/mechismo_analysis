@@ -47,6 +47,22 @@ V(g)$label <- V(g)$name
 V(g)$degree <- degree(g)
 plot(g)
 
+
+svg(filename=paste(OUT_DIR,"SigRxnCooccurrenceAll.svg",sep=""),
+    width=11,
+    height=11,
+    pointsize=10)
+v %>% pheatmap::pheatmap()
+dev.off()
+
+system_command = paste("qlmanage -t -s 1366 -o ",
+                       OUT_DIR,
+                       " ",
+                       OUT_DIR,
+                       "*.svg", 
+                       sep="")
+system(paste(system_command))
+
 cols_to_keep = colSums(v) > 1000
 v <- v[cols_to_keep,cols_to_keep]
 
