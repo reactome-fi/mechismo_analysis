@@ -593,17 +593,18 @@ public class MechismoAnalyzer {
     }
 
     private DirectedGraph<Long, DefaultEdge> RewireReactionGraph(
-            DefaultDirectedGraph<Long, DefaultEdge> reactionGraph) {
-        return RewireReactionGraph(reactionGraph, 88L);
-    }
-
-
-    private DirectedGraph<Long, DefaultEdge> RewireReactionGraph(
             DefaultDirectedGraph<Long, DefaultEdge> reactionGraph,
-            long randomSeed) {
+            Random prng) {
         DefaultDirectedGraph<Long, DefaultEdge> rewiredReactionGraph = new DefaultDirectedGraph<>(DefaultEdge.class);
         Graphs.addGraph(rewiredReactionGraph, reactionGraph);
 
+        RewireComponents(rewiredReactionGraph, prng);
+
+        return rewiredReactionGraph;
+    }
+
+    private void RewireComponents(DefaultDirectedGraph<Long, DefaultEdge> rewiredReactionGraph,
+                                  Random prng) {
         ConnectivityInspector connectivityInspector = new ConnectivityInspector(rewiredReactionGraph);
         List<Set<Long>> connectedSets = connectivityInspector.connectedSets();
 
@@ -611,116 +612,134 @@ public class MechismoAnalyzer {
         int initialEdgeCount = rewiredReactionGraph.edgeSet().size();
         int initialVtxCount = rewiredReactionGraph.vertexSet().size();
 
-        Set<Long> largestComponentVertexSet = new HashSet<>();
         for (Set<Long> connectedSet : connectedSets) {
-            if (connectedSet.size() > largestComponentVertexSet.size()) {
-                largestComponentVertexSet = connectedSet;
+            if (connectedSet.size() > 3) {
+                System.out.println(String.format("Connected Set Size: %d",
+                        connectedSet.size()));
+
+                if (connectedSet.size() >= initialVtxCount) {
+                    throw new IllegalStateException(String.format(
+                            "component vtx count (%d) should be less than initial (%d)",
+                            connectedSet.size(),
+                            initialVtxCount));
+                }
+
+                Set<DefaultEdge> componentEdges = new HashSet<>();
+                for (Long vertex : connectedSet) {
+                    componentEdges.addAll(rewiredReactionGraph.incomingEdgesOf(vertex));
+                    componentEdges.addAll(rewiredReactionGraph.outgoingEdgesOf(vertex));
+                }
+
+                if (componentEdges.size() >= initialEdgeCount) {
+                    throw new IllegalStateException(String.format(
+                            "component edge count (%d) should be less than initial (%d)",
+                            componentEdges.size(),
+                            initialEdgeCount));
+                }
+
+
+                int E = componentEdges.size();
+                int V = connectedSet.size();
+                DefaultEdge randEdge1, randEdge2;
+                ArrayList<DefaultEdge> componentEdgesAry = new ArrayList<>(componentEdges);
+                ArrayList<Long> componentVtxAry = new ArrayList<>(connectedSet);
+                Long sourceVtx1, sourceVtx2, targetVtx1, targetVtx2;
+
+                //from https://en.wikipedia.org/wiki/Degree-preserving_randomization
+                int rewires = (int) ((E / 2.0) * Math.log(1 / Math.pow(10, -7)));
+                for (int i = 0; i < rewires; i++) {
+
+                    randEdge1 = componentEdgesAry.get(prng.nextInt(E));
+                    randEdge2 = componentEdgesAry.get(prng.nextInt(E));
+
+                    while (Objects.equals(randEdge1,randEdge2)) {
+                        randEdge1 = componentEdgesAry.get(prng.nextInt(E));
+                        randEdge2 = componentEdgesAry.get(prng.nextInt(E));
+                    }
+
+                    boolean success1 = rewiredReactionGraph.removeEdge(randEdge1);
+                    componentEdgesAry.remove(randEdge1);
+
+                    int curEdgeCount1 = rewiredReactionGraph.edgeSet().size();
+                    if (curEdgeCount1 != (initialEdgeCount - 1)) {
+                        throw new IllegalStateException(String.format(
+                                "current edge count (%d) should not differ from initial - 1 (%d)",
+                                curEdgeCount1,
+                                initialEdgeCount - 1));
+                    }
+
+                    boolean success2 = rewiredReactionGraph.removeEdge(randEdge2);
+                    componentEdgesAry.remove(randEdge2);
+
+                    int curEdgeCount2 = rewiredReactionGraph.edgeSet().size();
+                    if (curEdgeCount2 != (initialEdgeCount - 2)) {
+                        throw new IllegalStateException(String.format(
+                                "current edge count (%d) should not differ from initial - 2 (%d)",
+                                curEdgeCount2,
+                                initialEdgeCount - 2));
+                    }
+
+                    sourceVtx1 = componentVtxAry.get(prng.nextInt(V));
+                    targetVtx1 = componentVtxAry.get(prng.nextInt(V));
+
+                    sourceVtx2 = componentVtxAry.get(prng.nextInt(V));
+                    targetVtx2 = componentVtxAry.get(prng.nextInt(V));
+
+                    while (Objects.equals(sourceVtx1, sourceVtx2) ||
+                            Objects.equals(targetVtx1, targetVtx2) ||
+                            Objects.equals(sourceVtx1,targetVtx1) ||
+                            Objects.equals(sourceVtx2,targetVtx2)) {
+                        sourceVtx1 = componentVtxAry.get(prng.nextInt(V));
+                        targetVtx1 = componentVtxAry.get(prng.nextInt(V));
+
+                        sourceVtx2 = componentVtxAry.get(prng.nextInt(V));
+                        targetVtx2 = componentVtxAry.get(prng.nextInt(V));
+                    }
+
+                    //randomly flip edge direction
+                    //rewire edge 1
+                    WireEdge(prng.nextInt(V),
+                            V,
+                            prng,
+                            sourceVtx1,
+                            targetVtx2,
+                            rewiredReactionGraph,
+                            componentEdgesAry,
+                            componentVtxAry);
+
+                    int curEdgeCount3 = rewiredReactionGraph.edgeSet().size();
+                    if (curEdgeCount3 != (initialEdgeCount - 1)) {
+                        throw new IllegalStateException(String.format(
+                                "current edge count (%d) should not differ from initial - 1 (%d)",
+                                curEdgeCount3,
+                                initialEdgeCount - 1));
+                    }
+
+                    //rewire edge 2
+                    WireEdge(prng.nextInt(V),
+                            V,
+                            prng,
+                            sourceVtx2,
+                            targetVtx1,
+                            rewiredReactionGraph,
+                            componentEdgesAry,
+                            componentVtxAry);
+
+                    int curEdgeCount4 = rewiredReactionGraph.edgeSet().size();
+                    if (curEdgeCount4 != initialEdgeCount) {
+                        throw new IllegalStateException(String.format(
+                                "current edge count (%d) should not differ from initial (%d)",
+                                curEdgeCount4,
+                                initialEdgeCount));
+                    }
+
+                    //if (i % 10000 == 0) {
+                    //    System.out.println(String.format("Rewired %d of %d Edges...",
+                    //            i, rewires));
+                    //}
+                }
             }
         }
-
-        if (largestComponentVertexSet.size() >= initialVtxCount) {
-            throw new IllegalStateException(String.format(
-                    "largest component vtx size (%d) should be no less than initial (%d)",
-                    largestComponentVertexSet.size(),
-                    initialVtxCount));
-        }
-
-        Set<DefaultEdge> largestComponentEdges = new HashSet<>();
-        for (Long vertex : largestComponentVertexSet) {
-            largestComponentEdges.addAll(rewiredReactionGraph.incomingEdgesOf(vertex));
-            largestComponentEdges.addAll(rewiredReactionGraph.outgoingEdgesOf(vertex));
-        }
-
-        if (largestComponentEdges.size() >= initialEdgeCount) {
-            throw new IllegalStateException(String.format(
-                    "largest component edge size (%d) should be no larger than initial (%d)",
-                    largestComponentEdges.size(),
-                    initialEdgeCount));
-        }
-
-        Random random = new Random(randomSeed);
-
-        int E = largestComponentEdges.size();
-        int rand1, rand2;
-        DefaultEdge randEdge1, randEdge2;
-        ArrayList<DefaultEdge> largestComponentEdgesAry = new ArrayList<>(largestComponentEdges);
-        Long sourceVtx1, sourceVtx2, targetVtx1, targetVtx2;
-
-        //from https://en.wikipedia.org/wiki/Degree-preserving_randomization
-        int rewires = (int) ((E / 2.0) * Math.log(1 / Math.pow(10, -7)));
-        for (int i = 0; i < rewires; i++) {
-
-            //remove edge 1
-            rand1 = random.nextInt(E);
-            randEdge1 = largestComponentEdgesAry.get(rand1);
-            sourceVtx1 = rewiredReactionGraph.getEdgeSource(randEdge1);
-            targetVtx1 = rewiredReactionGraph.getEdgeTarget(randEdge1);
-
-            //remove edge2
-            rand2 = random.nextInt(E);
-            randEdge2 = largestComponentEdgesAry.get(rand2);
-            sourceVtx2 = rewiredReactionGraph.getEdgeSource(randEdge2);
-            targetVtx2 = rewiredReactionGraph.getEdgeTarget(randEdge2);
-
-            //otherwise we lose edges & degrees
-            while (rewiredReactionGraph.getEdge(sourceVtx1, targetVtx2) != null ||
-                    rewiredReactionGraph.getEdge(sourceVtx2, targetVtx1) != null ||
-                    rewiredReactionGraph.getEdge(targetVtx2, sourceVtx1) != null ||
-                    rewiredReactionGraph.getEdge(targetVtx1, sourceVtx2) != null) {
-                rand1 = random.nextInt(E);
-                randEdge1 = largestComponentEdgesAry.get(rand1);
-                sourceVtx1 = rewiredReactionGraph.getEdgeSource(randEdge1);
-                targetVtx1 = rewiredReactionGraph.getEdgeTarget(randEdge1);
-
-                rand2 = random.nextInt(E);
-                randEdge2 = largestComponentEdgesAry.get(rand2);
-                sourceVtx2 = rewiredReactionGraph.getEdgeSource(randEdge2);
-                targetVtx2 = rewiredReactionGraph.getEdgeTarget(randEdge2);
-            }
-
-            boolean success1 = rewiredReactionGraph.removeEdge(randEdge1);
-            largestComponentEdgesAry.remove(randEdge1);
-
-            int curEdgeCount1 = rewiredReactionGraph.edgeSet().size();
-            if (curEdgeCount1 != (initialEdgeCount - 1)) {
-                throw new IllegalStateException(String.format(
-                        "current edge count (%d) should not differ from initial - 1 (%d)",
-                        curEdgeCount1,
-                        initialEdgeCount - 1));
-            }
-
-            boolean success2 = rewiredReactionGraph.removeEdge(randEdge2);
-            largestComponentEdgesAry.remove(randEdge2);
-
-            int curEdgeCount2 = rewiredReactionGraph.edgeSet().size();
-            if (curEdgeCount2 != (initialEdgeCount - 2)) {
-                throw new IllegalStateException(String.format(
-                        "current edge count (%d) should not differ from initial - 2 (%d)",
-                        curEdgeCount2,
-                        initialEdgeCount - 2));
-            }
-
-            //randomly flip edge direction
-            //rewire edge 1
-            WireEdge(rand1, sourceVtx1, targetVtx2, rewiredReactionGraph, largestComponentEdgesAry);
-
-            //rewire edge 2
-            WireEdge(rand2, sourceVtx2, targetVtx1, rewiredReactionGraph, largestComponentEdgesAry);
-
-            int curEdgeCount3 = rewiredReactionGraph.edgeSet().size();
-            if (curEdgeCount3 != initialEdgeCount) {
-                throw new IllegalStateException(String.format(
-                        "current edge count (%d) should not differ from initial (%d)",
-                        curEdgeCount3,
-                        initialEdgeCount));
-            }
-
-            //if (i % 10000 == 0) {
-            //    System.out.println(String.format("Rewired %d of %d Edges...",
-            //            i, rewires));
-            //}
-        }
-
         int finalComponentCount = connectivityInspector.connectedSets().size();
         int finalEdgeCount = rewiredReactionGraph.edgeSet().size();
         int finalVtxCount = rewiredReactionGraph.vertexSet().size();
@@ -745,25 +764,38 @@ public class MechismoAnalyzer {
                     finalVtxCount,
                     initialVtxCount));
         }
-
-        return rewiredReactionGraph;
     }
 
     private void WireEdge(int rand,
+                          int V,
+                          Random prng,
                           Long sourceVtx,
                           Long targetVtx,
                           DefaultDirectedGraph<Long, DefaultEdge> graph,
-                          ArrayList<DefaultEdge> edgeAry) {
-        if (rand % 2 == 0) {
+                          ArrayList<DefaultEdge> edgeAry,
+                          ArrayList<Long> vtxAry) {
+        //if (rand % 2 == 0) {
+            while(graph.getEdge(sourceVtx, targetVtx) != null){
+                rand = prng.nextInt(V);
+                sourceVtx = vtxAry.get(rand);
+                rand = prng.nextInt(V);
+                targetVtx = vtxAry.get(rand);
+            }
             graph.addEdge(sourceVtx, targetVtx);
             edgeAry.add(
                     graph.getEdge(sourceVtx, targetVtx));
-
-        } else {
+        /*}
+        else {
+            while(graph.getEdge(targetVtx, sourceVtx) != null){
+                rand = prng.nextInt(V);
+                sourceVtx = vtxAry.get(rand);
+                rand = prng.nextInt(V);
+                targetVtx = vtxAry.get(rand);
+            }
             graph.addEdge(targetVtx, sourceVtx);
             edgeAry.add(
                     graph.getEdge(targetVtx, sourceVtx));
-        }
+        }*/
     }
 
     private void MapReactionFIs(Map<String, Set<Long>> fi2ReactionSet,
@@ -1250,13 +1282,14 @@ public class MechismoAnalyzer {
         DefaultDirectedGraph<Long, DefaultEdge> reactionGraph =
                 reactomeReactionGraphLoader.getReactionGraph();
 
+        Random prng = new Random(88L);
         Map<String, Map<String, Set<String>>> samples2FIs2Muts = mechismoOutputLoader.ExtractSamples2FIs2Muts();
         double maxMemUsed = CalculateJavaMemFootprintGiB();
         for (int i = 0; i < numPermutations; i++) {
             long startLoopTime = System.currentTimeMillis();
 
             DirectedGraph<Long, DefaultEdge> rewiredReactionGraph =
-                    RewireReactionGraph(reactionGraph, i);
+                    RewireReactionGraph(reactionGraph, prng);
 
             ConnectivityInspector<Long, DefaultEdge> connectivityInspector =
                     new ConnectivityInspector<>(rewiredReactionGraph);
@@ -1696,7 +1729,7 @@ public class MechismoAnalyzer {
                         upstreamReaction2Id));
 
                 cooccurrencePvalues.add(
-                        fisherExact.getTwoTailedP(
+                        fisherExact.getRightTailedP(
                                 A.size(),
                                 B.size(),
                                 C.size(),
@@ -2002,16 +2035,16 @@ public class MechismoAnalyzer {
             //CollapseReactionPairs();
         }
 
-        private void CollapseReactionPairs(){
+        private void CollapseReactionPairs() {
 
-            Map<String,String> targetReactionMap = new HashMap<>();
-            Map<String,Double> pValueMap = new HashMap<>();
-            Map<String,int[]> ABCDsMap = new HashMap<>();
-            Map<String,Set<String>[]> BCDSamplesMap = new HashMap<>();
-            Map<String,Set<String>> DSampleFI1sMap = new HashMap<>();
-            Map<String,Set<String>> DSampleFI2sMap = new HashMap<>();
+            Map<String, String> targetReactionMap = new HashMap<>();
+            Map<String, Double> pValueMap = new HashMap<>();
+            Map<String, int[]> ABCDsMap = new HashMap<>();
+            Map<String, Set<String>[]> BCDSamplesMap = new HashMap<>();
+            Map<String, Set<String>> DSampleFI1sMap = new HashMap<>();
+            Map<String, Set<String>> DSampleFI2sMap = new HashMap<>();
 
-            for(int i = 0; i < this.pValues.size(); i++){
+            for (int i = 0; i < this.pValues.size(); i++) {
                 String targetReaction = this.targetReactionList.get(i);
                 String upstreamReactions = this.upstreamReactionList.get(i);
                 Double pValue = this.pValues.get(i);
@@ -2021,7 +2054,7 @@ public class MechismoAnalyzer {
                 Set<String> DSampleFI2s = this.DSampleFI2s.get(i);
 
                 String targetReactionString;
-                if(targetReactionMap.containsKey(upstreamReactions)){
+                if (targetReactionMap.containsKey(upstreamReactions)) {
                     targetReactionString = String.format("%s|%s",
                             targetReactionMap.get(upstreamReactions),
                             targetReaction);
@@ -2030,15 +2063,15 @@ public class MechismoAnalyzer {
                     assert Arrays.equals(BCDSamplesMap.get(upstreamReactions), BCDSamples);
                     assert DSampleFI1sMap.get(upstreamReactions).equals(DSampleFI1s);
                     assert DSampleFI2sMap.get(upstreamReactions).equals(DSampleFI2s);
-                }else{
+                } else {
                     targetReactionString = targetReaction;
-                    pValueMap.put(upstreamReactions,pValue);
-                    ABCDsMap.put(upstreamReactions,ABCDs);
-                    BCDSamplesMap.put(upstreamReactions,BCDSamples);
-                    DSampleFI1sMap.put(upstreamReactions,DSampleFI1s);
-                    DSampleFI2sMap.put(upstreamReactions,DSampleFI2s);
+                    pValueMap.put(upstreamReactions, pValue);
+                    ABCDsMap.put(upstreamReactions, ABCDs);
+                    BCDSamplesMap.put(upstreamReactions, BCDSamples);
+                    DSampleFI1sMap.put(upstreamReactions, DSampleFI1s);
+                    DSampleFI2sMap.put(upstreamReactions, DSampleFI2s);
                 }
-                targetReactionMap.put(upstreamReactions,targetReactionString);
+                targetReactionMap.put(upstreamReactions, targetReactionString);
             }
 
             this.targetReactionList.clear();
