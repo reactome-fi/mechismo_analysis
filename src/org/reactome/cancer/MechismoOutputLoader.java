@@ -37,7 +37,7 @@ public class MechismoOutputLoader {
     private Map<String, Set<String>> samples2fis = null;
     private Map<String, Set<String>> fis2Samples = null;
     //TODO: decide whether or not to add protein B pos/res info to muts?
-    private Map<String, Map<String, Set<String>>> samples2fis2muts = null;
+    private Map<String, Map<String, Set<List<String>>>> samples2fis2muts = null;
     private Pattern sampleIDPattern = null;
     private Matcher sampleIDMatcher = null;
 
@@ -60,7 +60,7 @@ public class MechismoOutputLoader {
     }
 
     private void ParseMechismoFIFilterFile() {
-        if(this.mechismoFIFilterFilePath != null) {
+        if (this.mechismoFIFilterFilePath != null) {
             this.fiFilter = new HashSet<>();
             FileUtility fileUtility = new FileUtility();
             try {
@@ -70,7 +70,7 @@ public class MechismoOutputLoader {
                 line = fileUtility.readLine(); //skip header line
                 while ((line = fileUtility.readLine()) != null) {
                     tokens = line.split("\t");
-                    if(Integer.parseInt(tokens[2]) > Integer.parseInt(tokens[3]) &&
+                    if (Integer.parseInt(tokens[2]) > Integer.parseInt(tokens[3]) &&
                             Double.parseDouble(tokens[10]) < 0.05) {
                         this.fiFilter.add(String.format("%s\t%s",
                                 tokens[0],
@@ -83,7 +83,7 @@ public class MechismoOutputLoader {
                 fileUtility.close();
             } catch (IOException ioe) {
                 logger.error(String.format("Couldn't use %s, %s: %s",
-                        mechismoOuputFilePath.toString(),
+                        mechismoOuputFilePath,
                         ioe.getMessage(),
                         Arrays.toString(ioe.getStackTrace())));
             }
@@ -127,11 +127,13 @@ public class MechismoOutputLoader {
                                     protB,
                                     protA);
                             String userInput = tokens[userInputIdx];
-                            String mutString = String.format("%s:pos%s-res%s-mut%s",
-                                    tokens[primaryIdA1Idx],
-                                    tokens[posA1Idx],
-                                    tokens[resA1Idx],
-                                    tokens[mutA1Idx]);
+                            //mutated gene is always the first one listed (partner A)
+                            List<String> mutation = new ArrayList<String>(
+                                    Arrays.asList(nameA, //HGNC gene name
+                                            protA, //protein uniprot ID
+                                            tokens[posA1Idx], //position
+                                            tokens[resA1Idx], //normal residue
+                                            tokens[mutA1Idx])); //mutated residue
                             this.sampleIDMatcher = this.sampleIDPattern.matcher(userInput);
                             while (this.sampleIDMatcher.find()) {
                                 String sampleID = this.sampleIDMatcher.group();
@@ -164,19 +166,19 @@ public class MechismoOutputLoader {
                                 fis2Samples.put(backwardFI, fiSamples);
 
                                 //update samples2fis2muts
-                                Map<String, Set<String>> fis2muts;
+                                Map<String, Set<List<String>>> fis2muts;
                                 if (samples2fis2muts.containsKey(sampleID)) {
                                     fis2muts = samples2fis2muts.get(sampleID);
                                 } else {
                                     fis2muts = new HashMap<>();
                                 }
-                                Set<String> muts;
+                                Set<List<String>> muts;
                                 if (fis2muts.containsKey(forwardFI)) {
                                     muts = fis2muts.get(forwardFI);
                                 } else {
                                     muts = new HashSet<>();
                                 }
-                                muts.add(mutString);
+                                muts.add(mutation);
                                 fis2muts.put(forwardFI, muts);
                                 fis2muts.put(backwardFI, muts);
                                 samples2fis2muts.put(sampleID, fis2muts);
@@ -190,17 +192,17 @@ public class MechismoOutputLoader {
             fileUtility.close();
         } catch (IOException ioe) {
             logger.error(String.format("Couldn't use %s, %s: %s",
-                    mechismoOuputFilePath.toString(),
+                    mechismoOuputFilePath,
                     ioe.getMessage(),
                     Arrays.toString(ioe.getStackTrace())));
         }
     }
 
-    public Map<String, Map<String, Set<String>>> ExtractSamples2FIs2Muts() {
+    public Map<String, Map<String, Set<List<String>>>> ExtractSamples2FIs2Muts() {
         return this.ExtractSamples2FIs2Muts(this.mechismoOuputFilePath);
     }
 
-    public Map<String, Map<String, Set<String>>> ExtractSamples2FIs2Muts(String mechismoOuputFilePath) {
+    public Map<String, Map<String, Set<List<String>>>> ExtractSamples2FIs2Muts(String mechismoOuputFilePath) {
         if (this.samples2fis2muts == null) {
             this.ParseMechismoOutputFile(mechismoOuputFilePath);
         }
