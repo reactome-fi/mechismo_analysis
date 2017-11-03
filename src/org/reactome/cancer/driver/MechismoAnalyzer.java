@@ -7,6 +7,7 @@ package org.reactome.cancer.driver;
 import org.apache.commons.math.MathException;
 import org.apache.commons.math.stat.correlation.PearsonsCorrelation;
 import org.apache.commons.math.stat.correlation.SpearmansCorrelation;
+import org.apache.commons.math3.distribution.ChiSquaredDistribution;
 import org.apache.log4j.Logger;
 import org.gk.model.GKInstance;
 import org.gk.persistence.MySQLAdaptor;
@@ -652,7 +653,7 @@ public class MechismoAnalyzer {
                     randEdge1 = componentEdgesAry.get(prng.nextInt(E));
                     randEdge2 = componentEdgesAry.get(prng.nextInt(E));
 
-                    while (Objects.equals(randEdge1,randEdge2)) {
+                    while (Objects.equals(randEdge1, randEdge2)) {
                         randEdge1 = componentEdgesAry.get(prng.nextInt(E));
                         randEdge2 = componentEdgesAry.get(prng.nextInt(E));
                     }
@@ -687,8 +688,8 @@ public class MechismoAnalyzer {
 
                     while (Objects.equals(sourceVtx1, sourceVtx2) ||
                             Objects.equals(targetVtx1, targetVtx2) ||
-                            Objects.equals(sourceVtx1,targetVtx1) ||
-                            Objects.equals(sourceVtx2,targetVtx2)) {
+                            Objects.equals(sourceVtx1, targetVtx1) ||
+                            Objects.equals(sourceVtx2, targetVtx2)) {
                         sourceVtx1 = componentVtxAry.get(prng.nextInt(V));
                         targetVtx1 = componentVtxAry.get(prng.nextInt(V));
 
@@ -775,15 +776,15 @@ public class MechismoAnalyzer {
                           ArrayList<DefaultEdge> edgeAry,
                           ArrayList<Long> vtxAry) {
         //if (rand % 2 == 0) {
-            while(graph.getEdge(sourceVtx, targetVtx) != null){
-                rand = prng.nextInt(V);
-                sourceVtx = vtxAry.get(rand);
-                rand = prng.nextInt(V);
-                targetVtx = vtxAry.get(rand);
-            }
-            graph.addEdge(sourceVtx, targetVtx);
-            edgeAry.add(
-                    graph.getEdge(sourceVtx, targetVtx));
+        while (graph.getEdge(sourceVtx, targetVtx) != null) {
+            rand = prng.nextInt(V);
+            sourceVtx = vtxAry.get(rand);
+            rand = prng.nextInt(V);
+            targetVtx = vtxAry.get(rand);
+        }
+        graph.addEdge(sourceVtx, targetVtx);
+        edgeAry.add(
+                graph.getEdge(sourceVtx, targetVtx));
         /*}
         else {
             while(graph.getEdge(targetVtx, sourceVtx) != null){
@@ -1311,7 +1312,6 @@ public class MechismoAnalyzer {
                     rxn2Samples,
                     samples2FIs2Muts,
                     depth,
-                    false,
                     ignoreDependentUpstreamReactions,
                     ignoreIndependentUpstreamReactions,
                     excludeMultipleImmediateUpstreamReactions);
@@ -1343,7 +1343,6 @@ public class MechismoAnalyzer {
                 rxn2Samples,
                 samples2FIs2Muts,
                 depth,
-                true,
                 ignoreDependentUpstreamReactions,
                 ignoreIndependentUpstreamReactions,
                 excludeMultipleImmediateUpstreamReactions);
@@ -1397,99 +1396,119 @@ public class MechismoAnalyzer {
             fileUtility.setOutput(outFilePath5);
             fileUtility.printLine(
                     "Target Reaction," +
+                            "#Upstream Reactions," +
+                            "#FIs,"+
+                            "#Samples With 1+ Upstream Pair,"+
+                            "#Samples Excluded By Shared Mutation,"+
+                            "#Included Mutations,"+
+                            "#Excluded Mutations,"+
                             "Upstream Reactions," +
-                            "#Neither," +
-                            "#Rxn 1 Only," +
-                            "#Rxn 2 Only," +
-                            "#Both," +
-                            "#Both (Due to Single Mutation)," +
-                            "#Mutations," +
-                            "Rxn 1 Only Samples," +
-                            "Rxn 2 Only Samples," +
-                            "Both Samples," +
-                            "Rxn 1 FIs (Among Both Samples)," +
-                            "Rxn 2 FIs (Among Both Samples)," +
-                            "Fisher Exact P-value," +
+                            "FIs,"+
+                            "Samples With 1+ Upstream Pair,"+
+                            "Samples Excluded By Shared Mutation,"+
+                            "Included Mutations,"+
+                            "Excluded Mutations,"+
+                            "Fishers Method Combined P-value," +
                             "BH Adjusted P-value," +
                             "Permutation-Based Empirical P-value");
 
-            for (int i = 0; i < cooccurrenceResult.targetReactionList.size(); i++) {
-                WriteLineToFile(fileUtility,
-                        cooccurrenceResult.targetReactionList,
+            for (int i = 0; i < cooccurrenceResult.getTargetRxnCount(); i++) {
+                WriteLineToFile(
+                        fileUtility,
                         i,
                         longRxnDbIdToName,
-                        cooccurrenceResult.upstreamReactionList,
-                        cooccurrenceResult.ABCDs,
-                        cooccurrenceResult.BCDSamples,
-                        cooccurrenceResult.DSampleFI1s,
-                        cooccurrenceResult.DSampleFI2s,
                         cooccurrenceResult.pValues,
+                        cooccurrenceResult.fIs,
+                        cooccurrenceResult.targetRxns,
+                        cooccurrenceResult.upstreamRxns,
+                        cooccurrenceResult.upstreamPairSamples,
+                        cooccurrenceResult.excludedUpstreamPairSamples,
+                        cooccurrenceResult.upstreamRxnMutationsIncluded,
+                        cooccurrenceResult.upstreamRxnMutationsExlcuded,
                         cooccurrenceResult.pValue2BHAdjustedPValueMap,
                         cooccurrenceResult.pValue2EmpiricalPValueMap);
             }
             fileUtility.close();
         } catch (IOException ioe) {
             logger.error(String.format("Couldn't use %s, %s: %s",
-                    outFilePath5.toString(),
+                    outFilePath5,
                     ioe.getMessage(),
                     Arrays.toString(ioe.getStackTrace())));
         }
     }
 
-    private void WriteLineToFile(FileUtility fileUtility5,
-                                 List<String> targetReactionList,
+    private void WriteLineToFile(FileUtility fileUtility,
                                  int i,
                                  Map<Long, String> longRxnDbIdToName,
-                                 List<String> upstreamReactionList,
-                                 List<int[]> ABCDs,
-                                 List<Set<String>[]> BCDSamples,
-                                 List<Set<String>> DSampleFI1s,
-                                 List<Set<String>> DSampleFI2s,
                                  List<Double> pValues,
+                                 List<Set<String>> fIs,
+                                 List<Long> targetRxns,
+                                 List<Set<Long>> upstreamRxns,
+                                 List<Set<String>> upstreamPairSamples,
+                                 List<Set<String>> excludedUpstreamPairSamples,
+                                 List<Set<String>> upstreamRxnMutationsIncluded,
+                                 List<Set<String>> upstreamRxnMutationsExlcuded,
                                  Map<Double, Double> pValue2BHAdjustedPValueMap,
                                  Map<Double, Double> pValue2EmpiricalPValueMap) throws IOException {
-        fileUtility5.printLine(String.format(
-                "%s:%s,%s,%d,%d,%d,%d,%d,%d,%s,%s,%s,%s,%s,%.20f,%.20f,%.20f",
-                targetReactionList.get(i),
-                longRxnDbIdToName.get(
-                        Long.parseLong(
-                                targetReactionList.get(i))).replace(
-                        ",", "~"),
-                upstreamReactionList.get(i),
-                ABCDs.get(i)[0],
-                ABCDs.get(i)[1],
-                ABCDs.get(i)[2],
-                ABCDs.get(i)[3],
-                ABCDs.get(i)[4],
-                ABCDs.get(i)[5],
-                BCDSamples.get(i)[0].size() > 1
+        fileUtility.printLine(String.format(
+                "%s:%s," + //Target Reaction
+                        "%d,"+ //#Upstream Reactions
+                        "%d,"+ //#FIs
+                        "%d,"+ //#Samples With 1+ Upstream Pair
+                        "%d,"+ //#Samples Excluded By Shared Mutation
+                        "%d,"+ //#Included Mutations
+                        "%d,"+ //#Excluded Mutations
+                        "%s," + //Upstream Reactions
+                        "%s," + //FIs
+                        "%s," + //Samples With 1+ Upstream Pair
+                        "%s," + //Samples Excluded By Shared Mutation
+                        "%s," + //Included Mutations
+                        "%s," + //Excluded Mutations
+                        "%.20f," + //Fishers Method Combined P-value
+                        "%.20f," + //BH Adjusted P-value
+                        "%.20f", //Permutation-Based Empirical P-value
+                targetRxns.get(i),
+                longRxnDbIdToName.get(targetRxns.get(i)).replace(",", "~"),
+                upstreamRxns.get(i).size(),
+                fIs.get(i).size(),
+                upstreamPairSamples.get(i).size(),
+                excludedUpstreamPairSamples.get(i).size(),
+                upstreamRxnMutationsIncluded.get(i).size(),
+                upstreamRxnMutationsExlcuded.get(i).size(),
+                upstreamRxns.get(i).size() > 1
                         ? org.gk.util.StringUtils.join("|",
-                        new ArrayList<>(BCDSamples.get(i)[0]))
-                        : Arrays.asList(BCDSamples.get(i)[0]).get(0).toString()
+                        new ArrayList<>(upstreamRxns.get(i)))
+                        : Arrays.asList(upstreamRxns.get(i)).get(0).toString()
                         .replace("[", "")
                         .replace("]", ""),
-                BCDSamples.get(i)[1].size() > 1
+                fIs.get(i).size() > 1
                         ? org.gk.util.StringUtils.join("|",
-                        new ArrayList<>(BCDSamples.get(i)[1]))
-                        : Arrays.asList(BCDSamples.get(i)[1]).get(0).toString()
+                        new ArrayList<>(fIs.get(i)))
+                        : Arrays.asList(fIs.get(i)).get(0).toString()
                         .replace("[", "")
                         .replace("]", ""),
-                BCDSamples.get(i)[2].size() > 1
+                upstreamPairSamples.get(i).size() > 1
                         ? org.gk.util.StringUtils.join("|",
-                        new ArrayList<>(BCDSamples.get(i)[2]))
-                        : Arrays.asList(BCDSamples.get(i)[2]).get(0).toString()
+                        new ArrayList<>(upstreamPairSamples.get(i)))
+                        : Arrays.asList(upstreamPairSamples.get(i)).get(0).toString()
                         .replace("[", "")
                         .replace("]", ""),
-                DSampleFI1s.get(i).size() > 1
+                excludedUpstreamPairSamples.get(i).size() > 1
                         ? org.gk.util.StringUtils.join("|",
-                        new ArrayList<>(DSampleFI1s.get(i)))
-                        : Arrays.asList(DSampleFI1s.get(i)).get(0).toString()
+                        new ArrayList<>(excludedUpstreamPairSamples.get(i)))
+                        : Arrays.asList(excludedUpstreamPairSamples.get(i)).get(0).toString()
                         .replace("[", "")
                         .replace("]", ""),
-                DSampleFI2s.get(i).size() > 1
+                upstreamRxnMutationsIncluded.get(i).size() > 1
                         ? org.gk.util.StringUtils.join("|",
-                        new ArrayList<>(DSampleFI2s.get(i)))
-                        : Arrays.asList(DSampleFI2s.get(i)).get(0).toString()
+                        new ArrayList<>(upstreamRxnMutationsIncluded.get(i)))
+                        : Arrays.asList(upstreamRxnMutationsIncluded.get(i)).get(0).toString()
+                        .replace("[", "")
+                        .replace("]", ""),
+                upstreamRxnMutationsExlcuded.get(i).size() > 1
+                        ? org.gk.util.StringUtils.join("|",
+                        new ArrayList<>(upstreamRxnMutationsExlcuded.get(i)))
+                        : Arrays.asList(upstreamRxnMutationsExlcuded.get(i)).get(0).toString()
                         .replace("[", "")
                         .replace("]", ""),
                 pValues.get(i),
@@ -1505,15 +1524,15 @@ public class MechismoAnalyzer {
             Map<Long, Set<String>> rxn2Samples,
             Map<String, Map<String, Set<String>>> samples2fis2muts,
             int depth,
-            boolean rememberEverything,
             boolean ignoreDependentUpstreamReactions,
             boolean ignoreIndependentUpstreamReactions,
             boolean excludeMultipleImmediateUpstreamReactions) {
 
         Set<TargetReactionSummary> targetReactionSummaries = new HashSet<>();
-        Set<Set<String>> allFIs = new HashSet<>();
-        SearchRxnNetwork(targetReactionSummaries,
-                allFIs,
+        Set<Set<String>> allFIsForClustering = new HashSet<>();
+        SearchRxnNetwork(
+                targetReactionSummaries,
+                allFIsForClustering,
                 reaction2FiSet,
                 reactionGraph,
                 longRxnDbIdToName,
@@ -1523,15 +1542,15 @@ public class MechismoAnalyzer {
                 targetReactionSummaries.size()));
 
         System.out.println(String.format("Found %d unique supporting FI sets",
-                allFIs.size()));
+                allFIsForClustering.size()));
 
         /*
         Set<Set<String>> fiIntersectingSetUnionClusters = new HashSet<>();
         FindIntersectionUnionClusters(fiIntersectingSetUnionClusters,
-                allFIs);
+                allFIsForClustering);
 
         System.out.println(String.format("Aggregated %d unique FI sets into %d intersection-unions",
-                allFIs.size(),
+                allFIsForClustering.size(),
                 fiIntersectingSetUnionClusters.size()));
 
         CalculateClusterStats(fiIntersectingSetUnionClusters);
@@ -1543,85 +1562,86 @@ public class MechismoAnalyzer {
         System.gc();
 
         FisherExact fisherExact = new FisherExact(samples2FIs.keySet().size());
-        List<String> targetReactionList = new ArrayList<>();
-        List<String> upstreamReactionList = new ArrayList<>();
-        List<Double> pValues = new ArrayList<>();
-        List<int[]> abcds = new ArrayList<>();
-        List<Set<String>[]> bcdSamples = new ArrayList<>();
-        List<Set<String>> dSampleFI1s = new ArrayList<>();
-        List<Set<String>> dSampleFI2s = new ArrayList<>();
+        List<Double> allPValues = new ArrayList<>();
+        List<Set<String>> allFIs = new ArrayList<>();
+        List<Long> allTargetRxns = new ArrayList<>();
+        List<Set<Long>> allUpstreamRxns = new ArrayList<>();
+        List<Set<String>> allUpstreamPairSamples = new ArrayList<>();
+        List<Set<String>> allExcludedUpstreamPairSamples = new ArrayList<>();
+        List<Set<String>> allUpstreamRxnMutationsIncluded = new ArrayList<>();
+        List<Set<String>> allUpstreamRxnMutationsExlcuded = new ArrayList<>();
 
-        CalculateCooccurrence(targetReactionSummaries,
-                longRxnDbIdToName,
+        CalculateCooccurrence(
                 reactionGraph,
+                fisherExact,
+                allPValues,
+                allFIs,
+                allTargetRxns,
+                allUpstreamRxns,
+                allUpstreamPairSamples,
+                allExcludedUpstreamPairSamples,
+                allUpstreamRxnMutationsIncluded,
+                allUpstreamRxnMutationsExlcuded,
+                reaction2FiSet,
                 rxn2Samples,
                 samples2FIs,
-                reaction2FiSet,
-                fisherExact,
-                targetReactionList,
-                upstreamReactionList,
-                pValues,
-                abcds,
-                bcdSamples,
-                dSampleFI1s,
-                dSampleFI2s,
                 samples2fis2muts,
-                rememberEverything,
+                targetReactionSummaries,
                 ignoreDependentUpstreamReactions,
                 ignoreIndependentUpstreamReactions,
                 excludeMultipleImmediateUpstreamReactions);
 
-        //Map<Double, Double> inPValue2FDRMap = CalculateBHAdjustedPValues(pValues);
-
-        return (new CooccurrenceResult(targetReactionList,
-                upstreamReactionList,
-                pValues,
-                abcds,
-                bcdSamples,
-                dSampleFI1s,
-                dSampleFI2s));
+        return (new CooccurrenceResult(
+                allPValues,
+                allFIs,
+                allTargetRxns,
+                allUpstreamRxns,
+                allUpstreamPairSamples,
+                allExcludedUpstreamPairSamples,
+                allUpstreamRxnMutationsIncluded,
+                allUpstreamRxnMutationsExlcuded));
     }
 
-    private void CalculateCooccurrence(Set<TargetReactionSummary> targetReactionSummaries,
-                                       Map<Long, String> longRxnDbIdToName,
-                                       DirectedGraph<Long, DefaultEdge> reactionGraph,
-                                       Map<Long, Set<String>> rxn2Samples,
-                                       Map<String, Set<String>> samples2FIs,
-                                       Map<Long, Set<String>> reaction2FiSet,
-                                       FisherExact fisherExact,
-                                       List<String> targetReactionList,
-                                       List<String> upstreamReactionList,
-                                       List<Double> inPValues,
-                                       List<int[]> inABCDs,
-                                       List<Set<String>[]> inBCDSamples,
-                                       List<Set<String>> inDSampleFI1s,
-                                       List<Set<String>> inDSampleFI2s,
-                                       Map<String, Map<String, Set<String>>> samples2fis2muts,
-                                       boolean rememberEverything,
-                                       boolean ignoreDependentUpstreamReactions,
-                                       boolean ignoreIndependentUpstreamReactions,
-                                       boolean excludeMultipleImmediateUpstreamReactions) {
+    private void CalculateCooccurrence(
+            DirectedGraph<Long, DefaultEdge> reactionGraph,
+            FisherExact fisherExact,
+
+            List<Double> allPValues,
+            List<Set<String>> allFIs,
+            List<Long> allTargetRxns,
+            List<Set<Long>> allUpstreamRxns,
+            List<Set<String>> allUpstreamPairSamples,
+            List<Set<String>> allExcludedUpstreamPairSamples,
+            List<Set<String>> allUpstreamRxnMutationsIncluded,
+            List<Set<String>> allUpstreamRxnMutationsExlcuded,
+
+            Map<Long, Set<String>> rxn2FIs,
+            Map<Long, Set<String>> rxn2Samples,
+            Map<String, Set<String>> sample2FIs,
+            Map<String, Map<String, Set<String>>> sample2FIs2muts,
+            Set<TargetReactionSummary> targetReactionSummaries,
+            boolean ignoreDependentUpstreamReactions,
+            boolean ignoreIndependentUpstreamReactions,
+            boolean excludeMultipleImmediateUpstreamReactions) {
         Iterator<TargetReactionSummary> trsItr = targetReactionSummaries.iterator();
         int trsCounter = 0;
         while (trsItr.hasNext()) {
             TargetReactionSummary trs = trsItr.next();
-            Long targetReactionId = trs.rxnId;
-            List<Long[]> upstreamReactionPairs =
-                    new ArrayList<>(GenerateReactionSetPairs(trs.supRxns));
-            List<String> upstreamReactionPairStrings = new ArrayList<>();
-            List<Double> cooccurrencePvalues = new ArrayList<>();
-            List<int[]> inABCD = new ArrayList<>();
-            List<Set<String>[]> inBCDSample = new ArrayList<>();
-            List<Set<String>> inDSampleFI1 = new ArrayList<>();
-            List<Set<String>> inDSampleFI2 = new ArrayList<>();
-            for (Long[] upstreamReactionPair : upstreamReactionPairs) {
+            Long targetRxnId = trs.rxnId;
+            List<Long[]> targetUpstreamReactionPairs =
+                    new ArrayList<>(GenerateReactionSetPairs(trs.supportedUpstreamRxns));
+
+            List<Double> targetPValues = new ArrayList<>();
+            Set<Long> targetUpstreamRxns = new HashSet<>();
+            Set<String> targetUpstreamRxnFIs = new HashSet<>();
+            Set<String> targetAnyUpstreamPairSamples = new HashSet<>();
+            Set<String> targetExcludedUpstreamPairSamples = new HashSet<>();
+            Set<String> targetUpstreamRxnMutationsIncluded = new HashSet<>();
+            Set<String> targetUpstreamRxnMutationsExcluded = new HashSet<>();
+
+            for (Long[] upstreamReactionPair : targetUpstreamReactionPairs) {
                 Long upstreamReaction1Id = upstreamReactionPair[0];
                 Long upstreamReaction2Id = upstreamReactionPair[1];
-
-                if (upstreamReaction1Id == 114548L ||
-                        upstreamReaction2Id == 114548L) {
-                    int debug = 1;
-                }
 
                 if (ignoreDependentUpstreamReactions &&
                         !reactionGraph.getAllEdges(upstreamReaction1Id, upstreamReaction2Id).isEmpty() ||
@@ -1636,22 +1656,16 @@ public class MechismoAnalyzer {
                 }
 
                 if (excludeMultipleImmediateUpstreamReactions &&
-                        !reactionGraph.getAllEdges(upstreamReaction1Id, targetReactionId).isEmpty() &&
-                        !reactionGraph.getAllEdges(upstreamReaction2Id, targetReactionId).isEmpty()) {
+                        !reactionGraph.getAllEdges(upstreamReaction1Id, targetRxnId).isEmpty() &&
+                        !reactionGraph.getAllEdges(upstreamReaction2Id, targetRxnId).isEmpty()) {
                     continue;
                 }
 
-
-                upstreamReactionPairStrings.add(
-                        ConvertReactionPairToString(upstreamReaction1Id,
-                                upstreamReaction2Id
-                                , longRxnDbIdToName));
-
                 //one row
-                Set<String> A = new HashSet<>(samples2FIs.keySet());
-                Set<String> B = new HashSet<>(samples2FIs.keySet());
-                Set<String> C = new HashSet<>(samples2FIs.keySet());
-                Set<String> D = new HashSet<>(samples2FIs.keySet());
+                Set<String> A = new HashSet<>(sample2FIs.keySet());
+                Set<String> B = new HashSet<>(sample2FIs.keySet());
+                Set<String> C = new HashSet<>(sample2FIs.keySet());
+                Set<String> D = new HashSet<>(sample2FIs.keySet());
                 Set<String> upstreamRxn1Samples = new HashSet<>(rxn2Samples.get(upstreamReaction1Id));
                 Set<String> upstreamRxn2Samples = new HashSet<>(rxn2Samples.get(upstreamReaction2Id));
 
@@ -1668,37 +1682,40 @@ public class MechismoAnalyzer {
                 A.removeAll(C);
                 A.removeAll(D);
 
-                if ((A.size() + B.size() + C.size() + D.size()) != samples2FIs.keySet().size()) {
-                    int debug = 1;
+                if ((A.size() + B.size() + C.size() + D.size()) != sample2FIs.keySet().size()) {
+                    throw new IllegalStateException(String.format(
+                            "A(%d) + B(%d) + C(%d) + D(%d) sum to %d but should sum to %d",
+                            A.size(),
+                            B.size(),
+                            C.size(),
+                            D.size(),
+                            (A.size() + B.size() + C.size() + D.size()),
+                            sample2FIs.keySet().size()));
                 }
 
-                Set<String> largeD = new HashSet<>();
-                Set<String> largeDMuts = new HashSet<>();
-
-                //TODO:filter d by mutation
                 Iterator<String> dSampleItr = D.iterator();
                 while (dSampleItr.hasNext()) {
                     String sample = dSampleItr.next();
                     Set<String> rxn1muts = new HashSet<>();
                     Set<String> sampleFIsSupportingRxn1 = findSampleFIsSupportingRxn(
                             sample,
-                            samples2FIs,
-                            reaction2FiSet,
+                            sample2FIs,
+                            rxn2FIs,
                             upstreamReaction1Id);
                     for (String fi : sampleFIsSupportingRxn1) {
                         rxn1muts.addAll(
-                                samples2fis2muts.get(sample).get(fi)
+                                sample2FIs2muts.get(sample).get(fi)
                         );
                     }
                     Set<String> rxn2muts = new HashSet<>();
                     Set<String> sampleFIsSupportingRxn2 = findSampleFIsSupportingRxn(
                             sample,
-                            samples2FIs,
-                            reaction2FiSet,
+                            sample2FIs,
+                            rxn2FIs,
                             upstreamReaction2Id);
                     for (String fi : sampleFIsSupportingRxn2) {
                         rxn2muts.addAll(
-                                samples2fis2muts.get(sample).get(fi)
+                                sample2FIs2muts.get(sample).get(fi)
                         );
                     }
 
@@ -1706,55 +1723,57 @@ public class MechismoAnalyzer {
                     sampleRxnMutIntersection.retainAll(rxn2muts);
 
                     if (!sampleRxnMutIntersection.isEmpty()) {
-                        largeD.add(sample);
-                        largeDMuts.addAll(sampleRxnMutIntersection);
+                        targetExcludedUpstreamPairSamples.add(sample);
+                        targetUpstreamRxnMutationsExcluded.addAll(sampleRxnMutIntersection);
                         dSampleItr.remove();
+                    } else {
+                        targetUpstreamRxnMutationsIncluded.addAll(rxn1muts);
+                        targetUpstreamRxnMutationsIncluded.addAll(rxn2muts);
                     }
                 }
 
-                int[] abcd = {A.size(), B.size(), C.size(), D.size(), largeD.size(), largeDMuts.size()};
-                inABCD.add(abcd);
-
-                Set[] bcdSample = new Set[]{B, C, D};
-                inBCDSample.add(bcdSample);
-
-                inDSampleFI1.add(findSampleFIsSupportingRxn(D,
-                        samples2FIs,
-                        reaction2FiSet,
-                        upstreamReaction1Id));
-
-                inDSampleFI2.add(findSampleFIsSupportingRxn(D,
-                        samples2FIs,
-                        reaction2FiSet,
-                        upstreamReaction2Id));
-
-                cooccurrencePvalues.add(
+                //TODO: add single upstream reaction samples
+                targetAnyUpstreamPairSamples.addAll(D);
+                targetUpstreamRxns.add(upstreamReaction1Id);
+                targetUpstreamRxns.add(upstreamReaction2Id);
+                targetUpstreamRxnFIs.addAll(
+                        findSampleFIsSupportingRxn(
+                                D,
+                                sample2FIs,
+                                rxn2FIs,
+                                upstreamReaction1Id));
+                targetUpstreamRxnFIs.addAll(
+                        findSampleFIsSupportingRxn(
+                                D,
+                                sample2FIs,
+                                rxn2FIs,
+                                upstreamReaction2Id));
+                targetPValues.add(
                         fisherExact.getRightTailedP(
                                 A.size(),
                                 B.size(),
                                 C.size(),
                                 D.size()));
+            }
 
-            }
-            if (rememberEverything) {
-                fillAccumulators(cooccurrencePvalues,
-                        targetReactionList,
-                        targetReactionId,
-                        upstreamReactionList,
-                        upstreamReactionPairStrings,
-                        inPValues,
-                        inABCDs,
-                        inABCD,
-                        inBCDSamples,
-                        inBCDSample,
-                        inDSampleFI1s,
-                        inDSampleFI1,
-                        inDSampleFI2s,
-                        inDSampleFI2);
-            } else {
-                fillPvalueAccumulator(cooccurrencePvalues,
-                        inPValues);
-            }
+            CalculateCombinedPFishersMethod(
+                    targetRxnId,
+                    targetPValues,
+                    targetUpstreamRxns,
+                    targetUpstreamRxnFIs,
+                    targetAnyUpstreamPairSamples,
+                    targetExcludedUpstreamPairSamples,
+                    targetUpstreamRxnMutationsIncluded,
+                    targetUpstreamRxnMutationsExcluded,
+                    allPValues,
+                    allTargetRxns,
+                    allUpstreamRxns,
+                    allFIs,
+                    allUpstreamPairSamples,
+                    allExcludedUpstreamPairSamples,
+                    allUpstreamRxnMutationsIncluded,
+                    allUpstreamRxnMutationsExlcuded);
+
             trsCounter++;
             if (trsCounter % 500 == 0) {
                 System.out.println(String.format("Processed %d of %d Target Reactions...",
@@ -1790,193 +1809,56 @@ public class MechismoAnalyzer {
                 upstreamReactionId);
     }
 
-    /*
-    private void CalculateEXCooccurrence(Set<TargetReactionSummary> targetReactionSummaries,
-                                         Map<Long, String> longRxnDbIdToName,
-                                         DefaultDirectedGraph<Long, DefaultEdge> reactionGraph,
-                                         Map<String, Set<String>> samples2FIs,
-                                         Map<Long, Set<String>> reaction2FiSet,
-                                         FisherExact fisherExact,
-                                         Map<String, Set<String>> fis2Samples,
-                                         List<String> targetReactionList,
-                                         List<String> upstreamReactionList,
-                                         List<Double> exPValues,
-                                         List<int[]> exABCDs,
-                                         List<Set<String>[]> exBCDSamples,
-                                         List<Set<String>> exDSampleFI1s,
-                                         List<Set<String>> exDSampleFI2s,
-                                         Map<String, Map<String, Set<String>>> samples2fis2muts) {
-        Iterator<TargetReactionSummary> trsItr = targetReactionSummaries.iterator();
-        int trsCounter = 0;
-        while (trsItr.hasNext()) {
-            TargetReactionSummary trs = trsItr.next();
-            Long targetReactionId = trs.rxnId;
-            List<Long[]> upstreamReactionPairs =
-                    new ArrayList<>(GenerateReactionSetPairs(trs.supRxns));
-            List<String> upstreamReactionPairStrings =
-                    ConvertReactionPairToString(upstreamReactionPairs, longRxnDbIdToName);
-            List<Double> cooccurrencePvalues = new ArrayList<>();
-            List<int[]> exABCD = new ArrayList<>();
-            List<Set<String>[]> exBCDSample = new ArrayList<>();
-            List<Set<String>> exDSampleFI1 = new ArrayList<>();
-            List<Set<String>> exDSampleFI2 = new ArrayList<>();
-            for (Long[] upstreamReactionPair : upstreamReactionPairs) {
-                Long upstreamReaction1Id = upstreamReactionPair[0];
-                Long upstreamReaction2Id = upstreamReactionPair[1];
+    private void CalculateCombinedPFishersMethod(
+            Long targetRxnId,
+            List<Double> targetPValues,
+            Set<Long> targetUpstreamRxns,
+            Set<String> targetUpstreamRxnFIs,
+            Set<String> targetAnyUpstreamPairSamples,
+            Set<String> targetExcludedUpstreamPairSamples,
+            Set<String> targetUpstreamRxnMutationsIncluded,
+            Set<String> targetUpstreamRxnMutationsExcluded,
+            List<Double> allPValues,
+            List<Long> allTargetRxns,
+            List<Set<Long>> allUpstreamRxns,
+            List<Set<String>> allFIs,
+            List<Set<String>> allUpstreamPairSamples,
+            List<Set<String>> allExcludedUpstreamPairSamples,
+            List<Set<String>> allUpstreamRxnMutationsIncluded,
+            List<Set<String>> allUpstreamRxnMutationsExlcuded) {
 
-
-
-                //ignore interdependent pairs
-                if (reactionGraph.getAllEdges(upstreamReaction1Id, upstreamReaction2Id).isEmpty() &&
-                        reactionGraph.getAllEdges(upstreamReaction2Id, upstreamReaction1Id).isEmpty() &&
-                        !upstreamReaction1Id.equals(upstreamReaction2Id)) {
-
-                    //one row for EX
-                    Set<String> dnUp1FisExclusive =
-                            new HashSet<>(reaction2FiSet.get(upstreamReaction1Id));
-                    dnUp1FisExclusive.removeAll(reaction2FiSet.get(upstreamReaction2Id));
-
-                    Set<String> dnUp2FisExclusive =
-                            new HashSet<>(reaction2FiSet.get(upstreamReaction2Id));
-                    dnUp2FisExclusive.removeAll(reaction2FiSet.get(upstreamReaction1Id));
-
-                    Set<String> fi1sGenes = new HashSet<>();
-                    for (String fi : dnUp1FisExclusive) {
-                        String[] genes = fi.split("\t");
-                        fi1sGenes.add(genes[0]);
-                        fi1sGenes.add(genes[1]);
-                    }
-
-                    Set<String> fi2sGenes = new HashSet<>();
-                    for (String fi : dnUp2FisExclusive) {
-                        String[] genes = fi.split("\t");
-                        fi2sGenes.add(genes[0]);
-                        fi2sGenes.add(genes[1]);
-                    }
-
-                    Set<String> fisGeneIntersection = new HashSet<>(fi1sGenes);
-                    fisGeneIntersection.retainAll(fi2sGenes);
-
-                    Set<String> dnUp1SamplesExclusive = new HashSet<>();
-                    for (String dnUp1Fi : dnUp1FisExclusive) {
-                        String[] genes = dnUp1Fi.split("\t");
-                        if (!fisGeneIntersection.contains(genes[0]) &&
-                                !fisGeneIntersection.contains(genes[1])) {
-                            dnUp1SamplesExclusive.addAll(fis2Samples.get(dnUp1Fi));
-                        }
-                    }
-                    Set<String> dnUp2SamplesExclusive = new HashSet<>();
-                    for (String dnUp2Fi : dnUp2FisExclusive) {
-                        String[] genes = dnUp2Fi.split("\t");
-                        if (!fisGeneIntersection.contains(genes[0]) &&
-                                !fisGeneIntersection.contains(genes[1])) {
-                            dnUp2SamplesExclusive.addAll(fis2Samples.get(dnUp2Fi));
-                        }
-                    }
-
-                    Set<String> acE = new HashSet<>(samples2FIs.keySet());
-                    acE.removeAll(dnUp1SamplesExclusive);
-
-                    Set<String> bdE = new HashSet<>(dnUp1SamplesExclusive);
-
-                    Set<String> aE = new HashSet<>(acE);
-                    aE.removeAll(dnUp2SamplesExclusive);
-
-                    Set<String> cE = new HashSet<>(acE);
-                    cE.retainAll(dnUp2SamplesExclusive);
-
-                    Set<String> bE = new HashSet<>(bdE);
-                    bE.removeAll(dnUp2SamplesExclusive);
-
-                    Set<String> dE = new HashSet<>(bdE);
-                    dE.retainAll(dnUp2SamplesExclusive);
-
-                    //TODO: filter dE by mutation
-
-                    int[] abcdE = {aE.size(), bE.size(), cE.size(), dE.size()};
-                    exABCD.add(abcdE);
-
-                    Set[] bcdSampleE = new Set[]{bE, cE, dE};
-                    exBCDSample.add(bcdSampleE);
-
-                    exDSampleFI1.add(findSampleFIsSupportingRxn(dE,
-                            samples2FIs,
-                            reaction2FiSet,
-                            upstreamReaction1Id));
-
-                    exDSampleFI2.add(findSampleFIsSupportingRxn(dE,
-                            samples2FIs,
-                            reaction2FiSet,
-                            upstreamReaction2Id));
-
-                    cooccurrencePvalues.add(
-                            fisherExact.getTwoTailedP(
-                                    aE.size(),
-                                    bE.size(),
-                                    cE.size(),
-                                    dE.size()));
-                } else {
-                    //System.out.println(String.format("Ignoring interdependent upstream reaction pair %s-%s",
-                    //        dnUp1,dnUp2));
-                }
-            }
-            fillAccumulators(cooccurrencePvalues,
-                    targetReactionList,
-                    targetReactionId,
-                    upstreamReactionList,
-                    upstreamReactionPairStrings,
-                    exPValues,
-                    exABCDs,
-                    exABCD,
-                    exBCDSamples,
-                    exBCDSample,
-                    exDSampleFI1s,
-                    exDSampleFI1,
-                    exDSampleFI2s,
-                    exDSampleFI2);
-            trsCounter++;
-            if (trsCounter % 100 == 0) {
-                System.out.println(String.format("Processed %d of %d Target Reactions...",
-                        trsCounter, targetReactionSummaries.size()));
-                System.out.flush();
-            }
-        }
-    }
-    */
-
-    private void fillAccumulators(List<Double> cooccurrencePvalues,
-                                  List<String> targetReactionList,
-                                  Long targetReactionId,
-                                  List<String> upstreamReactionList,
-                                  List<String> upstreamReactionPairStrings,
-                                  List<Double> pValues,
-                                  List<int[]> ABCDs,
-                                  List<int[]> ABCD,
-                                  List<Set<String>[]> BCDSamples,
-                                  List<Set<String>[]> BCDSample,
-                                  List<Set<String>> DSampleRxn1FIs,
-                                  List<Set<String>> DSampleRxn1FI,
-                                  List<Set<String>> DSampleRxn2FIs,
-                                  List<Set<String>> DSampleRxn2FI) {
-
-        if (cooccurrencePvalues.size() != upstreamReactionPairStrings.size() ||
-                cooccurrencePvalues.size() != ABCD.size() ||
-                cooccurrencePvalues.size() != BCDSample.size() ||
-                cooccurrencePvalues.size() != DSampleRxn1FI.size() ||
-                cooccurrencePvalues.size() != DSampleRxn2FI.size()) {
+        if (allTargetRxns.size() != allPValues.size() ||
+                allTargetRxns.size() != allUpstreamRxns.size() ||
+                allTargetRxns.size() != allFIs.size()) {
             throw new IllegalStateException(String.format("These should all have size == %d",
-                    cooccurrencePvalues.size()));
+                    targetPValues.size()));
         }
 
-        for (int i = 0; i < cooccurrencePvalues.size(); i++) {
-            targetReactionList.add(targetReactionId.toString());
-            upstreamReactionList.add(upstreamReactionPairStrings.get(i));
-            pValues.add(cooccurrencePvalues.get(i));
-            ABCDs.add(ABCD.get(i));
-            BCDSamples.add(BCDSample.get(i));
-            DSampleRxn1FIs.add(DSampleRxn1FI.get(i));
-            DSampleRxn2FIs.add(DSampleRxn2FI.get(i));
+        if (targetPValues.size() == 0) {
+            return;
         }
+
+        double combinedPValue;
+        if (targetPValues.size() > 1) {
+            ChiSquaredDistribution chiSquaredDistribution = new ChiSquaredDistribution(targetPValues.size());
+            double chiSquared = 0.0;
+            for (double targetPValue : targetPValues) {
+                chiSquared += Math.log(targetPValue);
+            }
+            chiSquared *= -2.0;
+            combinedPValue = 1.0 - chiSquaredDistribution.cumulativeProbability(chiSquared);
+        } else {
+            combinedPValue = targetPValues.get(0);
+        }
+
+        allTargetRxns.add(targetRxnId);
+        allPValues.add(combinedPValue);
+        allUpstreamRxns.add(targetUpstreamRxns);
+        allFIs.add(targetUpstreamRxnFIs);
+        allUpstreamPairSamples.add(targetAnyUpstreamPairSamples);
+        allExcludedUpstreamPairSamples.add(targetExcludedUpstreamPairSamples);
+        allUpstreamRxnMutationsExlcuded.add(targetUpstreamRxnMutationsExcluded);
+        allUpstreamRxnMutationsIncluded.add(targetUpstreamRxnMutationsIncluded);
     }
 
     private void fillPvalueAccumulator(List<Double> cooccurrencePvalues, List<Double> pValues) {
@@ -2007,90 +1889,38 @@ public class MechismoAnalyzer {
     }
 
     private class CooccurrenceResult {
-        List<String> targetReactionList;
-        List<String> upstreamReactionList;
         List<Double> pValues;
-        List<int[]> ABCDs;
-        List<Set<String>[]> BCDSamples;
-        List<Set<String>> DSampleFI1s;
-        List<Set<String>> DSampleFI2s;
+        List<Set<String>> fIs;
+        List<Long> targetRxns;
+        List<Set<Long>> upstreamRxns;
+        List<Set<String>> upstreamPairSamples;
+        List<Set<String>> excludedUpstreamPairSamples;
+        List<Set<String>> upstreamRxnMutationsIncluded;
+        List<Set<String>> upstreamRxnMutationsExlcuded;
         Map<Double, Double> pValue2BHAdjustedPValueMap;
         Map<Double, Double> pValue2EmpiricalPValueMap;
 
-        private CooccurrenceResult(List<String> targetReactionList,
-                                   List<String> upstreamReactionList,
-                                   List<Double> pValues,
-                                   List<int[]> inABCDs,
-                                   List<Set<String>[]> inBCDSamples,
-                                   List<Set<String>> inDSampleFI1s,
-                                   List<Set<String>> inDSampleFI2s) {
-            this.targetReactionList = targetReactionList;
-            this.upstreamReactionList = upstreamReactionList;
-            this.pValues = pValues;
-            this.ABCDs = inABCDs;
-            this.BCDSamples = inBCDSamples;
-            this.DSampleFI1s = inDSampleFI1s;
-            this.DSampleFI2s = inDSampleFI2s;
-
-            //CollapseReactionPairs();
+        private CooccurrenceResult(
+                List<Double> allPValues,
+                List<Set<String>> allFIs,
+                List<Long> allTargetRxns,
+                List<Set<Long>> allUpstreamRxns,
+                List<Set<String>> allUpstreamPairSamples,
+                List<Set<String>> allExcludedUpstreamPairSamples,
+                List<Set<String>> allUpstreamRxnMutationsIncluded,
+                List<Set<String>> allUpstreamRxnMutationsExlcuded) {
+            this.pValues = allPValues;
+            this.fIs = allFIs;
+            this.targetRxns = allTargetRxns;
+            this.upstreamRxns = allUpstreamRxns;
+            this.upstreamPairSamples = allUpstreamPairSamples;
+            this.excludedUpstreamPairSamples = allExcludedUpstreamPairSamples;
+            this.upstreamRxnMutationsIncluded = allUpstreamRxnMutationsIncluded;
+            this.upstreamRxnMutationsExlcuded = allUpstreamRxnMutationsExlcuded;
         }
 
-        private void CollapseReactionPairs() {
-
-            Map<String, String> targetReactionMap = new HashMap<>();
-            Map<String, Double> pValueMap = new HashMap<>();
-            Map<String, int[]> ABCDsMap = new HashMap<>();
-            Map<String, Set<String>[]> BCDSamplesMap = new HashMap<>();
-            Map<String, Set<String>> DSampleFI1sMap = new HashMap<>();
-            Map<String, Set<String>> DSampleFI2sMap = new HashMap<>();
-
-            for (int i = 0; i < this.pValues.size(); i++) {
-                String targetReaction = this.targetReactionList.get(i);
-                String upstreamReactions = this.upstreamReactionList.get(i);
-                Double pValue = this.pValues.get(i);
-                int[] ABCDs = this.ABCDs.get(i);
-                Set<String>[] BCDSamples = this.BCDSamples.get(i);
-                Set<String> DSampleFI1s = this.DSampleFI1s.get(i);
-                Set<String> DSampleFI2s = this.DSampleFI2s.get(i);
-
-                String targetReactionString;
-                if (targetReactionMap.containsKey(upstreamReactions)) {
-                    targetReactionString = String.format("%s|%s",
-                            targetReactionMap.get(upstreamReactions),
-                            targetReaction);
-                    assert pValueMap.get(upstreamReactions).equals(pValue);
-                    assert Arrays.equals(ABCDsMap.get(upstreamReactions), ABCDs);
-                    assert Arrays.equals(BCDSamplesMap.get(upstreamReactions), BCDSamples);
-                    assert DSampleFI1sMap.get(upstreamReactions).equals(DSampleFI1s);
-                    assert DSampleFI2sMap.get(upstreamReactions).equals(DSampleFI2s);
-                } else {
-                    targetReactionString = targetReaction;
-                    pValueMap.put(upstreamReactions, pValue);
-                    ABCDsMap.put(upstreamReactions, ABCDs);
-                    BCDSamplesMap.put(upstreamReactions, BCDSamples);
-                    DSampleFI1sMap.put(upstreamReactions, DSampleFI1s);
-                    DSampleFI2sMap.put(upstreamReactions, DSampleFI2s);
-                }
-                targetReactionMap.put(upstreamReactions, targetReactionString);
-            }
-
-            this.targetReactionList.clear();
-            this.upstreamReactionList.clear();
-            this.pValues.clear();
-            this.ABCDs.clear();
-            this.BCDSamples.clear();
-            this.DSampleFI1s.clear();
-            this.DSampleFI2s.clear();
-
-            targetReactionMap.keySet().forEach(upstreamReactions -> {
-                this.targetReactionList.add(targetReactionMap.get(upstreamReactions));
-                this.upstreamReactionList.add(upstreamReactions);
-                this.pValues.add(pValueMap.get(upstreamReactions));
-                this.ABCDs.add(ABCDsMap.get(upstreamReactions));
-                this.BCDSamples.add(BCDSamplesMap.get(upstreamReactions));
-                this.DSampleFI1s.add(DSampleFI1sMap.get(upstreamReactions));
-                this.DSampleFI2s.add(DSampleFI2sMap.get(upstreamReactions));
-            });
+        int getTargetRxnCount() {
+            return this.targetRxns.size();
         }
 
         private void CalculateBHAdjustedPValues() {
@@ -2167,13 +1997,13 @@ public class MechismoAnalyzer {
 
         private void MagicallyShrinkMemoryFootprint() {
             //leave only pValues
-            this.targetReactionList = null;
-            this.upstreamReactionList = null;
-            this.ABCDs = null;
-            this.BCDSamples = null;
-            this.DSampleFI1s = null;
-            this.DSampleFI2s = null;
-            this.pValue2EmpiricalPValueMap = null;
+            this.fIs.clear();
+            this.targetRxns.clear();
+            this.upstreamRxns.clear();
+            this.upstreamPairSamples.clear();
+            this.excludedUpstreamPairSamples.clear();
+            this.upstreamRxnMutationsIncluded.clear();
+            this.upstreamRxnMutationsExlcuded.clear();
             System.gc();
         }
     }
@@ -2190,29 +2020,29 @@ public class MechismoAnalyzer {
                         "All Dn/Up Rxns," +
                         "Supporting FIs";
         private Long rxnId;
-        private Integer numSupUpRxn;
-        private Integer numUpRxn;
-        private Double supUpRatio;
-        private Set<Long> supRxns;
-        private Set<Long> upRxns;
-        private Set<String> supFIs;
+        private Integer numSupportedUpstreamRxns;
+        private Integer numUpstreamRxns;
+        private Double supportedUpstreamRxnRatio;
+        private Set<Long> supportedUpstreamRxns;
+        private Set<Long> upstreamRxns;
+        private Set<String> supportingFIs;
         private Map<Long, String> longRxnDbIdToName;
 
         private TargetReactionSummary(Long rxnId,
-                                      Integer numSupUpRxn,
-                                      Integer numUpRxn,
-                                      Double supUpRatio,
-                                      Set<Long> supRxns,
-                                      Set<Long> upRxns,
-                                      Set<String> supFIs,
+                                      Integer numSupportedUpstreamRxns,
+                                      Integer numUpstreamRxns,
+                                      Double supportedUpstreamRxnRatio,
+                                      Set<Long> supportedUpstreamRxns,
+                                      Set<Long> upstreamRxns,
+                                      Set<String> supportingFIs,
                                       Map<Long, String> longRxnDbIdToName) {
             this.rxnId = rxnId;
-            this.numSupUpRxn = numSupUpRxn;
-            this.numUpRxn = numUpRxn;
-            this.supUpRatio = supUpRatio;
-            this.supRxns = supRxns;
-            this.upRxns = upRxns;
-            this.supFIs = supFIs;
+            this.numSupportedUpstreamRxns = numSupportedUpstreamRxns;
+            this.numUpstreamRxns = numUpstreamRxns;
+            this.supportedUpstreamRxnRatio = supportedUpstreamRxnRatio;
+            this.supportedUpstreamRxns = supportedUpstreamRxns;
+            this.upstreamRxns = upstreamRxns;
+            this.supportingFIs = supportingFIs;
             this.longRxnDbIdToName = longRxnDbIdToName;
         }
 
@@ -2224,61 +2054,61 @@ public class MechismoAnalyzer {
             }
             TargetReactionSummary targetReactionSummary = (TargetReactionSummary) o;
             return Objects.equals(this.rxnId, targetReactionSummary.rxnId) &&
-                    Objects.equals(this.numSupUpRxn, targetReactionSummary.numSupUpRxn) &&
-                    Objects.equals(this.numUpRxn, targetReactionSummary.numUpRxn) &&
-                    Objects.equals(this.supUpRatio, targetReactionSummary.supUpRatio) &&
-                    Objects.equals(this.supRxns, targetReactionSummary.supRxns) &&
-                    Objects.equals(this.upRxns, targetReactionSummary.upRxns) &&
-                    Objects.equals(this.supFIs, targetReactionSummary.supFIs);
+                    Objects.equals(this.numSupportedUpstreamRxns, targetReactionSummary.numSupportedUpstreamRxns) &&
+                    Objects.equals(this.numUpstreamRxns, targetReactionSummary.numUpstreamRxns) &&
+                    Objects.equals(this.supportedUpstreamRxnRatio, targetReactionSummary.supportedUpstreamRxnRatio) &&
+                    Objects.equals(this.supportedUpstreamRxns, targetReactionSummary.supportedUpstreamRxns) &&
+                    Objects.equals(this.upstreamRxns, targetReactionSummary.upstreamRxns) &&
+                    Objects.equals(this.supportingFIs, targetReactionSummary.supportingFIs);
         }
 
         @Override
         public int hashCode() {
             return Objects.hash(this.rxnId,
-                    this.numSupUpRxn,
-                    this.numUpRxn,
-                    this.supUpRatio,
-                    this.supRxns,
-                    this.supFIs);
+                    this.numSupportedUpstreamRxns,
+                    this.numUpstreamRxns,
+                    this.supportedUpstreamRxnRatio,
+                    this.supportedUpstreamRxns,
+                    this.supportingFIs);
         }
 
         /*
         @Override
         public String toString() {
             List<String> supCombos = ConvertReactionPairToString(
-                    new ArrayList<>(GenerateReactionSetPairs(this.supRxns)),
+                    new ArrayList<>(GenerateReactionSetPairs(this.supportedUpstreamRxns)),
                     this.longRxnDbIdToName);
             return String.format(
                     "%d," + //rxnId
-                            "%d," + //numSupUpRxn
+                            "%d," + //numSupportedUpstreamRxns
                             "%d," + //numSupUpCombos
-                            "%d," + //numUpRxn
-                            "%f," + //supUpRatio
-                            "%s," + //supRxns
+                            "%d," + //numUpstreamRxns
+                            "%f," + //supportedUpstreamRxnRatio
+                            "%s," + //supportedUpstreamRxns
                             "%s," + //supCombos
-                            "%s," + //upRxns
-                            "%s",   //supFIs
+                            "%s," + //upstreamRxns
+                            "%s",   //supportingFIs
                     this.rxnId,
-                    this.numSupUpRxn,
+                    this.numSupportedUpstreamRxns,
                     supCombos.size(),
-                    this.numUpRxn,
-                    this.supUpRatio,
-                    this.supRxns.size() > 1
+                    this.numUpstreamRxns,
+                    this.supportedUpstreamRxnRatio,
+                    this.supportedUpstreamRxns.size() > 1
                             ? org.gk.util.StringUtils.join("~",
-                            new ArrayList<>(this.supRxns))
-                            : Arrays.asList(this.supRxns).get(0),
+                            new ArrayList<>(this.supportedUpstreamRxns))
+                            : Arrays.asList(this.supportedUpstreamRxns).get(0),
                     supCombos.size() > 1
                             ? org.gk.util.StringUtils.join("~",
                             new ArrayList<>(supCombos))
                             : Arrays.asList(supCombos).get(0),
-                    this.upRxns.size() > 1
+                    this.upstreamRxns.size() > 1
                             ? org.gk.util.StringUtils.join("~",
-                            new ArrayList<>(this.upRxns))
-                            : Arrays.asList(this.upRxns).get(0),
-                    this.supFIs.size() > 1
+                            new ArrayList<>(this.upstreamRxns))
+                            : Arrays.asList(this.upstreamRxns).get(0),
+                    this.supportingFIs.size() > 1
                             ? org.gk.util.StringUtils.join("~",
-                            new ArrayList<>(this.supFIs))
-                            : Arrays.asList(this.supFIs).get(0));
+                            new ArrayList<>(this.supportingFIs))
+                            : Arrays.asList(this.supportingFIs).get(0));
         }
         */
     }

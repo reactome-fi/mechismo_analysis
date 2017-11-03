@@ -117,7 +117,7 @@ public class ProcessDatasetsDriver {
                         "/home/burkhart/Software/Ogmios/datasets/Mechismo/TCGA_mech_output.tsv",
                         "/home/burkhart/Software/Ogmios/datasets/ReactionNetwork_070517.txt",
                         "/home/burkhart/Software/Ogmios/datasets/Mechismo/MechismoSamplesToReactions_103017.txt",
-                        "/home/burkhart/Software/Ogmios/datasets/Mechismo/tcga_mechismo_stat_pancancer.tsv",
+                        null,//"/home/burkhart/Software/Ogmios/datasets/Mechismo/tcga_mechismo_stat_pancancer.tsv",
                         "/home/burkhart/Software/Ogmios/results/Mechismo/",
                         "",
                         1,
