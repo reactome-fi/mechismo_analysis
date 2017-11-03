@@ -25,10 +25,7 @@ import org.reactome.cancer.ReactomeReactionGraphLoader;
 import org.reactome.px.util.InteractionUtilities;
 import org.reactome.r3.Interactome3dAnalyzer;
 import org.reactome.r3.ReactomeAnalyzer;
-import org.reactome.r3.util.FileUtility;
-import org.reactome.r3.util.FisherExact;
-import org.reactome.r3.util.MathUtilities;
-import org.reactome.r3.util.Plotter;
+import org.reactome.r3.util.*;
 
 import java.io.File;
 import java.io.IOException;
@@ -1580,7 +1577,7 @@ public class MechismoAnalyzer {
             int depth,
             boolean ignoreDependentUpstreamReactions,
             boolean ignoreIndependentUpstreamReactions,
-            boolean excludeMultipleImmediateUpstreamReactions) {
+            boolean excludeMultipleImmediateUpstreamReactions) throws MathException {
 
         Set<TargetReactionSummary> targetReactionSummaries = new HashSet<>();
         Set<Set<String>> allFIsForClustering = new HashSet<>();
@@ -1675,7 +1672,7 @@ public class MechismoAnalyzer {
             Set<TargetReactionSummary> targetReactionSummaries,
             boolean ignoreDependentUpstreamReactions,
             boolean ignoreIndependentUpstreamReactions,
-            boolean excludeMultipleImmediateUpstreamReactions) {
+            boolean excludeMultipleImmediateUpstreamReactions) throws MathException {
         Iterator<TargetReactionSummary> trsItr = targetReactionSummaries.iterator();
         int trsCounter = 0;
         while (trsItr.hasNext()) {
@@ -1858,7 +1855,7 @@ public class MechismoAnalyzer {
             List<Set<String>> allUpstreamPairSamples,
             List<Set<String>> allExcludedUpstreamPairSamples,
             List<Set<List<String>>> allUpstreamRxnMutationsIncluded,
-            List<Set<List<String>>> allUpstreamRxnMutationsExlcuded) {
+            List<Set<List<String>>> allUpstreamRxnMutationsExlcuded) throws MathException {
 
         if (allTargetRxns.size() != allPValues.size() ||
                 allTargetRxns.size() != allUpstreamRxns.size() ||
@@ -1867,21 +1864,7 @@ public class MechismoAnalyzer {
                     targetPValues.size()));
         }
 
-        double combinedPValue;
-        if (targetPValues.size() > 1) {
-            double chiSquared = 0.0;
-            for (double targetPValue : targetPValues) {
-                chiSquared += Math.log(targetPValue);
-            }
-            chiSquared *= -2.0;
-            combinedPValue = 1.0 - new ChiSquaredDistribution(targetPValues.size()).cumulativeProbability(chiSquared);
-        } else if (targetPValues.size() == 1) {
-            combinedPValue = targetPValues.get(0);
-        } else {
-            combinedPValue = 1.0;
-            System.out.println(
-                    "Something went wrong... can't calculate combined p-value without any p-values!");
-        }
+        double combinedPValue = MathUtilities.combinePValuesWithFisherMethod(targetPValues);
 
         allTargetRxns.add(targetRxnId);
         allPValues.add(combinedPValue);
