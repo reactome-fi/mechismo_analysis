@@ -71,7 +71,7 @@ public class MechismoOutputLoader {
                 while ((line = fileUtility.readLine()) != null) {
                     tokens = line.split("\t");
                     if (Integer.parseInt(tokens[2]) > Integer.parseInt(tokens[3]) &&
-                            Double.parseDouble(tokens[10]) < 0.05) {
+                            Double.parseDouble(tokens[10]) < 0.01) {
                         this.fiFilter.add(String.format("%s\t%s",
                                 tokens[0],
                                 tokens[1]));
