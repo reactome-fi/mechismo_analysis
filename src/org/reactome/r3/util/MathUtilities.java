@@ -4,15 +4,11 @@
  */
 package org.reactome.r3.util;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
+import cern.jet.random.Binomial;
+import cern.jet.random.ChiSquare;
+import cern.jet.random.Normal;
+import cern.jet.random.engine.DRand;
+import cern.jet.random.engine.RandomEngine;
 import org.apache.commons.math.MathException;
 import org.apache.commons.math.distribution.ChiSquaredDistribution;
 import org.apache.commons.math.distribution.ChiSquaredDistributionImpl;
@@ -26,30 +22,27 @@ import org.apache.commons.math.stat.correlation.SpearmansCorrelation;
 import org.apache.commons.math.stat.inference.TestUtils;
 import org.apache.commons.math3.random.RandomDataGenerator;
 import org.junit.Test;
+import org.nd4j.linalg.util.BigDecimalMath;
 
-import cern.jet.random.Binomial;
-import cern.jet.random.ChiSquare;
-import cern.jet.random.Normal;
-import cern.jet.random.engine.DRand;
-import cern.jet.random.engine.RandomEngine;
+import java.math.BigDecimal;
+import java.math.MathContext;
+import java.math.RoundingMode;
+import java.util.*;
 
 public class MathUtilities {
-    
+
     //private static DistributionFactory distFactory;
     private static RandomEngine randomeEngine;
-    
+
     static {
         //distFactory = DistributionFactory.newInstance();
         randomeEngine = new DRand();
     }
-    
+
     /**
      * It seems that there are some bugs in the package for LogRankTest(). The results
      * from this implementation is differnet from R.
-     * @param time1
-     * @param censor1
-     * @param time2
-     * @param censor2
+     *
      * @return
      */
 //    public static double logRankSurvivalTest(List<Double> time1,
@@ -64,14 +57,13 @@ public class MathUtilities {
 //        LogRankTest test = new LogRankTest(time11, censor11, time21, censor21);
 //        return test.pValue;
 //    }
-    
     private static double[] convertDoubleListToArray(List<Double> list) {
         double[] rtn = new double[list.size()];
         for (int i = 0; i < list.size(); i++)
             rtn[i] = list.get(i);
         return rtn;
     }
-    
+
     public static double calculateDistance(List<Integer> v1,
                                            List<Integer> v2) {
         if (v1.size() != v2.size())
@@ -84,11 +76,11 @@ public class MathUtilities {
         }
         return Math.sqrt(t);
     }
-    
+
     public static double log2(double value) {
         return Math.log(value) / Math.log(Math.E);
     }
-    
+
     public static double calculateHammingDistance(List<Boolean> vector1,
                                                   List<Boolean> vector2) {
         if (vector1.size() != vector2.size())
@@ -98,11 +90,11 @@ public class MathUtilities {
             Boolean b1 = vector1.get(i);
             Boolean b2 = vector2.get(i);
             if (!b1.equals(b2))
-                dist ++;
+                dist++;
         }
         return dist;
     }
-    
+
     public static double calculateNetworkDistance(List<Boolean> vector1,
                                                   List<Boolean> vector2,
                                                   List<Set<String>> clusters) {
@@ -122,7 +114,7 @@ public class MathUtilities {
         }
         return total - similarity;
     }
-    
+
     public static double calculateTTest(List<Double> sample1,
                                         List<Double> sample2) throws MathException {
         double[] sampleArray1 = new double[sample1.size()];
@@ -133,14 +125,14 @@ public class MathUtilities {
             sampleArray2[i] = sample2.get(i);
         return TestUtils.tTest(sampleArray1, sampleArray2);
     }
-    
+
     public static double calculateMean(List<Double> values) {
         double total = 0.0d;
         for (Double value : values)
             total += value;
         return total / values.size();
     }
-    
+
     public static double calculateJaccardIndex(Collection<String> set1,
                                                Collection<String> set2) {
         Set<String> copy1 = new HashSet<String>(set1);
@@ -150,19 +142,7 @@ public class MathUtilities {
         copy1.addAll(copy2);
         return (double) shared.size() / copy1.size();
     }
-    
-    @Test
-    public void test() throws Exception {
-//        double p = calculateHypergeometricPValue(45, 
-//                                                 17, 
-//                                                 15, 
-//                                                 9);
-//        System.out.println("P value: " + p);
-        double zvalue = calculateZValue(76, 91, 14, 18);
-        double pvalue = calTwoTailStandardNormalPvalue(zvalue);
-        System.out.println(pvalue);
-    }
-    
+
     public static double calculateBinomialPValue(double ratio,
                                                  int sampleSize,
                                                  int success) {
@@ -178,21 +158,22 @@ public class MathUtilities {
         // Try to use cern lib
         //One tailed only!!!
         Binomial cernBinomial = new Binomial(sampleSize, ratio, randomeEngine);
-        if(success == 0) // To avoid unreasonal value
+        if (success == 0) // To avoid unreasonal value
             success = 1;
         return 1.0d - cernBinomial.cdf(success - 1);
     }
 
-    public static double calOneTailedStandardNormalPvalue(double z){
-        Normal stdNormal = new Normal(0,1,randomeEngine);
+    public static double calOneTailedStandardNormalPvalue(double z) {
+        Normal stdNormal = new Normal(0, 1, randomeEngine);
         return stdNormal.cdf(z);
     }
-    
+
     /**
      * Calculate a up-tailed p-value based on hypergeometic distribution.
-     * @param N the total balls in urn
-     * @param s the white balls (as success)
-     * @param n the sample size
+     *
+     * @param N       the total balls in urn
+     * @param s       the white balls (as success)
+     * @param n       the sample size
      * @param success the white balls picked up in the sample size
      * @return
      */
@@ -201,8 +182,8 @@ public class MathUtilities {
                                                        int n,
                                                        int success) throws MathException {
         HypergeometricDistributionImpl hyper = new HypergeometricDistributionImpl(N,
-                                                                                  s,
-                                                                                  n);
+                s,
+                n);
         return hyper.upperCumulativeProbability(success);
 //        int max = Math.min(s, n);
 //        if (success >= max / 2)
@@ -211,26 +192,12 @@ public class MathUtilities {
 //            return 1.0d - hyper.cumulativeProbability(success - 1);
 //        return hyper.cumulativeProbability(success, max);
     }
-    
-    @Test
-    public void testHyper() throws MathException {
-        HypergeometricDistribution hyper = new HypergeometricDistributionImpl(9083, 1977, 201);
-        double pvalue1 = hyper.cumulativeProbability(54, 201);
-        System.out.println(pvalue1);
-        double pvalue2 = hyper.cumulativeProbability(53);
-        System.out.println(pvalue2);
-        System.out.println(pvalue1 + pvalue2);
-    }
-    
-    public Normal normalPDF(){
-        return new Normal(0,1,randomeEngine);
-    }
-    
-    public static double calTwoTailStandardNormalPvalue(double z){
+
+    public static double calTwoTailStandardNormalPvalue(double z) {
         z = Math.abs(z);
-        return 2*(1-calOneTailedStandardNormalPvalue(z));
+        return 2 * (1 - calOneTailedStandardNormalPvalue(z));
     }
-    
+
     public static double calculateZValue(int success1, int sample1,
                                          int success2, int sample2) {
         double ratio1 = (double) success1 / sample1;
@@ -240,26 +207,26 @@ public class MathUtilities {
         double z = (ratio1 - ratio2) / Math.sqrt(p * (1.0 - p) * (1.0 / sample1 + 1.0 / sample2));
         return z;
     }
-    
-    public static double twoTailGroupZTest(double p0, double p, int sampleSize){
-        double z = (p-p0)*1.0/(Math.sqrt((p0*(1-p0))/sampleSize));
-        return  calTwoTailStandardNormalPvalue(z);
+
+    public static double twoTailGroupZTest(double p0, double p, int sampleSize) {
+        double z = (p - p0) * 1.0 / (Math.sqrt((p0 * (1 - p0)) / sampleSize));
+        return calTwoTailStandardNormalPvalue(z);
     }
-    
-    public static double chiSquare(double df, double x2){
-        ChiSquare cs = new ChiSquare(df,randomeEngine);
+
+    public static double chiSquare(double df, double x2) {
+        ChiSquare cs = new ChiSquare(df, randomeEngine);
         return cs.cdf(x2);
     }
-    
+
     public static double calculateEnrichment(double ratio,
                                              int sampleTotal,
                                              int sampleSuccess) {
         double newValue = (double) sampleSuccess / sampleTotal;
         return newValue / ratio;
     }
-    
+
     public static <T> Set<T> randomSampling(Collection<T> set,
-                                             int size) {
+                                            int size) {
         Set<T> rtn = new HashSet<T>();
         int total = set.size();
         List<T> list = null;
@@ -274,10 +241,11 @@ public class MathUtilities {
         }
         return rtn;
     }
-    
+
     /**
      * Use this static method to construct a PearsonCorrelation object to get Pearson correaltion
      * value and its p-value.
+     *
      * @param values1
      * @param values2
      * @return
@@ -285,8 +253,8 @@ public class MathUtilities {
     public static PearsonsCorrelation constructPearsonCorrelation(List<Double> values1,
                                                                   List<Double> values2) {
         if (values1.size() != values2.size())
-            throw new IllegalArgumentException("Two double lists have different lengths: " + 
-                                                values1.size() + " and " + values2.size());
+            throw new IllegalArgumentException("Two double lists have different lengths: " +
+                    values1.size() + " and " + values2.size());
         Array2DRowRealMatrix matrix = constructMatrix(values1, values2);
         PearsonsCorrelation correlation = new PearsonsCorrelation(matrix);
         return correlation;
@@ -301,9 +269,10 @@ public class MathUtilities {
         }
         return matrix;
     }
-    
+
     /**
      * Use this method for doing Spearman Correlation.
+     *
      * @param values1
      * @param values2
      * @return
@@ -311,16 +280,17 @@ public class MathUtilities {
     public static SpearmansCorrelation constructSpearmansCorrelation(List<Double> values1,
                                                                      List<Double> values2) {
         if (values1.size() != values2.size())
-            throw new IllegalArgumentException("Two double lists have different lengths: " + 
-                                               values1.size() + " and " + values2.size());
+            throw new IllegalArgumentException("Two double lists have different lengths: " +
+                    values1.size() + " and " + values2.size());
         Array2DRowRealMatrix matrix = constructMatrix(values1, values2);
         SpearmansCorrelation correlation = new SpearmansCorrelation(matrix);
         return correlation;
     }
-    
+
     /**
      * This method is used to calculate Pearson correlation coefficient. The provided two
      * double lists should have the same size.
+     *
      * @param values1
      * @param values2
      * @return
@@ -333,44 +303,43 @@ public class MathUtilities {
         if (values1.size() != values2.size())
             throw new IllegalArgumentException("The provided two double lists have different sizes!");
         double av1 = 0.0, av2 = 0.0, var1 = 0.0, var2 = 0.0, var12 = 0.0, c;
-        
+
         int size = values1.size();
         for (int i = 0; i < size; i++) {
-          av1 += values1.get(i);
-          av2 += values2.get(i);
+            av1 += values1.get(i);
+            av2 += values2.get(i);
         }
         av1 /= (double) size;
         av2 /= (double) size;
         for (int i = 0; i < size; i++) {
-          var1 += (values1.get(i) - av1) * (values1.get(i) - av1);
-          var2 += (values2.get(i) - av2) * (values2.get(i) - av2);
-          var12 += (values1.get(i) - av1) * (values2.get(i) - av2);
+            var1 += (values1.get(i) - av1) * (values1.get(i) - av1);
+            var2 += (values2.get(i) - av2) * (values2.get(i) - av2);
+            var12 += (values1.get(i) - av1) * (values2.get(i) - av2);
         }
         if (var1 * var2 == 0.0) {
-          c = 1.0;
+            c = 1.0;
+        } else {
+            c = var12 / Math.sqrt(Math.abs(var1 * var2));
         }
-        else {
-          c = var12 / Math.sqrt(Math.abs(var1 * var2));
-        }
-        
+
         return c;
     }
-    
+
     @Deprecated
     public static double calculatePearsonCorrelation1(List<Double> values1,
-                                                     List<Double> values2) {
+                                                      List<Double> values2) {
         // Make sure the two lists have the same size
         if (values1.size() != values2.size())
             throw new IllegalArgumentException("The provided two double lists have different sizes!");
         double av1 = 0.0, av2 = 0.0, sqav1 = 0.0, sqav2 = 0.0, cross = 0.0d;
-        
+
         int size = values1.size();
         for (int i = 0; i < size; i++) {
-          av1 += values1.get(i);
-          sqav1 += values1.get(i) * values1.get(i);
-          av2 += values2.get(i);
-          sqav2 += values2.get(i) * values2.get(i);
-          cross += values1.get(i) * values2.get(i);
+            av1 += values1.get(i);
+            sqav1 += values1.get(i) * values1.get(i);
+            av2 += values2.get(i);
+            sqav2 += values2.get(i) * values2.get(i);
+            cross += values1.get(i) * values2.get(i);
         }
         av1 /= size;
         sqav1 /= size;
@@ -379,10 +348,11 @@ public class MathUtilities {
         cross /= size;
         return (cross - av1 * av2) / Math.sqrt((sqav1 - av1 * av1) * (sqav2 - av2 * av2));
     }
-    
+
     /**
      * This method should be used instead of randomSampling(Collection<String>, int) since
      * it should be a more standard randomization implementation.
+     *
      * @param set
      * @param size
      * @param randomizer
@@ -390,17 +360,18 @@ public class MathUtilities {
      */
     @SuppressWarnings("unchecked")
     public static <T> Set<T> randomSampling(Collection<T> set,
-                                             int size,
-                                             RandomData randomizer) {
+                                            int size,
+                                            RandomData randomizer) {
         Object[] objects = randomizer.nextSample(set, size);
         Set<T> rtn = new HashSet<T>();
         for (Object obj : objects)
             rtn.add((T) obj);
         return rtn;
     }
-    
+
     /**
      * Permutate a list of objects.
+     *
      * @param list
      * @param randomizer
      * @return
@@ -414,9 +385,10 @@ public class MathUtilities {
         }
         return rtn;
     }
-    
+
     /**
      * Same as another method permutate() but uses the API from math3.
+     *
      * @param list
      * @param randomizer
      * @return
@@ -430,9 +402,10 @@ public class MathUtilities {
         }
         return rtn;
     }
-    
+
     /**
      * Random permutate a map
+     *
      * @param keyToValue
      * @return
      */
@@ -450,9 +423,10 @@ public class MathUtilities {
         }
         return rtn;
     }
-    
+
     /**
      * Calculate a FDR from a permutation test. The order in an increasing order.
+     *
      * @param realValue
      * @param realValues
      * @param randomValues
@@ -484,11 +458,12 @@ public class MathUtilities {
             fdr = 1.0d;
         return fdr;
     }
-    
+
     /**
      * Use this method to calculate FDR from a list of pvalues using Benjamini-Hochberg
      * method. The implementation of this method is based on the source code for MEMo
-     * (http://cbio.mskcc.org/tools/memo/). 
+     * (http://cbio.mskcc.org/tools/memo/).
+     *
      * @param pvalues
      * @return
      */
@@ -507,10 +482,27 @@ public class MathUtilities {
         }
         return fdrs;
     }
-    
+
+    public static List<BigDecimal> calculateFDRWithBenjaminiHochbergBD(List<BigDecimal> pvalues) {
+        // Make sure the parsed list if sorted.
+        Collections.sort(pvalues);
+        List<BigDecimal> fdrs = new ArrayList<>(pvalues);
+        int size = pvalues.size();
+        // The last p-value (biggest) should be the same as FDR.
+        for (int i = size - 2; i >= 0; i--) {
+            BigDecimal right = fdrs.get(i + 1);
+            BigDecimal pvalue = pvalues.get(i);
+            BigDecimal left = pvalue.multiply(new BigDecimal(size).divide(new BigDecimal(i + 1.0d), BigDecimal.ROUND_HALF_UP));
+            BigDecimal fdr = left.compareTo(right) < 0 ? left : right;
+            fdrs.set(i, fdr);
+        }
+        return fdrs;
+    }
+
     /**
      * This method is used to combine a collection of pvalues using Fisher's method.
      * (see http://en.wikipedia.org/wiki/Fisher's_method).
+     *
      * @param pvalues
      */
     public static double combinePValuesWithFisherMethod(Collection<Double> pvalues) throws MathException {
@@ -529,35 +521,88 @@ public class MathUtilities {
         ChiSquaredDistribution distribution = new ChiSquaredDistributionImpl(2 * pvalues.size());
         return 1.0d - distribution.cumulativeProbability(total);
     }
-    
+
+    public static BigDecimal combinePValuesWithFisherMethodBD(Collection<BigDecimal> pvalues) throws MathException {
+        // Have to make sure there is no zero in the pvalues collection. Otherwise,
+        // log will throw an exception
+        for (BigDecimal pvalue : pvalues) {
+            if (pvalue.equals(BigDecimal.ZERO)) {
+                throw new IllegalArgumentException("The pvalue list contains 0, which is not allowed!");
+            }
+        }
+        BigDecimal total = BigDecimal.ZERO;
+        for (BigDecimal pvalue : pvalues) {
+            BigDecimal roundp250 = pvalue.round(
+                    new MathContext(250, RoundingMode.HALF_UP)); //losing precision
+            BigDecimal logp;
+            logp = BigDecimalMath.log(roundp250);
+            total = total.add(logp);
+        }
+        total = total.multiply(new BigDecimal(-2.0));
+        ChiSquaredDistribution distribution = new ChiSquaredDistributionImpl(2 * pvalues.size());
+        Double totalDouble = total.doubleValue();
+        if (totalDouble < Double.MIN_NORMAL) {
+            int debug = 1;
+        }
+        BigDecimal combinedInverseP = new BigDecimal(distribution.cumulativeProbability(totalDouble));
+        BigDecimal combinedP = BigDecimal.ONE.subtract(combinedInverseP);
+        return combinedP;
+    }
+
     /**
      * This implementation of proportion test is simplified based on the R prop.test. The chisq correction
      * is based on book: Introductory to Statistics with R.
      */
-    public static double proportionTest(int success, 
-                                 int sampleSize,
-                                 double proportation) throws MathException {
+    public static double proportionTest(int success,
+                                        int sampleSize,
+                                        double proportation) throws MathException {
         double diff = Math.abs(success - sampleSize * proportation);
         // Check what correction should be used
-        double yatesCorrection = Math.min(0.50d,  diff);
+        double yatesCorrection = Math.min(0.50d, diff);
         double chisqr = (diff - yatesCorrection) * (diff - yatesCorrection) / (sampleSize * proportation * (1.0d - proportation));
         // Calculate chisq pvalues
         ChiSquaredDistribution distribution = new ChiSquaredDistributionImpl(1);
         return 1.0d - distribution.cumulativeProbability(chisqr);
     }
-    
+
+    @Test
+    public void test() throws Exception {
+//        double p = calculateHypergeometricPValue(45,
+//                                                 17,
+//                                                 15,
+//                                                 9);
+//        System.out.println("P value: " + p);
+        double zvalue = calculateZValue(76, 91, 14, 18);
+        double pvalue = calTwoTailStandardNormalPvalue(zvalue);
+        System.out.println(pvalue);
+    }
+
+    @Test
+    public void testHyper() throws MathException {
+        HypergeometricDistribution hyper = new HypergeometricDistributionImpl(9083, 1977, 201);
+        double pvalue1 = hyper.cumulativeProbability(54, 201);
+        System.out.println(pvalue1);
+        double pvalue2 = hyper.cumulativeProbability(53);
+        System.out.println(pvalue2);
+        System.out.println(pvalue1 + pvalue2);
+    }
+
+    public Normal normalPDF() {
+        return new Normal(0, 1, randomeEngine);
+    }
+
     @Test
     public void testProportionTest() throws MathException {
         Double pvalue = proportionTest(16, 560, 0.012);
         System.out.println("Pvalue for 16, 560, 0.012: " + pvalue);
-        pvalue = proportionTest(84,  560,  0.012);
+        pvalue = proportionTest(84, 560, 0.012);
         System.out.println("Pvalue for 84, 560, 0.012: " + pvalue);
         pvalue = proportionTest(6, 560, 0.012);
         System.out.println("Pvalue for 6, 560, 0.012: " + pvalue);
         pvalue = proportionTest(13, 560, 0.016);
         System.out.println("Pvalue for 13, 560, 0.016: " + pvalue);
     }
-    
+
     @Test
     public void testRandomization() {
         int total = 500;
@@ -572,5 +617,5 @@ public class MathUtilities {
             System.out.println(builder.toString());
         }
     }
-    
+
 }

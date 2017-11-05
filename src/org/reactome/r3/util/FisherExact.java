@@ -6,6 +6,13 @@
 // terms of the Lesser GNU General Public License (LGPL)
 
 package org.reactome.r3.util;
+import org.nd4j.linalg.util.BigDecimalMath;
+
+import java.math.BigDecimal;
+import java.math.MathContext;
+import java.math.RoundingMode;
+//from https://arxiv.org/src/0908.3030v2/anc
+
 
 /**
  * This does a Fisher Exact test.  The Fisher's Exact test procedure calculates an exact probability value
@@ -15,7 +22,7 @@ package org.reactome.r3.util;
  * for independence; however, the Chi-square gives only an estimate of the true probability value, an estimate
  * which might not be very accurate if the marginal is very uneven or if there is a small value (less than five)
  * in one of the cells.
- *
+ * <p>
  * It uses an array of factorials initialized at the beginning to provide speed.
  * There could be better ways to do this.
  *
@@ -25,8 +32,9 @@ package org.reactome.r3.util;
 
 public class FisherExact {
     private static final boolean DEBUG = false;
-    private double[] f;
     int maxSize;
+    private double[] f;
+    private BigDecimal[] fBD;
 
 
     /**
@@ -42,236 +50,13 @@ public class FisherExact {
         for (int i = 1; i <= this.maxSize; i++) {
             f[i] = f[i - 1] + Math.log(i);
         }
+
+        fBD = new BigDecimal[maxSize + 1];
+        fBD[0] = BigDecimal.ZERO;
+        for (int i = 1; i <= this.maxSize; i++) {
+            fBD[i] = fBD[i - 1].add(BigDecimalMath.log(new BigDecimal(i)));
+        }
     }
-
-    /**
-     * calculates the P-value for this specific state
-     *
-     * @param a     a, b, c, d are the four cells in a 2x2 matrix
-     * @param b
-     * @param c
-     * @param d
-     * @return the P-value
-     */
-    public final double getP(int a, int b, int c, int d) {
-        int n = a + b + c + d;
-        if (n > maxSize) {
-            return Double.NaN;
-        }
-        double p;
-        p = (f[a + b] + f[c + d] + f[a + c] + f[b + d]) - (f[a] + f[b] + f[c] + f[d] + f[n]);
-        return Math.exp(p);
-    }
-
-    /**
-     * Calculates the one-tail P-value for the Fisher Exact test.  Determines whether to calculate the right- or left-
-     * tail, thereby always returning the smallest p-value.
-     *
-     * @param a     a, b, c, d are the four cells in a 2x2 matrix
-     * @param b
-     * @param c
-     * @param d
-     * @return one-tailed P-value (right or left, whichever is smallest)
-     */
-    public final double getCumlativeP(int a, int b, int c, int d) {
-        int min, i;
-        int n = a + b + c + d;
-        if (n > maxSize) {
-            return Double.NaN;
-        }
-        double p = 0;
-
-        p += getP(a, b, c, d);
-        if (DEBUG) {System.out.println("p = " + p);}
-        if ((a * d) >= (b * c)) {
-            if (DEBUG) {System.out.println("doing R-tail: a=" + a + " b=" + b + " c=" + c + " d=" + d);}
-            min = (c < b) ? c : b;
-            for (i = 0; i < min; i++) {
-                if (DEBUG) {System.out.print("doing round " + i);}
-                p += getP(++a, --b, --c, ++d);
-                if (DEBUG) {System.out.println("\ta=" + a + " b=" + b + " c=" + c + " d=" + d);}
-            }
-            System.out.println("");
-        }
-        if ((a * d) < (b * c)) {
-            if (DEBUG) {System.out.println("doing L-tail: a=" + a + " b=" + b + " c=" + c + " d=" + d);}
-            min = (a < d) ? a : d;
-            for (i = 0; i < min; i++) {
-                if (DEBUG) {System.out.print("doing round " + i);}
-                double pTemp = getP(--a, ++b, ++c, --d);
-                if (DEBUG) {System.out.print("\tpTemp = " + pTemp);}
-                p += pTemp;
-                if (DEBUG) {System.out.println("\ta=" + a + " b=" + b + " c=" + c + " d=" + d);}
-            }
-        }
-        return p;
-    }
-
-    /**
-     * Calculates the right-tail P-value for the Fisher Exact test.
-     *
-     * @param a     a, b, c, d are the four cells in a 2x2 matrix
-     * @param b
-     * @param c
-     * @param d
-     * @return one-tailed P-value (right-tail)
-     */
-    public final double getRightTailedP(int a, int b, int c, int d) {
-        int min, i;
-        int n = a + b + c + d;
-        if (n > maxSize) {
-            return Double.NaN;
-        }
-        double p = 0;
-
-        p += getP(a, b, c, d);
-        if (DEBUG) {System.out.println("p = " + p);}
-        if (DEBUG) {System.out.println("doing R-tail: a=" + a + " b=" + b + " c=" + c + " d=" + d);}
-        min = (c < b) ? c : b;
-        for (i = 0; i < min; i++) {
-            p += getP(++a, --b, --c, ++d);
-
-        }
-        return p;
-    }
-
-    /**
-     * Calculates the left-tail P-value for the Fisher Exact test.
-     *
-     * @param a     a, b, c, d are the four cells in a 2x2 matrix
-     * @param b
-     * @param c
-     * @param d
-     * @return one-tailed P-value (left-tail)
-     */
-    public final double getLeftTailedP(int a, int b, int c, int d) {
-        int min, i;
-        int n = a + b + c + d;
-        if (n > maxSize) {
-            return Double.NaN;
-        }
-        double p = 0;
-
-        p += getP(a, b, c, d);
-        if (DEBUG) {System.out.println("p = " + p);}
-        if (DEBUG) {System.out.println("doing L-tail: a=" + a + " b=" + b + " c=" + c + " d=" + d);}
-        min = (a < d) ? a : d;
-        for (i = 0; i < min; i++) {
-            if (DEBUG) {System.out.print("doing round " + i);}
-            double pTemp = getP(--a, ++b, ++c, --d);
-            if (DEBUG) {System.out.print("\tpTemp = " + pTemp);}
-            p += pTemp;
-            if (DEBUG) {System.out.println("\ta=" + a + " b=" + b + " c=" + c + " d=" + d);}
-        }
-
-
-        return p;
-    }
-
-
-    /**
-     *   Calculates the two-tailed P-value for the Fisher Exact test.
-     *
-     *   In order for a table under consideration to have its p-value included
-     *   in the final result, it must have a p-value less than the original table's P-value, i.e.
-     *   Fisher's exact test computes the probability, given the observed marginal
-     *   frequencies, of obtaining exactly the frequencies observed and any configuration more extreme.
-     *   By "more extreme," we mean any configuration (given observed marginals) with a smaller probability of
-     *   occurrence in the same direction (one-tailed) or in both directions (two-tailed).
-     *
-     * @param a     a, b, c, d are the four cells in a 2x2 matrix
-     * @param b
-     * @param c
-     * @param d
-     * @return two-tailed P-value
-     */
-    public final double getTwoTailedP(int a, int b, int c, int d) {
-        int min, i;
-        int n = a + b + c + d;
-        if (n > maxSize) {
-            return Double.NaN;
-        }
-        double p = 0;
-
-        double baseP = getP(a, b, c, d);
-//         in order for a table under consideration to have its p-value included
-//         in the final result, it must have a p-value less than the baseP, i.e.
-//         Fisher's exact test computes the probability, given the observed marginal
-//         frequencies, of obtaining exactly the frequencies observed and any configuration more extreme.
-//         By "more extreme," we mean any configuration (given observed marginals) with a smaller probability of
-//         occurrence in the same direction (one-tailed) or in both directions (two-tailed).
-
-        if (DEBUG) {System.out.println("baseP = " + baseP);}
-        int initialA = a, initialB = b, initialC = c, initialD = d;
-        p += baseP;
-        if (DEBUG) {System.out.println("p = " + p);}
-        if (DEBUG) {System.out.println("Starting with R-tail: a=" + a + " b=" + b + " c=" + c + " d=" + d);}
-        min = (c < b) ? c : b;
-        for (i = 0; i < min; i++) {
-            if (DEBUG) {System.out.print("doing round " + i);}
-            double tempP = getP(++a, --b, --c, ++d);
-            if (tempP <= baseP) {
-                if (DEBUG) {System.out.print("\ttempP (" + tempP + ") is less than baseP (" + baseP + ")");}
-                p += tempP;
-            }
-            if (DEBUG) {System.out.println(" a=" + a + " b=" + b + " c=" + c + " d=" + d);}
-        }
-
-        // reset the values to their original so we can repeat this process for the other side
-        a = initialA;
-        b = initialB;
-        c = initialC;
-        d = initialD;
-
-        if (DEBUG) {System.out.println("Now doing L-tail: a=" + a + " b=" + b + " c=" + c + " d=" + d);}
-        min = (a < d) ? a : d;
-        if (DEBUG) {System.out.println("min = " + min);}
-        for (i = 0; i < min; i++) {
-            if (DEBUG) {System.out.print("doing round " + i);}
-            double pTemp = getP(--a, ++b, ++c, --d);
-            if (DEBUG) {System.out.println("  pTemp = " + pTemp);}
-            if (pTemp <= baseP) {
-                if (DEBUG) {System.out.print("\ttempP (" + pTemp + ") is less than baseP (" + baseP + ")");}
-                p += pTemp;
-            }
-            if (DEBUG) {System.out.println(" a=" + a + " b=" + b + " c=" + c + " d=" + d);}
-        }
-        return p;
-    }
-//
-//    public static void main(String[] args) {
-//
-//        if(args.length != 4){
-//            System.out.println("Please enter 4 values");
-//            System.exit(0);
-//        }
-//        int[] argInts = new int[args.length];
-//
-//        for(int i = 0; i < argInts.length; i++){
-//            argInts[i] = Integer.parseInt(args[i]);
-//        }
-//        FisherExact fe = new FisherExact(100);
-//
-//        System.out.println("\n*****Original algorithm");
-//        double cumulativeP = fe.getCumlativeP(argInts[0], argInts[1], argInts[2], argInts[3]);
-//        System.out.println("cumulativeP = " + cumulativeP );
-//
-//        System.out.println("\n*****Modified algorithm");
-//        double algorithmSelectedP = fe.getAlgorithmSelected(argInts[0], argInts[1], argInts[2], argInts[3]);
-//        System.out.println("algorithmSelectedP = " + algorithmSelectedP);
-//
-//        System.out.println("\n*****Left Tailed");
-//        double leftTailedP = fe.getLeftTailedP(argInts[0], argInts[1], argInts[2], argInts[3]);
-//        System.out.println("leftTailedP = " + leftTailedP);
-//
-//        System.out.println("\n*****Right Tailed");
-//        double rightTailedP = fe.getRightTailedP(argInts[0], argInts[1], argInts[2], argInts[3]);
-//        System.out.println("rightTailedP = " + rightTailedP);
-//
-//        System.out.println("\n*****Two Tailed");
-//        double twoTailedP = fe.getTwoTailedP(argInts[0], argInts[1], argInts[2], argInts[3]);
-//        System.out.println("twoTailedP = " + twoTailedP);
-//    }
 
     public static void main(String[] args) {
 
@@ -312,5 +97,340 @@ public class FisherExact {
             double twoTailedP = fe.getTwoTailedP(argInts[i][0], argInts[i][1], argInts[i][2], argInts[i][3]);
             System.out.println("\ttwoTailedP = " + twoTailedP);
         }
+    }
+
+    /**
+     * calculates the P-value for this specific state
+     *
+     * @param a a, b, c, d are the four cells in a 2x2 matrix
+     * @param b
+     * @param c
+     * @param d
+     * @return the P-value
+     */
+    public final double getP(int a, int b, int c, int d) {
+        int n = a + b + c + d;
+        if (n > maxSize) {
+            return Double.NaN;
+        }
+        double p;
+        p = (f[a + b] + f[c + d] + f[a + c] + f[b + d]) - (f[a] + f[b] + f[c] + f[d] + f[n]);
+        return Math.exp(p);
+    }
+
+    private final BigDecimal getPBD(int a, int b, int c, int d) {
+        int n = a + b + c + d;
+        if (n > maxSize) {
+            throw new IllegalStateException(String.format(
+                    "Can't calculate p because FisherExact object was initialized with %d instead of %d",
+                    maxSize,
+                    n));
+        }
+        BigDecimal p;
+        p = (fBD[a + b].add(fBD[c + d].add(fBD[a + c].add(fBD[b + d])))).subtract(
+                (fBD[a].add(fBD[b].add(fBD[c].add(fBD[d].add(fBD[n]))))));
+
+        BigDecimal roundE250 = BigDecimalMath.E.round(
+                new MathContext(250, RoundingMode.HALF_UP)); //losing precision
+        BigDecimal roundp250 = p.round(
+                new MathContext(250, RoundingMode.HALF_UP)); //losing precision
+
+        BigDecimal ret = BigDecimalMath.pow(roundE250,roundp250);
+        return ret;
+    }
+
+    /**
+     * Calculates the one-tail P-value for the Fisher Exact test.  Determines whether to calculate the right- or left-
+     * tail, thereby always returning the smallest p-value.
+     *
+     * @param a a, b, c, d are the four cells in a 2x2 matrix
+     * @param b
+     * @param c
+     * @param d
+     * @return one-tailed P-value (right or left, whichever is smallest)
+     */
+    public final double getCumlativeP(int a, int b, int c, int d) {
+        int min, i;
+        int n = a + b + c + d;
+        if (n > maxSize) {
+            return Double.NaN;
+        }
+        double p = 0;
+
+        p += getP(a, b, c, d);
+        if (DEBUG) {
+            System.out.println("p = " + p);
+        }
+        if ((a * d) >= (b * c)) {
+            if (DEBUG) {
+                System.out.println("doing R-tail: a=" + a + " b=" + b + " c=" + c + " d=" + d);
+            }
+            min = (c < b) ? c : b;
+            for (i = 0; i < min; i++) {
+                if (DEBUG) {
+                    System.out.print("doing round " + i);
+                }
+                p += getP(++a, --b, --c, ++d);
+                if (DEBUG) {
+                    System.out.println("\ta=" + a + " b=" + b + " c=" + c + " d=" + d);
+                }
+            }
+            System.out.println("");
+        }
+        if ((a * d) < (b * c)) {
+            if (DEBUG) {
+                System.out.println("doing L-tail: a=" + a + " b=" + b + " c=" + c + " d=" + d);
+            }
+            min = (a < d) ? a : d;
+            for (i = 0; i < min; i++) {
+                if (DEBUG) {
+                    System.out.print("doing round " + i);
+                }
+                double pTemp = getP(--a, ++b, ++c, --d);
+                if (DEBUG) {
+                    System.out.print("\tpTemp = " + pTemp);
+                }
+                p += pTemp;
+                if (DEBUG) {
+                    System.out.println("\ta=" + a + " b=" + b + " c=" + c + " d=" + d);
+                }
+            }
+        }
+        return p;
+    }
+
+    /**
+     * Calculates the right-tail P-value for the Fisher Exact test.
+     *
+     * @param a a, b, c, d are the four cells in a 2x2 matrix
+     * @param b
+     * @param c
+     * @param d
+     * @return one-tailed P-value (right-tail)
+     */
+    public final double getRightTailedP(int a, int b, int c, int d) {
+        int min, i;
+        int n = a + b + c + d;
+        if (n > maxSize) {
+            return Double.NaN;
+        }
+        double p = 0;
+
+        p += getP(a, b, c, d);
+        if (DEBUG) {
+            System.out.println("p = " + p);
+        }
+        if (DEBUG) {
+            System.out.println("doing R-tail: a=" + a + " b=" + b + " c=" + c + " d=" + d);
+        }
+        min = (c < b) ? c : b;
+        for (i = 0; i < min; i++) {
+            p += getP(++a, --b, --c, ++d);
+
+        }
+        return p;
+    }
+
+    public final BigDecimal getRightTailedPBD(int a, int b, int c, int d) {
+        int min, i;
+        int n = a + b + c + d;
+        if (n > maxSize) {
+            throw new IllegalStateException(String.format(
+                    "Can't calculate p because FisherExact object was initialized with %d instead of %d",
+                    maxSize,
+                    n));
+        }
+        BigDecimal p = BigDecimal.ZERO;
+
+        p = p.add(getPBD(a, b, c, d));
+        if (DEBUG) {
+            System.out.println("p = " + p);
+        }
+        if (DEBUG) {
+            System.out.println("doing R-tail: a=" + a + " b=" + b + " c=" + c + " d=" + d);
+        }
+        min = (c < b) ? c : b;
+        for (i = 0; i < min; i++) {
+            p = p.add(getPBD(++a, --b, --c, ++d));
+
+        }
+        if (p.compareTo(BigDecimal.ZERO) <= 0) {
+            //throw new IllegalStateException(String.format(
+            //        "The whole point of BigDecimal introduction is to avoid this"
+            //));
+            p = BigDecimal.ZERO;
+        }
+        return p;
+    }
+
+    /**
+     * Calculates the left-tail P-value for the Fisher Exact test.
+     *
+     * @param a a, b, c, d are the four cells in a 2x2 matrix
+     * @param b
+     * @param c
+     * @param d
+     * @return one-tailed P-value (left-tail)
+     */
+    public final double getLeftTailedP(int a, int b, int c, int d) {
+        int min, i;
+        int n = a + b + c + d;
+        if (n > maxSize) {
+            return Double.NaN;
+        }
+        double p = 0;
+
+        p += getP(a, b, c, d);
+        if (DEBUG) {
+            System.out.println("p = " + p);
+        }
+        if (DEBUG) {
+            System.out.println("doing L-tail: a=" + a + " b=" + b + " c=" + c + " d=" + d);
+        }
+        min = (a < d) ? a : d;
+        for (i = 0; i < min; i++) {
+            if (DEBUG) {
+                System.out.print("doing round " + i);
+            }
+            double pTemp = getP(--a, ++b, ++c, --d);
+            if (DEBUG) {
+                System.out.print("\tpTemp = " + pTemp);
+            }
+            p += pTemp;
+            if (DEBUG) {
+                System.out.println("\ta=" + a + " b=" + b + " c=" + c + " d=" + d);
+            }
+        }
+
+
+        return p;
+    }
+//
+//    public static void main(String[] args) {
+//
+//        if(args.length != 4){
+//            System.out.println("Please enter 4 values");
+//            System.exit(0);
+//        }
+//        int[] argInts = new int[args.length];
+//
+//        for(int i = 0; i < argInts.length; i++){
+//            argInts[i] = Integer.parseInt(args[i]);
+//        }
+//        FisherExact fe = new FisherExact(100);
+//
+//        System.out.println("\n*****Original algorithm");
+//        double cumulativeP = fe.getCumlativeP(argInts[0], argInts[1], argInts[2], argInts[3]);
+//        System.out.println("cumulativeP = " + cumulativeP );
+//
+//        System.out.println("\n*****Modified algorithm");
+//        double algorithmSelectedP = fe.getAlgorithmSelected(argInts[0], argInts[1], argInts[2], argInts[3]);
+//        System.out.println("algorithmSelectedP = " + algorithmSelectedP);
+//
+//        System.out.println("\n*****Left Tailed");
+//        double leftTailedP = fe.getLeftTailedP(argInts[0], argInts[1], argInts[2], argInts[3]);
+//        System.out.println("leftTailedP = " + leftTailedP);
+//
+//        System.out.println("\n*****Right Tailed");
+//        double rightTailedP = fe.getRightTailedP(argInts[0], argInts[1], argInts[2], argInts[3]);
+//        System.out.println("rightTailedP = " + rightTailedP);
+//
+//        System.out.println("\n*****Two Tailed");
+//        double twoTailedP = fe.getTwoTailedP(argInts[0], argInts[1], argInts[2], argInts[3]);
+//        System.out.println("twoTailedP = " + twoTailedP);
+//    }
+
+    /**
+     * Calculates the two-tailed P-value for the Fisher Exact test.
+     * <p>
+     * In order for a table under consideration to have its p-value included
+     * in the final result, it must have a p-value less than the original table's P-value, i.e.
+     * Fisher's exact test computes the probability, given the observed marginal
+     * frequencies, of obtaining exactly the frequencies observed and any configuration more extreme.
+     * By "more extreme," we mean any configuration (given observed marginals) with a smaller probability of
+     * occurrence in the same direction (one-tailed) or in both directions (two-tailed).
+     *
+     * @param a a, b, c, d are the four cells in a 2x2 matrix
+     * @param b
+     * @param c
+     * @param d
+     * @return two-tailed P-value
+     */
+    public final double getTwoTailedP(int a, int b, int c, int d) {
+        int min, i;
+        int n = a + b + c + d;
+        if (n > maxSize) {
+            return Double.NaN;
+        }
+        double p = 0;
+
+        double baseP = getP(a, b, c, d);
+//         in order for a table under consideration to have its p-value included
+//         in the final result, it must have a p-value less than the baseP, i.e.
+//         Fisher's exact test computes the probability, given the observed marginal
+//         frequencies, of obtaining exactly the frequencies observed and any configuration more extreme.
+//         By "more extreme," we mean any configuration (given observed marginals) with a smaller probability of
+//         occurrence in the same direction (one-tailed) or in both directions (two-tailed).
+
+        if (DEBUG) {
+            System.out.println("baseP = " + baseP);
+        }
+        int initialA = a, initialB = b, initialC = c, initialD = d;
+        p += baseP;
+        if (DEBUG) {
+            System.out.println("p = " + p);
+        }
+        if (DEBUG) {
+            System.out.println("Starting with R-tail: a=" + a + " b=" + b + " c=" + c + " d=" + d);
+        }
+        min = (c < b) ? c : b;
+        for (i = 0; i < min; i++) {
+            if (DEBUG) {
+                System.out.print("doing round " + i);
+            }
+            double tempP = getP(++a, --b, --c, ++d);
+            if (tempP <= baseP) {
+                if (DEBUG) {
+                    System.out.print("\ttempP (" + tempP + ") is less than baseP (" + baseP + ")");
+                }
+                p += tempP;
+            }
+            if (DEBUG) {
+                System.out.println(" a=" + a + " b=" + b + " c=" + c + " d=" + d);
+            }
+        }
+
+        // reset the values to their original so we can repeat this process for the other side
+        a = initialA;
+        b = initialB;
+        c = initialC;
+        d = initialD;
+
+        if (DEBUG) {
+            System.out.println("Now doing L-tail: a=" + a + " b=" + b + " c=" + c + " d=" + d);
+        }
+        min = (a < d) ? a : d;
+        if (DEBUG) {
+            System.out.println("min = " + min);
+        }
+        for (i = 0; i < min; i++) {
+            if (DEBUG) {
+                System.out.print("doing round " + i);
+            }
+            double pTemp = getP(--a, ++b, ++c, --d);
+            if (DEBUG) {
+                System.out.println("  pTemp = " + pTemp);
+            }
+            if (pTemp <= baseP) {
+                if (DEBUG) {
+                    System.out.print("\ttempP (" + pTemp + ") is less than baseP (" + baseP + ")");
+                }
+                p += pTemp;
+            }
+            if (DEBUG) {
+                System.out.println(" a=" + a + " b=" + b + " c=" + c + " d=" + d);
+            }
+        }
+        return p;
     }
 }

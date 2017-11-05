@@ -1,12 +1,13 @@
 package org.reactome.cancer;
 
-import org.reactome.cancer.driver.MechismoAnalyzer;
 import org.reactome.r3.util.MathUtilities;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.*;
 
 public class CooccurrenceResult {
-    private List<Double> pValues;
+    private List<BigDecimal> pValues;
     private List<Set<String>> fIs;
     private List<Long> targetRxns;
     private List<Set<Long>> upstreamRxns;
@@ -14,11 +15,11 @@ public class CooccurrenceResult {
     private List<Set<String>> excludedUpstreamPairSamples;
     private List<Set<List<String>>> upstreamRxnMutationsIncluded;
     private List<Set<List<String>>> upstreamRxnMutationsExlcuded;
-    private Map<Double, Double> pValue2BHAdjustedPValueMap;
-    private Map<Double, Double> pValue2EmpiricalPValueMap;
+    private Map<BigDecimal, BigDecimal> pValue2BHAdjustedPValueMap;
+    private Map<BigDecimal, BigDecimal> pValue2EmpiricalPValueMap;
 
     public CooccurrenceResult(
-            List<Double> allPValues,
+            List<BigDecimal> allPValues,
             List<Set<String>> allFIs,
             List<Long> allTargetRxns,
             List<Set<Long>> allUpstreamRxns,
@@ -42,10 +43,10 @@ public class CooccurrenceResult {
 
     public void CalculateBHAdjustedPValues() {
         //The FDR calculation has the side effect of sorting the passed list...
-        List<Double> pValuesSorted = new ArrayList<>(this.pValues);
+        List<BigDecimal> pValuesSorted = new ArrayList<>(this.pValues);
 
-        List<Double> BHAdjustedPValues =
-                MathUtilities.calculateFDRWithBenjaminiHochberg(pValuesSorted);
+        List<BigDecimal> BHAdjustedPValues =
+                MathUtilities.calculateFDRWithBenjaminiHochbergBD(pValuesSorted);
 
         this.pValue2BHAdjustedPValueMap = new HashMap<>();
         for (int i = 0; i < pValues.size(); i++) {
@@ -57,7 +58,7 @@ public class CooccurrenceResult {
     public void CalculateEmpiricalPValues(List<CooccurrenceResult> rewiredNetworkResults) {
 
 
-        List<Double> rewiredNetworkPvalues = new ArrayList<>();
+        List<BigDecimal> rewiredNetworkPvalues = new ArrayList<>();
 
         double p5 = this.pValues.size() * 1.5;
         double m5 = this.pValues.size() * 0.5;
@@ -67,7 +68,7 @@ public class CooccurrenceResult {
             if (rewiredNetworkResult.pValues.size() > p5 ||
                     rewiredNetworkResult.pValues.size() < m5) {
                 System.out.println(String.format(
-                        "The number of p values from this permutation was %d but should be closer to %d",
+                        "Permutation had %d results but real had %d",
                         rewiredNetworkResult.pValues.size(),
                         this.pValues.size()));
             }
@@ -78,7 +79,7 @@ public class CooccurrenceResult {
         this.pValue2EmpiricalPValueMap = new HashMap<>();
 
         //loop over pValues
-        for (Double pValue : this.pValues) {
+        for (BigDecimal pValue : this.pValues) {
             this.pValue2EmpiricalPValueMap.put(pValue,
                     CalculateEmpiricalPValue(
                             CountValuesLTEThresh(rewiredNetworkPvalues, pValue),
@@ -88,24 +89,32 @@ public class CooccurrenceResult {
         }
     }
 
-    private double CalculateEmpiricalPValue(int randomLessThan,
-                                            int realLessThan,
-                                            int randomTotal,
-                                            int realTotal) {
+    private BigDecimal CalculateEmpiricalPValue(int randomLessThan,
+                                                int realLessThan,
+                                                int randomTotal,
+                                                int realTotal) {
 
-        double fdr = ((double) randomLessThan /
-                (double) randomTotal) /
-                ((double) realLessThan /
-                        (double) realTotal);
-        if (fdr > 1.0)
-            fdr = 1.0;
+        BigDecimal randomLessThanBD = new BigDecimal(randomLessThan);
+        BigDecimal realLessThanBD = new BigDecimal(realLessThan);
+        BigDecimal randomTotalBD = new BigDecimal(randomTotal);
+        BigDecimal realTotalBD = new BigDecimal(realTotal);
+        BigDecimal fdr = null;
+        try {
+            BigDecimal num = randomLessThanBD.divide(realLessThanBD, RoundingMode.HALF_UP);
+            BigDecimal denom = randomTotalBD.divide(realTotalBD, RoundingMode.HALF_UP);
+            fdr = num.divide(denom, RoundingMode.HALF_UP);
+        }catch(ArithmeticException ae){
+            int debug = 1;
+        }
+        if (fdr.compareTo(BigDecimal.ONE) > 0)
+            fdr = BigDecimal.ONE;
         return fdr;
     }
 
-    private int CountValuesLTEThresh(List<Double> vals, Double threshold) {
+    private int CountValuesLTEThresh(List<BigDecimal> vals, BigDecimal threshold) {
         int count = 0;
-        for (Double val : vals) {
-            count = val <= threshold ?
+        for (BigDecimal val : vals) {
+            count = val.compareTo(threshold) <= 0 ?
                     count + 1 :
                     count;
         }
@@ -124,7 +133,7 @@ public class CooccurrenceResult {
         System.gc();
     }
 
-    public List<Double> getpValues() {
+    public List<BigDecimal> getpValues() {
         return pValues;
     }
 
@@ -156,11 +165,11 @@ public class CooccurrenceResult {
         return upstreamRxnMutationsExlcuded;
     }
 
-    public Map<Double, Double> getpValue2BHAdjustedPValueMap() {
+    public Map<BigDecimal, BigDecimal> getpValue2BHAdjustedPValueMap() {
         return pValue2BHAdjustedPValueMap;
     }
 
-    public Map<Double, Double> getpValue2EmpiricalPValueMap() {
+    public Map<BigDecimal, BigDecimal> getpValue2EmpiricalPValueMap() {
         return pValue2EmpiricalPValueMap;
     }
 }

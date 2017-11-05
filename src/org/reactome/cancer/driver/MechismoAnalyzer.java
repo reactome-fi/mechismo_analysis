@@ -33,9 +33,12 @@ import org.reactome.r3.util.Plotter;
 
 import java.io.File;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.text.DecimalFormat;
+import java.text.NumberFormat;
 import java.util.*;
 import java.util.function.BiFunction;
 import java.util.stream.Collectors;
@@ -938,7 +941,6 @@ public class MechismoAnalyzer {
     }
 
 
-
     private void MapReactionsToSamples(Map<Long, Set<String>> reaction2FiSet,
                                        Map<Long, Set<String>> rxn2Samples,
                                        Map<String, Set<String>> fis2Samples) {
@@ -957,7 +959,6 @@ public class MechismoAnalyzer {
             }
         }
     }
-
 
 
     public void mapReactomeReactions(CancerDriverReactomeAnalyzer cancerDriverReactomeAnalyzer,
@@ -1227,6 +1228,9 @@ public class MechismoAnalyzer {
                 excludedMutationsGeneNames,
                 excludedMutations);
 
+        NumberFormat decimalFormat = new DecimalFormat(
+                "#0.0000000000000000000000000000000000000000000000000000000000000");
+
         fileUtility.printLine(String.format(
                 "%s:%s," + //Target Reaction
                         "%d," + //#Upstream Reactions
@@ -1245,9 +1249,9 @@ public class MechismoAnalyzer {
                         "%s," + //Excluded Mutations Gene Names
                         "%s," + //Included Mutations
                         "%s," + //Excluded Mutations
-                        "%.100e," + //Fishers Method Combined P-value
-                        "%.100e," + //BH Adjusted P-value
-                        "%.100e", //Permutation-Based Empirical P-value
+                        "%s," + //Fishers Method Combined P-value
+                        "%s," + //BH Adjusted P-value
+                        "%s", //Permutation-Based Empirical P-value
                 cr.getTargetRxns().get(i),
                 longRxnDbIdToName.get(cr.getTargetRxns().get(i)).replace(",", "~"),
                 cr.getUpstreamRxns().get(i).size(),
@@ -1306,9 +1310,9 @@ public class MechismoAnalyzer {
                         : Collections.singletonList(excludedMutations).get(0).toString()
                         .replace("[", "")
                         .replace("]", ""),
-                cr.getpValues().get(i),
-                cr.getpValue2BHAdjustedPValueMap().get(cr.getpValues().get(i)),
-                cr.getpValue2EmpiricalPValueMap().get(cr.getpValues().get(i))));
+                decimalFormat.format(cr.getpValues().get(i)),
+                decimalFormat.format(cr.getpValue2BHAdjustedPValueMap().get(cr.getpValues().get(i))),
+                decimalFormat.format(cr.getpValue2EmpiricalPValueMap().get(cr.getpValues().get(i)))));
     }
 
     private CooccurrenceResult CalculateCooccurrencePValues(
@@ -1357,7 +1361,7 @@ public class MechismoAnalyzer {
 
         System.gc();
 
-        List<Double> allPValues = new ArrayList<>();
+        List<BigDecimal> allPValues = new ArrayList<>();
         List<Set<String>> allFIs = new ArrayList<>();
         List<Long> allTargetRxns = new ArrayList<>();
         List<Set<Long>> allUpstreamRxns = new ArrayList<>();
@@ -1401,7 +1405,7 @@ public class MechismoAnalyzer {
             DirectedGraph<Long, DefaultEdge> reactionGraph,
             FisherExact fisherExact,
 
-            List<Double> allPValues,
+            List<BigDecimal> allPValues,
             List<Set<String>> allFIs,
             List<Long> allTargetRxns,
             List<Set<Long>> allUpstreamRxns,
@@ -1426,7 +1430,7 @@ public class MechismoAnalyzer {
             List<Long[]> targetUpstreamReactionPairs =
                     new ArrayList<>(GenerateReactionSetPairs(trs.getSupportedUpstreamRxns()));
 
-            List<Double> targetPValues = new ArrayList<>();
+            List<BigDecimal> targetPValues = new ArrayList<>();
             Set<Long> targetUpstreamRxns = new HashSet<>();
             Set<String> targetUpstreamRxnFIs = new HashSet<>();
             Set<String> targetAnyUpstreamPairSamples = new HashSet<>();
@@ -1442,17 +1446,17 @@ public class MechismoAnalyzer {
 
                     if (ignoreDependentUpstreamReactions &&
                             (!reactionGraph.getAllEdges(upstreamReaction1Id, upstreamReaction2Id).isEmpty() ||
-                            !reactionGraph.getAllEdges(upstreamReaction2Id, upstreamReaction1Id).isEmpty() ||
-                            !reactionGraph.getAllEdges(targetRxnId,upstreamReaction1Id).isEmpty() ||
-                            !reactionGraph.getAllEdges(targetRxnId,upstreamReaction2Id).isEmpty())) {
+                                    !reactionGraph.getAllEdges(upstreamReaction2Id, upstreamReaction1Id).isEmpty() ||
+                                    !reactionGraph.getAllEdges(targetRxnId, upstreamReaction1Id).isEmpty() ||
+                                    !reactionGraph.getAllEdges(targetRxnId, upstreamReaction2Id).isEmpty())) {
                         continue;
                     } else if (ignoreIndependentUpstreamReactions &&
                             (reactionGraph.getAllEdges(upstreamReaction1Id, upstreamReaction2Id).isEmpty() &&
-                            reactionGraph.getAllEdges(upstreamReaction2Id, upstreamReaction1Id).isEmpty())) {
+                                    reactionGraph.getAllEdges(upstreamReaction2Id, upstreamReaction1Id).isEmpty())) {
                         continue;
                     } else if (excludeMultipleImmediateUpstreamReactions &&
                             (!reactionGraph.getAllEdges(upstreamReaction1Id, targetRxnId).isEmpty() &&
-                            !reactionGraph.getAllEdges(upstreamReaction2Id, targetRxnId).isEmpty())) {
+                                    !reactionGraph.getAllEdges(upstreamReaction2Id, targetRxnId).isEmpty())) {
                         continue;
                     } else {
 
@@ -1533,7 +1537,7 @@ public class MechismoAnalyzer {
                                 }
                                 sampleRxnMutUnion.retainAll(targetRxnmuts);
 
-                                if(!sampleRxnMutUnion.isEmpty()){
+                                if (!sampleRxnMutUnion.isEmpty()) {
                                     dSampleItr.remove();
                                 }
 
@@ -1569,19 +1573,22 @@ public class MechismoAnalyzer {
                                         rxn2FIs,
                                         upstreamReaction2Id));
 
-                        double p = fisherExact.getRightTailedP(
+                        BigDecimal p = fisherExact.getRightTailedPBD(
                                 A.size(),
                                 B.size(),
                                 C.size(),
                                 D.size());
 
-                        if (p <= 0.0) {
-                            int debug = 1;
-                            p = Double.MIN_VALUE;
+                        if (p.compareTo(BigDecimal.ZERO) <= 0) {
+                            throw new IllegalStateException(String.format(
+                                    "The whole point of BigDecimal introduction is to avoid this"
+                            ));
                         }
 
                         //FisherExact uses numerical approximation and is sometimes > 1.0000000000
-                        targetPValues.add(p > 1.0 ? 1.0 : p);
+                        targetPValues.add(p.compareTo(BigDecimal.ONE) > 0 ?
+                                BigDecimal.ONE :
+                                p);
 
                         if (targetPValues.size() == 0) {
                             int debug = 1;
@@ -1627,14 +1634,14 @@ public class MechismoAnalyzer {
 
     private void CalculateCombinedPFishersMethod(
             Long targetRxnId,
-            List<Double> targetPValues,
+            List<BigDecimal> targetPValues,
             Set<Long> targetUpstreamRxns,
             Set<String> targetUpstreamRxnFIs,
             Set<String> targetAnyUpstreamPairSamples,
             Set<String> targetExcludedUpstreamPairSamples,
             Set<List<String>> targetUpstreamRxnMutationsIncluded,
             Set<List<String>> targetUpstreamRxnMutationsExcluded,
-            List<Double> allPValues,
+            List<BigDecimal> allPValues,
             List<Long> allTargetRxns,
             List<Set<Long>> allUpstreamRxns,
             List<Set<String>> allFIs,
@@ -1650,12 +1657,9 @@ public class MechismoAnalyzer {
                     targetPValues.size()));
         }
 
-        double combinedPValue = 1.0;
-        try {
-            combinedPValue = MathUtilities.combinePValuesWithFisherMethod(targetPValues);
-        } catch (IllegalArgumentException iae) {
-            int debug = 1;
-        }
+        BigDecimal combinedPValue;
+        combinedPValue = MathUtilities.combinePValuesWithFisherMethodBD(targetPValues);
+
         allTargetRxns.add(targetRxnId);
         allPValues.add(combinedPValue);
         allUpstreamRxns.add(targetUpstreamRxns);
