@@ -8,7 +8,7 @@ public class CooccurrenceResult {
     private List<Long> targetRxns;
     private List<Set<Long>> upstreamRxns;
     private List<Set<String>> upstreamRxnFIs;
-    private List<Set<String>> samplesW0MutatedUpstreamRxns;
+    private List<Integer> numSamplesW0MutatedUpstreamRxns;
     private List<Set<String>> samplesW1MutatedUpstreamRxn;
     private List<Set<String>> samplesW2plusMutatedUpstreamRxns;
     private List<Set<List<String>>> superIndirectMutations;
@@ -27,9 +27,9 @@ public class CooccurrenceResult {
             List<Long> targetRxns,
             List<Set<Long>> upstreamRxns,
             List<Set<String>> upstreamRxnFIs,
+            List<Integer> numSamplesW0MutatedUpstreamRxns,
             List<Set<String>> samplesW1MutatedUpstreamRxn,
             List<Set<String>> samplesW2plusMutatedUpstreamRxns,
-            List<Set<String>> samplesW0MutatedUpstreamRxns,
             List<Set<List<String>>> superIndirectMutations,
             List<Set<List<String>>> indirectMutations,
             List<Set<List<String>>> superDirectMutations,
@@ -39,7 +39,7 @@ public class CooccurrenceResult {
         this.targetRxns = targetRxns;
         this.upstreamRxns = upstreamRxns;
         this.upstreamRxnFIs = upstreamRxnFIs;
-        this.samplesW0MutatedUpstreamRxns = samplesW0MutatedUpstreamRxns;
+        this.numSamplesW0MutatedUpstreamRxns = numSamplesW0MutatedUpstreamRxns;
         this.samplesW1MutatedUpstreamRxn = samplesW1MutatedUpstreamRxn;
         this.samplesW2plusMutatedUpstreamRxns = samplesW2plusMutatedUpstreamRxns;
         this.superIndirectMutations = superIndirectMutations;
@@ -56,22 +56,28 @@ public class CooccurrenceResult {
         this.pValue2EmpiricalPValueMap = null;
     }
 
-    private void FillMutatedGeneSets(){
-        for(int i = 0; i < this.pValues.size(); i++) {
+    private void FillMutatedGeneSets() {
+
+        this.superIndirectMutatedGenes = new ArrayList<>();
+        this.indirectMutatedGenes = new ArrayList<>();
+        this.superDirectMutatedGenes = new ArrayList<>();
+        this.directMutatedGenes = new ArrayList<>();
+
+        for (int i = 0; i < this.pValues.size(); i++) {
             Set<String> superIndirectTargetMutations = new HashSet<>();
             Set<String> indirectTargetMutations = new HashSet<>();
             Set<String> superDirectTargetMutations = new HashSet<>();
             Set<String> directTargetMutations = new HashSet<>();
-            for (List<String> mutation : this.superIndirectMutations.get(i)){
-               superIndirectTargetMutations.add(mutation.get(0));
+            for (List<String> mutation : this.superIndirectMutations.get(i)) {
+                superIndirectTargetMutations.add(mutation.get(0));
             }
-            for (List<String> mutation : this.indirectMutations.get(i)){
+            for (List<String> mutation : this.indirectMutations.get(i)) {
                 indirectTargetMutations.add(mutation.get(0));
             }
-            for (List<String> mutation : this.superDirectMutations.get(i)){
+            for (List<String> mutation : this.superDirectMutations.get(i)) {
                 superDirectTargetMutations.add(mutation.get(0));
             }
-            for (List<String> mutation : this.directMutations.get(i)){
+            for (List<String> mutation : this.directMutations.get(i)) {
                 directTargetMutations.add(mutation.get(0));
             }
             this.superIndirectMutatedGenes.add(superIndirectTargetMutations);
@@ -81,29 +87,29 @@ public class CooccurrenceResult {
         }
     }
 
-    public List<Set<String>> getSuperIndirectMutatedGenes(){
-        if(this.superIndirectMutatedGenes == null) {
+    public List<Set<String>> getSuperIndirectMutatedGenes() {
+        if (this.superIndirectMutatedGenes == null) {
             FillMutatedGeneSets();
         }
         return this.superIndirectMutatedGenes;
     }
 
-    public List<Set<String>> getIndirectMutatedGenes(){
-        if(this.indirectMutatedGenes == null) {
+    public List<Set<String>> getIndirectMutatedGenes() {
+        if (this.indirectMutatedGenes == null) {
             FillMutatedGeneSets();
         }
         return this.indirectMutatedGenes;
     }
 
-    public List<Set<String>> getSuperDirectMutatedGenes(){
-        if(this.superDirectMutatedGenes == null) {
+    public List<Set<String>> getSuperDirectMutatedGenes() {
+        if (this.superDirectMutatedGenes == null) {
             FillMutatedGeneSets();
         }
         return this.superDirectMutatedGenes;
     }
 
-    public List<Set<String>> getDirectMutatedGenes(){
-        if(this.directMutatedGenes == null) {
+    public List<Set<String>> getDirectMutatedGenes() {
+        if (this.directMutatedGenes == null) {
             FillMutatedGeneSets();
         }
         return this.directMutatedGenes;
@@ -185,7 +191,7 @@ public class CooccurrenceResult {
         this.targetRxns.clear();
         this.upstreamRxns.clear();
         this.upstreamRxnFIs.clear();
-        this.samplesW0MutatedUpstreamRxns.clear();
+        this.numSamplesW0MutatedUpstreamRxns.clear();
         this.samplesW1MutatedUpstreamRxn.clear();
         this.samplesW2plusMutatedUpstreamRxns.clear();
         this.superIndirectMutations.clear();
@@ -219,8 +225,8 @@ public class CooccurrenceResult {
         return pValue2EmpiricalPValueMap;
     }
 
-    public List<Set<String>> getSamplesW0MutatedUpstreamRxns() {
-        return samplesW0MutatedUpstreamRxns;
+    public List<Integer> getNumSamplesW0MutatedUpstreamRxns() {
+        return numSamplesW0MutatedUpstreamRxns;
     }
 
     public List<Set<String>> getSamplesW1MutatedUpstreamRxn() {
