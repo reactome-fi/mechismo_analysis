@@ -22,7 +22,7 @@ import org.reactome.annotate.PathwayBasedAnnotator;
 import org.reactome.cancer.CooccurrenceResult;
 import org.reactome.cancer.MechismoOutputLoader;
 import org.reactome.cancer.ReactomeReactionGraphLoader;
-import org.reactome.cancer.TargetReactionSummary;
+import org.reactome.cancer.TargetReactionCandidate;
 import org.reactome.px.util.InteractionUtilities;
 import org.reactome.r3.Interactome3dAnalyzer;
 import org.reactome.r3.ReactomeAnalyzer;
@@ -611,7 +611,7 @@ public class MechismoAnalyzer {
         int initialVtxCount = rewiredReactionGraph.vertexSet().size();
 
         for (Set<Long> connectedSet : connectedSets) {
-            if (connectedSet.size() > 3) {
+            if (connectedSet.size() >= 3) {
 
                 if (connectedSet.size() >= initialVtxCount) {
                     throw new IllegalStateException(String.format(
@@ -845,7 +845,7 @@ public class MechismoAnalyzer {
                                          Map<Long, Set<String>> reaction2FiSet,
                                          Long currentReactionId,
                                          Set<Set<String>> allFIs,
-                                         Set<TargetReactionSummary> targetReactionSummaries,
+                                         Set<TargetReactionCandidate> targetReactionSummaries,
                                          Long targetReactionId,
                                          Map<Long, String> longRxnDbIdToName) {
         Set<DefaultEdge> incomingEdgesCpy = new HashSet<>(incomingEdges);
@@ -893,7 +893,7 @@ public class MechismoAnalyzer {
         }
         allFIs.add(supportedFIs);
 
-        targetReactionSummaries.add(new TargetReactionSummary(
+        targetReactionSummaries.add(new TargetReactionCandidate(
                 targetReactionId,
                 supportedUpstreamReactions.size(),
                 upstreamReactions.size(),
@@ -905,7 +905,7 @@ public class MechismoAnalyzer {
                 longRxnDbIdToName));
     }
 
-    private void SearchRxnNetwork(Set<TargetReactionSummary> targetReactionSummaries,
+    private void SearchRxnNetwork(Set<TargetReactionCandidate> targetReactionSummaries,
                                   Set<Set<String>> allFIs,
                                   Map<Long, Set<String>> reaction2FiSet,
                                   DirectedGraph<Long, DefaultEdge> reactionGraph,
@@ -938,7 +938,6 @@ public class MechismoAnalyzer {
     }
 
 
-
     private void MapReactionsToSamples(Map<Long, Set<String>> reaction2FiSet,
                                        Map<Long, Set<String>> rxn2Samples,
                                        Map<String, Set<String>> fis2Samples) {
@@ -957,7 +956,6 @@ public class MechismoAnalyzer {
             }
         }
     }
-
 
 
     public void mapReactomeReactions(CancerDriverReactomeAnalyzer cancerDriverReactomeAnalyzer,
@@ -1108,13 +1106,6 @@ public class MechismoAnalyzer {
         realResult.CalculateBHAdjustedPValues();
         realResult.CalculateEmpiricalPValues(rewiredNetworkResults);
 
-        /*
-        WriteRxn2SamplesToFile(outputDir,
-                outputFilePrefix,
-                rxn2Samples,
-                samples2FIs);
-        */
-
         WriteCooccurrenceToFile(
                 realResult,
                 outputDir,
@@ -1156,25 +1147,35 @@ public class MechismoAnalyzer {
                     "Target Reaction," +
                             "#Upstream Reactions," +
                             "#FIs," +
-                            "#Samples With 1+ Upstream Pair," +
-                            "#Samples Excluded By Shared Mutation," +
-                            "#Included Mutations Genes," +
-                            "#Excluded Mutations Genes," +
-                            "#Included Mutations," +
-                            "#Excluded Mutations," +
-                            "Upstream Reactions," +
-                            "FIs," +
-                            "Samples With 1+ Upstream Pair," +
-                            "Samples Excluded By Shared Mutation," +
-                            "Included Mutations Gene Names," +
-                            "Excluded Mutations Gene Names," +
-                            "Included Mutations," +
-                            "Excluded Mutations," +
+                            "#Samples With 0 Mutated Upstream Reactions," +
+                            "#Samples With 1 Mutated Upstream Reaction," +
+                            "#Samples With 2+ Mutated Upstream Reactions," +
+                            "#Super-Indirect Mutated Genes," +
+                            "#Indirect Genes," +
+                            "#Super-Direct Genes," +
+                            "#Direct Genes," +
+                            "#Unique Super-Indirect Mutations," +
+                            "#Unique Indirect Mutations," +
+                            "#Unique Super-Direct Mutations," +
+                            "#Unique Direct Mutations," +
+                            "Upstream Reaction Cluster ID," + //Set hashcode with all caps or something
+                            "Upstream Reactions (#Samples)," + //add reaction name
+                            "FIs (#Samples)," +
+                            "Samples With 1 Mutated Upstream Reaction," +
+                            "Samples With 2+ Mutated Upstream Reactions," +
+                            "Super-Indirect Mutated Genes (#Samples)," +
+                            "Indirect Genes (#Samples)," +
+                            "Super-Direct Genes (#Samples)," +
+                            "Direct Genes (#Samples)," +
+                            "Super-Indirect Mutations (#Samples)," +
+                            "Indirect Mutations (#Samples)," +
+                            "Super-Direct Mutations (#Samples)," +
+                            "Direct Mutations (#Samples)," +
                             "Fishers Method Combined P-value," +
                             "BH Adjusted P-value," +
                             "Permutation-Based Empirical P-value");
 
-            for (int i = 0; i < cooccurrenceResult.getTargetRxnCount(); i++) {
+            for (int i = 0; i < cooccurrenceResult.getTargetRxns().size(); i++) {
                 WriteLineToFile(
                         fileUtility,
                         i,
@@ -1190,20 +1191,35 @@ public class MechismoAnalyzer {
         }
     }
 
-    private void ConvertMutationArysToStringArrayLists(int i,
-                                                       List<Set<List<String>>> rxnMutations,
-                                                       Set<String> mutationsGeneNamesAryList,
-                                                       Set<String> mutationsAryList) {
+    private Set<String> ConvertMutationSetToStringSet(Set<List<String>> rxnMutations) {
+        Set<String> rxnMutationStringSet = new HashSet<>();
+
         //0 = gene name, 1 = uniprot ID, 2 = position, 3 = normal residue, 4 = mutated residue
-        for (List<String> mutation : rxnMutations.get(i)) {
-            mutationsGeneNamesAryList.add(mutation.get(0));
-            mutationsAryList.add(String.format("hgnc(%s):uniprot(%s):pos(%s):res(%s):mut(%s)",
+        for (List<String> mutation : rxnMutations) {
+            rxnMutationStringSet.add(String.format("hgnc(%s):uniprot(%s):pos(%s):res(%s):mut(%s)",
                     mutation.get(0),
                     mutation.get(1),
                     mutation.get(2),
                     mutation.get(3),
                     mutation.get(4)));
         }
+        return rxnMutationStringSet;
+    }
+
+    private String ConvertLongRxnIDToString(Long rxnID, Map<Long, String> longRxnDbIdToName) {
+        return String.format("%d:%s",
+                rxnID,
+                longRxnDbIdToName.get(
+                        longRxnDbIdToName).replace(
+                        ",", "~"));
+    }
+
+    private Set<String> ConvertLongRxnIDSetToStringSet(Set<Long> rxnIDSet, Map<Long, String> longRxnDbIdToName) {
+        Set<String> rxnIDStringSet = new HashSet<>();
+        for (Long rxnID : rxnIDSet) {
+            rxnIDStringSet.add(ConvertLongRxnIDToString(rxnID, longRxnDbIdToName));
+        }
+        return rxnIDStringSet;
     }
 
     private void WriteLineToFile(FileUtility fileUtility,
@@ -1211,99 +1227,141 @@ public class MechismoAnalyzer {
                                  Map<Long, String> longRxnDbIdToName,
                                  CooccurrenceResult cr) throws IOException {
 
-        Set<String> includedMutationsGeneNames = new HashSet<>();
-        Set<String> includedMutations = new HashSet<>();
+        //TODO: add sample counts for mutations and whatnot
 
-        ConvertMutationArysToStringArrayLists(i,
-                cr.getUpstreamRxnMutationsIncluded(),
-                includedMutationsGeneNames,
-                includedMutations);
+        Set<String> upstreamReactionNames = ConvertLongRxnIDSetToStringSet(
+                cr.getUpstreamRxns().get(i),
+                longRxnDbIdToName);
 
-        Set<String> excludedMutationsGeneNames = new HashSet<>();
-        Set<String> excludedMutations = new HashSet<>();
+        Set<String> superIndirectMutationNames = ConvertMutationSetToStringSet(
+                cr.getSuperIndirectMutations().get(i));
 
-        ConvertMutationArysToStringArrayLists(i,
-                cr.getUpstreamRxnMutationsExlcuded(),
-                excludedMutationsGeneNames,
-                excludedMutations);
+        Set<String> indirectMutationNames = ConvertMutationSetToStringSet(
+                cr.getIndirectMutations().get(i));
+
+        Set<String> superDirectMutationNames = ConvertMutationSetToStringSet(
+                cr.getSuperDirectMutations().get(i)
+        );
+        Set<String> directMutationNames = ConvertMutationSetToStringSet(
+                cr.getDirectMutations().get(i)
+        );
 
         fileUtility.printLine(String.format(
-                "%s:%s," + //Target Reaction
+                "%s," + //Target Reaction
                         "%d," + //#Upstream Reactions
                         "%d," + //#FIs
-                        "%d," + //#Samples With 1+ Upstream Pair
-                        "%d," + //#Samples Excluded By Shared Mutation
-                        "%d," + //#Included Mutations Genes
-                        "%d," + //#Excluded Mutations Genes
-                        "%d," + //#Included Mutations
-                        "%d," + //#Excluded Mutations
-                        "%s," + //Upstream Reactions
-                        "%s," + //FIs
-                        "%s," + //Samples With 1+ Upstream Pair
-                        "%s," + //Samples Excluded By Shared Mutation
-                        "%s," + //Included Mutations Gene Names
-                        "%s," + //Excluded Mutations Gene Names
-                        "%s," + //Included Mutations
-                        "%s," + //Excluded Mutations
+                        "%d," + //#Samples With 0 Mutated Upstream Reactions
+                        "%d," + //#Samples With 1 Mutated Upstream Reaction
+                        "%d," + //#Samples With 2+ Mutated Upstream Reactions
+                        "%d," + //#Super-Indirect Mutated Genes
+                        "%d," + //#Indirect Genes
+                        "%d," + //#Super-Direct Genes
+                        "%d," + //#Direct Genes
+                        "%d," + //#Unique Super-Indirect Mutations
+                        "%d," + //#Unique Indirect Mutations
+                        "%d," + //#Unique Super-Direct Mutations
+                        "%d," + //#Unique Direct Mutations
+                        "%d," + //Upstream Reaction Cluster ID
+                        "%s," + //Upstream Reactions (#Samples)
+                        "%s," + //FIs (#Samples)
+                        "%s," + //Samples With 1 Mutated Upstream Reaction
+                        "%s," + //Samples With 2+ Mutated Upstream Reactions
+                        "%s," + //Super-Indirect Mutated Genes (#Samples)
+                        "%s," + //Indirect Mutated Genes (#Samples)
+                        "%s," + //Super-Direct Mutated Genes (#Samples)
+                        "%s," + //Direct Mutated Genes (#Samples)
+                        "%s," + //Super-Indirect Mutations (#Samples)
+                        "%s," + //Indirect Mutations (#Samples)
+                        "%s," + //Super-Direct Mutations (#Samples)
+                        "%s," + //Direct Mutations (#Samples)
                         "%.100e," + //Fishers Method Combined P-value
                         "%.100e," + //BH Adjusted P-value
                         "%.100e", //Permutation-Based Empirical P-value
-                cr.getTargetRxns().get(i),
-                longRxnDbIdToName.get(cr.getTargetRxns().get(i)).replace(",", "~"),
+                ConvertLongRxnIDToString(cr.getTargetRxns().get(i), longRxnDbIdToName),
                 cr.getUpstreamRxns().get(i).size(),
-                cr.getfIs().get(i).size(),
-                cr.getUpstreamPairSamples().get(i).size(),
-                cr.getExcludedUpstreamPairSamples().get(i).size(),
-                includedMutationsGeneNames.size(),
-                excludedMutationsGeneNames.size(),
-                includedMutations.size(),
-                excludedMutations.size(),
-                cr.getUpstreamRxns().get(i).size() > 1
+                cr.getUpstreamRxnFIs().get(i).size(),
+                cr.getSamplesW0MutatedUpstreamRxns().get(i).size(),
+                cr.getSamplesW1MutatedUpstreamRxn().get(i).size(),
+                cr.getSamplesW2plusMutatedUpstreamRxns().get(i).size(),
+                cr.getSuperIndirectMutatedGenes().get(i).size(),
+                cr.getIndirectMutatedGenes().get(i).size(),
+                cr.getSuperDirectMutatedGenes().get(i).size(),
+                cr.getDirectMutatedGenes().get(i).size(),
+                cr.getSuperIndirectMutations().get(i).size(),
+                cr.getIndirectMutations().get(i).size(),
+                cr.getSuperDirectMutations().get(i).size(),
+                cr.getDirectMutations().get(i).size(),
+                cr.getUpstreamRxns().get(i).hashCode(),
+                upstreamReactionNames.size() > 1
                         ? org.gk.util.StringUtils.join("|",
-                        new ArrayList<>(cr.getUpstreamRxns().get(i)))
-                        : Collections.singletonList(cr.getUpstreamRxns().get(i)).get(0).toString()
+                        new ArrayList<>(upstreamReactionNames))
+                        : Collections.singletonList(upstreamReactionNames).get(0).toString()
                         .replace("[", "")
                         .replace("]", ""),
-                cr.getfIs().get(i).size() > 1
+                cr.getUpstreamRxnFIs().get(i).size() > 1
                         ? org.gk.util.StringUtils.join("|",
-                        new ArrayList<>(cr.getfIs().get(i)))
-                        : Collections.singletonList(cr.getfIs().get(i)).get(0).toString()
+                        new ArrayList<>(cr.getUpstreamRxnFIs().get(i)))
+                        : Collections.singletonList(cr.getUpstreamRxnFIs().get(i)).get(0).toString()
                         .replace("[", "")
                         .replace("]", ""),
-                cr.getUpstreamPairSamples().get(i).size() > 1
+                cr.getSamplesW1MutatedUpstreamRxn().get(i).size() > 1
                         ? org.gk.util.StringUtils.join("|",
-                        new ArrayList<>(cr.getUpstreamPairSamples().get(i)))
-                        : Collections.singletonList(cr.getUpstreamPairSamples().get(i)).get(0).toString()
+                        new ArrayList<>(cr.getSamplesW1MutatedUpstreamRxn().get(i)))
+                        : Collections.singletonList(cr.getSamplesW1MutatedUpstreamRxn().get(i)).get(0).toString()
                         .replace("[", "")
                         .replace("]", ""),
-                cr.getExcludedUpstreamPairSamples().get(i).size() > 1
+                cr.getSamplesW2plusMutatedUpstreamRxns().get(i).size() > 1
                         ? org.gk.util.StringUtils.join("|",
-                        new ArrayList<>(cr.getExcludedUpstreamPairSamples().get(i)))
-                        : Collections.singletonList(cr.getExcludedUpstreamPairSamples().get(i)).get(0).toString()
+                        new ArrayList<>(cr.getSamplesW2plusMutatedUpstreamRxns().get(i)))
+                        : Collections.singletonList(cr.getSamplesW2plusMutatedUpstreamRxns().get(i)).get(0).toString()
                         .replace("[", "")
                         .replace("]", ""),
-                includedMutationsGeneNames.size() > 1
+                cr.getSuperIndirectMutatedGenes().get(i).size() > 1
                         ? org.gk.util.StringUtils.join(" ", //space for copy-pasting
-                        new ArrayList<>(includedMutationsGeneNames))
-                        : Collections.singletonList(includedMutationsGeneNames).get(0).toString()
+                        new ArrayList<>(cr.getSuperIndirectMutatedGenes().get(i)))
+                        : Collections.singletonList(cr.getSuperIndirectMutatedGenes().get(i)).get(0).toString()
                         .replace("[", "")
                         .replace("]", ""),
-                excludedMutationsGeneNames.size() > 1
+                cr.getIndirectMutatedGenes().get(i).size() > 1
                         ? org.gk.util.StringUtils.join(" ", //space for copy-pasting
-                        new ArrayList<>(excludedMutationsGeneNames))
-                        : Collections.singletonList(excludedMutationsGeneNames).get(0).toString()
+                        new ArrayList<>(cr.getIndirectMutatedGenes().get(i)))
+                        : Collections.singletonList(cr.getIndirectMutatedGenes().get(i)).get(0).toString()
                         .replace("[", "")
                         .replace("]", ""),
-                includedMutations.size() > 1
-                        ? org.gk.util.StringUtils.join("|",
-                        new ArrayList<>(includedMutations))
-                        : Collections.singletonList(includedMutations).get(0).toString()
+                cr.getSuperDirectMutatedGenes().get(i).size() > 1
+                        ? org.gk.util.StringUtils.join(" ", //space for copy-pasting
+                        new ArrayList<>(cr.getSuperDirectMutatedGenes().get(i)))
+                        : Collections.singletonList(cr.getSuperDirectMutatedGenes().get(i)).get(0).toString()
                         .replace("[", "")
                         .replace("]", ""),
-                excludedMutations.size() > 1
+                cr.getDirectMutatedGenes().get(i).size() > 1
+                        ? org.gk.util.StringUtils.join(" ", //space for copy-pasting
+                        new ArrayList<>(cr.getDirectMutatedGenes().get(i)))
+                        : Collections.singletonList(cr.getDirectMutatedGenes().get(i)).get(0).toString()
+                        .replace("[", "")
+                        .replace("]", ""),
+                superIndirectMutationNames.size() > 1
                         ? org.gk.util.StringUtils.join("|",
-                        new ArrayList<>(excludedMutations))
-                        : Collections.singletonList(excludedMutations).get(0).toString()
+                        new ArrayList<>(superIndirectMutationNames))
+                        : Collections.singletonList(superIndirectMutationNames).get(0).toString()
+                        .replace("[", "")
+                        .replace("]", ""),
+                indirectMutationNames.size() > 1
+                        ? org.gk.util.StringUtils.join("|",
+                        new ArrayList<>(indirectMutationNames))
+                        : Collections.singletonList(indirectMutationNames).get(0).toString()
+                        .replace("[", "")
+                        .replace("]", ""),
+                superDirectMutationNames.size() > 1
+                        ? org.gk.util.StringUtils.join("|",
+                        new ArrayList<>(superDirectMutationNames))
+                        : Collections.singletonList(superDirectMutationNames).get(0).toString()
+                        .replace("[", "")
+                        .replace("]", ""),
+                directMutationNames.size() > 1
+                        ? org.gk.util.StringUtils.join("|",
+                        new ArrayList<>(directMutationNames))
+                        : Collections.singletonList(directMutationNames).get(0).toString()
                         .replace("[", "")
                         .replace("]", ""),
                 cr.getpValues().get(i),
@@ -1324,7 +1382,7 @@ public class MechismoAnalyzer {
             boolean ignoreIndependentUpstreamReactions,
             boolean excludeMultipleImmediateUpstreamReactions) throws MathException {
 
-        Set<TargetReactionSummary> targetReactionSummaries = new HashSet<>();
+        Set<TargetReactionCandidate> targetReactionSummaries = new HashSet<>();
         Set<Set<String>> allFIsForClustering = new HashSet<>();
         SearchRxnNetwork(
                 targetReactionSummaries,
@@ -1357,26 +1415,9 @@ public class MechismoAnalyzer {
 
         System.gc();
 
-        List<Double> allPValues = new ArrayList<>();
-        List<Set<String>> allFIs = new ArrayList<>();
-        List<Long> allTargetRxns = new ArrayList<>();
-        List<Set<Long>> allUpstreamRxns = new ArrayList<>();
-        List<Set<String>> allUpstreamPairSamples = new ArrayList<>();
-        List<Set<String>> allExcludedUpstreamPairSamples = new ArrayList<>();
-        List<Set<List<String>>> allUpstreamRxnMutationsIncluded = new ArrayList<>();
-        List<Set<List<String>>> allUpstreamRxnMutationsExlcuded = new ArrayList<>();
-
-        CalculateCooccurrence(
+        return CalculateCooccurrence(
                 reactionGraph,
                 fisherExact,
-                allPValues,
-                allFIs,
-                allTargetRxns,
-                allUpstreamRxns,
-                allUpstreamPairSamples,
-                allExcludedUpstreamPairSamples,
-                allUpstreamRxnMutationsIncluded,
-                allUpstreamRxnMutationsExlcuded,
                 reaction2FiSet,
                 rxn2Samples,
                 samples2FIs,
@@ -1385,83 +1426,79 @@ public class MechismoAnalyzer {
                 ignoreDependentUpstreamReactions,
                 ignoreIndependentUpstreamReactions,
                 excludeMultipleImmediateUpstreamReactions);
-
-        return (new CooccurrenceResult(
-                allPValues,
-                allFIs,
-                allTargetRxns,
-                allUpstreamRxns,
-                allUpstreamPairSamples,
-                allExcludedUpstreamPairSamples,
-                allUpstreamRxnMutationsIncluded,
-                allUpstreamRxnMutationsExlcuded));
     }
 
-    private void CalculateCooccurrence(
+    private CooccurrenceResult CalculateCooccurrence(
             DirectedGraph<Long, DefaultEdge> reactionGraph,
             FisherExact fisherExact,
-
-            List<Double> allPValues,
-            List<Set<String>> allFIs,
-            List<Long> allTargetRxns,
-            List<Set<Long>> allUpstreamRxns,
-            List<Set<String>> allUpstreamPairSamples,
-            List<Set<String>> allExcludedUpstreamPairSamples,
-            List<Set<List<String>>> allUpstreamRxnMutationsIncluded,
-            List<Set<List<String>>> allUpstreamRxnMutationsExlcuded,
-
-            Map<Long, Set<String>> rxn2FIs,
-            Map<Long, Set<String>> rxn2Samples,
-            Map<String, Set<String>> sample2FIs,
-            Map<String, Map<String, Set<List<String>>>> sample2FIs2muts,
-            Set<TargetReactionSummary> targetReactionSummaries,
+            Map<Long, Set<String>> rxnToFIsMap,
+            Map<Long, Set<String>> rxnToSamplesMap,
+            Map<String, Set<String>> sampleToFIsMap,
+            Map<String, Map<String, Set<List<String>>>> sampleToFIsToMutsMap,
+            Set<TargetReactionCandidate> targetReactionSummaries,
             boolean ignoreDependentUpstreamReactions,
             boolean ignoreIndependentUpstreamReactions,
             boolean excludeMultipleImmediateUpstreamReactions) throws MathException {
-        Iterator<TargetReactionSummary> trsItr = targetReactionSummaries.iterator();
-        int trsCounter = 0;
-        while (trsItr.hasNext()) {
-            TargetReactionSummary trs = trsItr.next();
-            Long targetRxnId = trs.getRxnId();
-            List<Long[]> targetUpstreamReactionPairs =
-                    new ArrayList<>(GenerateReactionSetPairs(trs.getSupportedUpstreamRxns()));
 
-            List<Double> targetPValues = new ArrayList<>();
+        List<Long> allTargetRxns = new ArrayList<>();
+        List<Set<Long>> allUpstreamRxns = new ArrayList<>();
+        List<Set<String>> allUpstreamReactionFIs = new ArrayList<>();
+        List<Set<String>> allSamplesW0MutatedUpstreamRxns = new ArrayList<>();
+        List<Set<String>> allSamplesW1MutatedUpstreamRxn = new ArrayList<>();
+        List<Set<String>> allSamplesW2plusMutatedUpstreamRxns = new ArrayList<>();
+        List<Set<List<String>>> allSuperIndirectMutatedGenes = new ArrayList<>();
+        List<Set<List<String>>> allIndirectMutatedGenes = new ArrayList<>();
+        List<Set<List<String>>> allSuperDirectMutatedGenes = new ArrayList<>();
+        List<Set<List<String>>> allDirectMutatedGenes = new ArrayList<>();
+        List<Double> allPValues = new ArrayList<>();
+
+        Iterator<TargetReactionCandidate> targetReactionCandidateIterator = targetReactionSummaries.iterator();
+        int iterationCounter = 0;
+        while (targetReactionCandidateIterator.hasNext()) {
+            TargetReactionCandidate targetReactionCandidate = targetReactionCandidateIterator.next();
+            Long targetRxnId = targetReactionCandidate.getRxnId();
+            List<Long[]> targetUpstreamReactionPairs =
+                    new ArrayList<>(GenerateReactionSetPairs(targetReactionCandidate.getSupportedUpstreamRxns()));
             Set<Long> targetUpstreamRxns = new HashSet<>();
-            Set<String> targetUpstreamRxnFIs = new HashSet<>();
-            Set<String> targetAnyUpstreamPairSamples = new HashSet<>();
-            Set<String> targetExcludedUpstreamPairSamples = new HashSet<>();
-            Set<List<String>> targetUpstreamRxnMutationsIncluded = new HashSet<>();
-            Set<List<String>> targetUpstreamRxnMutationsExcluded = new HashSet<>();
+            Set<String> targetUpstreamReactionFIs = new HashSet<>();
+            Set<String> targetSamplesW0MutatedUpstreamRxns = new HashSet<>();
+            Set<String> targetSamplesW1MutatedUpstreamRxn = new HashSet<>();
+            Set<String> targetSamplesW2plusMutatedUpstreamRxns = new HashSet<>();
+            Set<List<String>> targetSuperIndirectMutatedGenes = new HashSet<>();
+            Set<List<String>> targetIndirectMutatedGenes = new HashSet<>();
+            Set<List<String>> targetSuperDirectMutatedGenes = new HashSet<>();
+            Set<List<String>> targetDirectMutatedGenes = new HashSet<>();
+            List<Double> targetUpstreamReactionPValues = new ArrayList<>();
 
             if (!targetUpstreamReactionPairs.isEmpty()) {
-                boolean analyzeUpstreamRxns = false;
+                boolean targetReactionDetected = false;
                 for (Long[] upstreamReactionPair : targetUpstreamReactionPairs) {
                     Long upstreamReaction1Id = upstreamReactionPair[0];
                     Long upstreamReaction2Id = upstreamReactionPair[1];
 
                     if (ignoreDependentUpstreamReactions &&
                             (!reactionGraph.getAllEdges(upstreamReaction1Id, upstreamReaction2Id).isEmpty() ||
-                            !reactionGraph.getAllEdges(upstreamReaction2Id, upstreamReaction1Id).isEmpty() ||
-                            !reactionGraph.getAllEdges(targetRxnId,upstreamReaction1Id).isEmpty() ||
-                            !reactionGraph.getAllEdges(targetRxnId,upstreamReaction2Id).isEmpty())) {
+                                    !reactionGraph.getAllEdges(upstreamReaction2Id, upstreamReaction1Id).isEmpty() ||
+                                    !reactionGraph.getAllEdges(targetRxnId, upstreamReaction1Id).isEmpty() ||
+                                    !reactionGraph.getAllEdges(targetRxnId, upstreamReaction2Id).isEmpty())) {
                         continue;
                     } else if (ignoreIndependentUpstreamReactions &&
                             (reactionGraph.getAllEdges(upstreamReaction1Id, upstreamReaction2Id).isEmpty() &&
-                            reactionGraph.getAllEdges(upstreamReaction2Id, upstreamReaction1Id).isEmpty())) {
+                                    reactionGraph.getAllEdges(upstreamReaction2Id, upstreamReaction1Id).isEmpty())) {
                         continue;
                     } else if (excludeMultipleImmediateUpstreamReactions &&
                             (!reactionGraph.getAllEdges(upstreamReaction1Id, targetRxnId).isEmpty() &&
-                            !reactionGraph.getAllEdges(upstreamReaction2Id, targetRxnId).isEmpty())) {
+                                    !reactionGraph.getAllEdges(upstreamReaction2Id, targetRxnId).isEmpty())) {
                         continue;
                     } else {
+                        targetReactionDetected = true;
 
-                        Set<String> A = new HashSet<>(sample2FIs.keySet());
-                        Set<String> B = new HashSet<>(sample2FIs.keySet());
-                        Set<String> C = new HashSet<>(sample2FIs.keySet());
-                        Set<String> D = new HashSet<>(sample2FIs.keySet());
-                        Set<String> upstreamRxn1Samples = new HashSet<>(rxn2Samples.get(upstreamReaction1Id));
-                        Set<String> upstreamRxn2Samples = new HashSet<>(rxn2Samples.get(upstreamReaction2Id));
+                        Set<String> A = new HashSet<>(sampleToFIsMap.keySet());
+                        Set<String> B = new HashSet<>(sampleToFIsMap.keySet());
+                        Set<String> C = new HashSet<>(sampleToFIsMap.keySet());
+                        Set<String> D = new HashSet<>(sampleToFIsMap.keySet());
+                        Set<String> upstreamRxn1Samples = new HashSet<>(rxnToSamplesMap.get(upstreamReaction1Id));
+                        Set<String> upstreamRxn2Samples = new HashSet<>(rxnToSamplesMap.get(upstreamReaction2Id));
 
                         D.retainAll(upstreamRxn1Samples);
                         D.retainAll(upstreamRxn2Samples);
@@ -1476,7 +1513,7 @@ public class MechismoAnalyzer {
                         A.removeAll(C);
                         A.removeAll(D);
 
-                        if ((A.size() + B.size() + C.size() + D.size()) != sample2FIs.keySet().size()) {
+                        if ((A.size() + B.size() + C.size() + D.size()) != sampleToFIsMap.keySet().size()) {
                             throw new IllegalStateException(String.format(
                                     "A(%d) + B(%d) + C(%d) + D(%d) sum to %d but should sum to %d",
                                     A.size(),
@@ -1484,186 +1521,158 @@ public class MechismoAnalyzer {
                                     C.size(),
                                     D.size(),
                                     (A.size() + B.size() + C.size() + D.size()),
-                                    sample2FIs.keySet().size()));
+                                    sampleToFIsMap.keySet().size()));
                         }
 
+                        if (D.size() > 0) {
+                            targetUpstreamRxns.add(upstreamReaction1Id);
+                            targetUpstreamRxns.add(upstreamReaction2Id);
 
-                        if (rxn2Samples.containsKey(targetRxnId)) {
-                            Iterator<String> dSampleItr = D.iterator();
-                            while (dSampleItr.hasNext()) {
-                                String sample = dSampleItr.next();
-                                Set<List<String>> rxn1muts = new HashSet<>();
+                            targetUpstreamReactionFIs.addAll(
+                                    findSampleFIsSupportingRxn(
+                                            D,
+                                            sampleToFIsMap,
+                                            rxnToFIsMap,
+                                            upstreamReaction1Id));
+                            targetUpstreamReactionFIs.addAll(
+                                    findSampleFIsSupportingRxn(
+                                            D,
+                                            sampleToFIsMap,
+                                            rxnToFIsMap,
+                                            upstreamReaction2Id));
+
+                            Iterator<String> dIterator = D.iterator();
+                            while (dIterator.hasNext()) {
+                                String sample = dIterator.next();
+                                Set<List<String>> upstreamRxn1Mutations = new HashSet<>();
                                 Set<String> sampleFIsSupportingRxn1 = findSampleFIsSupportingRxn(
                                         sample,
-                                        sample2FIs,
-                                        rxn2FIs,
+                                        sampleToFIsMap,
+                                        rxnToFIsMap,
                                         upstreamReaction1Id);
                                 for (String fi : sampleFIsSupportingRxn1) {
-                                    rxn1muts.addAll(
-                                            sample2FIs2muts.get(sample).get(fi)
+                                    upstreamRxn1Mutations.addAll(
+                                            sampleToFIsToMutsMap.get(sample).get(fi)
                                     );
                                 }
-                                Set<List<String>> rxn2muts = new HashSet<>();
+                                Set<List<String>> upstreamRxn2Mutations = new HashSet<>();
                                 Set<String> sampleFIsSupportingRxn2 = findSampleFIsSupportingRxn(
                                         sample,
-                                        sample2FIs,
-                                        rxn2FIs,
+                                        sampleToFIsMap,
+                                        rxnToFIsMap,
                                         upstreamReaction2Id);
                                 for (String fi : sampleFIsSupportingRxn2) {
-                                    rxn2muts.addAll(
-                                            sample2FIs2muts.get(sample).get(fi)
+                                    upstreamRxn2Mutations.addAll(
+                                            sampleToFIsToMutsMap.get(sample).get(fi)
                                     );
                                 }
 
-                                //group
-                                Set<List<String>> sampleRxnMutUnion = new HashSet<>(rxn1muts);
-                                sampleRxnMutUnion.addAll(rxn2muts);
+                                //upstream union
+                                Set<List<String>> sampleRxnMutUnion = new HashSet<>(upstreamRxn1Mutations);
+                                sampleRxnMutUnion.addAll(upstreamRxn2Mutations);
 
-                                //filter
                                 Set<List<String>> targetRxnmuts = new HashSet<>();
-                                Set<String> sampleFIsSupportingTargetRxn = findSampleFIsSupportingRxn(
-                                        sample,
-                                        sample2FIs,
-                                        rxn2FIs,
-                                        targetRxnId);
-                                for (String fi : sampleFIsSupportingTargetRxn) {
-                                    targetRxnmuts.addAll(
-                                            sample2FIs2muts.get(sample).get(fi)
-                                    );
+                                if (rxnToSamplesMap.containsKey(targetRxnId)) {
+                                    Set<String> sampleFIsSupportingTargetRxn = findSampleFIsSupportingRxn(
+                                            sample,
+                                            sampleToFIsMap,
+                                            rxnToFIsMap,
+                                            targetRxnId);
+                                    for (String fi : sampleFIsSupportingTargetRxn) {
+                                        targetRxnmuts.addAll(
+                                                sampleToFIsToMutsMap.get(sample).get(fi)
+                                        );
+                                    }
+                                    //upstream union & target intersection
+                                    Set<List<String>> sampleRxnMutUnionCpy = new HashSet<>(sampleRxnMutUnion);
+                                    sampleRxnMutUnionCpy.retainAll(targetRxnmuts);
+                                    targetSuperDirectMutatedGenes.addAll(sampleRxnMutUnion);
+
+                                    //target - upstream union
+                                    Set<List<String>> targetRxnmutsCpy = new HashSet<>(targetRxnmuts);
+                                    targetRxnmutsCpy.removeAll(sampleRxnMutUnion);
+                                    targetDirectMutatedGenes.addAll(targetRxnmutsCpy);
                                 }
-                                sampleRxnMutUnion.retainAll(targetRxnmuts);
 
-                                if(!sampleRxnMutUnion.isEmpty()){
-                                    dSampleItr.remove();
-                                }
+                                //upstream intersection - target
+                                Set<List<String>> sampleRxnMutIntersection = new HashSet<>(upstreamRxn1Mutations);
+                                sampleRxnMutIntersection.retainAll(upstreamRxn2Mutations);
+                                sampleRxnMutIntersection.removeAll(targetRxnmuts);
+                                targetSuperIndirectMutatedGenes.addAll(sampleRxnMutIntersection);
 
-                                /*
-                                Set<List<String>> sampleRxnMutIntersection = new HashSet<>(rxn1muts);
-                                sampleRxnMutIntersection.retainAll(rxn2muts);
-
-                                if (!sampleRxnMutIntersection.isEmpty()) {
-                                    targetExcludedUpstreamPairSamples.add(sample);
-                                    targetUpstreamRxnMutationsExcluded.addAll(sampleRxnMutIntersection);
-                                    //dSampleItr.remove();
-                                } else {
-                                    targetUpstreamRxnMutationsIncluded.addAll(rxn1muts);
-                                    targetUpstreamRxnMutationsIncluded.addAll(rxn2muts);
-                                }*/
+                                //upstream union - upstream intersection - target
+                                sampleRxnMutUnion.removeAll(sampleRxnMutIntersection);
+                                sampleRxnMutUnion.removeAll(targetRxnmuts);
+                                targetIndirectMutatedGenes.addAll(sampleRxnMutUnion);
                             }
                         }
 
-                        //TODO: add single upstream reaction samples (B,C)
-                        targetAnyUpstreamPairSamples.addAll(D);
-                        targetUpstreamRxns.add(upstreamReaction1Id);
-                        targetUpstreamRxns.add(upstreamReaction2Id);
-                        targetUpstreamRxnFIs.addAll(
-                                findSampleFIsSupportingRxn(
-                                        D,
-                                        sample2FIs,
-                                        rxn2FIs,
-                                        upstreamReaction1Id));
-                        targetUpstreamRxnFIs.addAll(
-                                findSampleFIsSupportingRxn(
-                                        D,
-                                        sample2FIs,
-                                        rxn2FIs,
-                                        upstreamReaction2Id));
-
-                        double p = fisherExact.getRightTailedP(
-                                A.size(),
-                                B.size(),
-                                C.size(),
-                                D.size());
-
-                        if (p <= 0.0) {
-                            int debug = 1;
-                            p = Double.MIN_VALUE;
-                        }
+                        targetSamplesW0MutatedUpstreamRxns.addAll(A);
+                        targetSamplesW1MutatedUpstreamRxn.addAll(B);
+                        targetSamplesW1MutatedUpstreamRxn.addAll(C);
+                        targetSamplesW2plusMutatedUpstreamRxns.addAll(D);
 
                         //FisherExact uses numerical approximation and is sometimes > 1.0000000000
-                        targetPValues.add(p > 1.0 ? 1.0 : p);
-
-                        if (targetPValues.size() == 0) {
-                            int debug = 1;
-                        }
-
-                        analyzeUpstreamRxns = true;
+                        targetUpstreamReactionPValues.add(
+                                MathUtilities.boundDouble01(
+                                        fisherExact.getRightTailedP(
+                                                A.size(),
+                                                B.size(),
+                                                C.size(),
+                                                D.size())
+                                ));
                     }
                 }
 
-                if (analyzeUpstreamRxns && targetPValues.size() == 0) {
-                    int debug = 1;
-                }
+                if (targetReactionDetected) {
 
-                if (analyzeUpstreamRxns) {
-                    CalculateCombinedPFishersMethod(
-                            targetRxnId,
-                            targetPValues,
-                            targetUpstreamRxns,
-                            targetUpstreamRxnFIs,
-                            targetAnyUpstreamPairSamples,
-                            targetExcludedUpstreamPairSamples,
-                            targetUpstreamRxnMutationsIncluded,
-                            targetUpstreamRxnMutationsExcluded,
-                            allPValues,
-                            allTargetRxns,
-                            allUpstreamRxns,
-                            allFIs,
-                            allUpstreamPairSamples,
-                            allExcludedUpstreamPairSamples,
-                            allUpstreamRxnMutationsIncluded,
-                            allUpstreamRxnMutationsExlcuded);
+                    if (allTargetRxns.size() != allPValues.size() ||
+                            allTargetRxns.size() != allUpstreamRxns.size() ||
+                            allTargetRxns.size() != allUpstreamReactionFIs.size()) {
+                        throw new IllegalStateException(String.format("These should all have size == %d",
+                                targetUpstreamReactionPValues.size()));
+                    }
+
+                    //we lose track of super relationships in upstream reaction pair context
+                    targetIndirectMutatedGenes.removeAll(targetSuperIndirectMutatedGenes);
+                    targetDirectMutatedGenes.removeAll(targetSuperDirectMutatedGenes);
+
+                    allTargetRxns.add(targetRxnId);
+                    allUpstreamRxns.add(targetUpstreamRxns);
+                    allUpstreamReactionFIs.add(targetUpstreamReactionFIs);
+                    allSamplesW0MutatedUpstreamRxns.add(targetSamplesW0MutatedUpstreamRxns);
+                    allSamplesW1MutatedUpstreamRxn.add(targetSamplesW1MutatedUpstreamRxn);
+                    allSamplesW2plusMutatedUpstreamRxns.add(targetSamplesW2plusMutatedUpstreamRxns);
+                    allSuperIndirectMutatedGenes.add(targetSuperIndirectMutatedGenes);
+                    allIndirectMutatedGenes.add(targetIndirectMutatedGenes);
+                    allSuperDirectMutatedGenes.add(targetSuperDirectMutatedGenes);
+                    allDirectMutatedGenes.add(targetDirectMutatedGenes);
+                    allPValues.add(
+                            MathUtilities.boundDouble01(
+                                    MathUtilities.combinePValuesWithFisherMethod(
+                                            targetUpstreamReactionPValues)));
                 }
             }
 
-            trsCounter++;
-            if (trsCounter % 500 == 0) {
+            iterationCounter++;
+            if (iterationCounter % 500 == 0) {
                 System.out.println(String.format("Processed %d of %d Target Reactions...",
-                        trsCounter, targetReactionSummaries.size()));
+                        iterationCounter, targetReactionSummaries.size()));
                 System.out.flush();
             }
         }
-    }
-
-    private void CalculateCombinedPFishersMethod(
-            Long targetRxnId,
-            List<Double> targetPValues,
-            Set<Long> targetUpstreamRxns,
-            Set<String> targetUpstreamRxnFIs,
-            Set<String> targetAnyUpstreamPairSamples,
-            Set<String> targetExcludedUpstreamPairSamples,
-            Set<List<String>> targetUpstreamRxnMutationsIncluded,
-            Set<List<String>> targetUpstreamRxnMutationsExcluded,
-            List<Double> allPValues,
-            List<Long> allTargetRxns,
-            List<Set<Long>> allUpstreamRxns,
-            List<Set<String>> allFIs,
-            List<Set<String>> allUpstreamPairSamples,
-            List<Set<String>> allExcludedUpstreamPairSamples,
-            List<Set<List<String>>> allUpstreamRxnMutationsIncluded,
-            List<Set<List<String>>> allUpstreamRxnMutationsExlcuded) throws MathException {
-
-        if (allTargetRxns.size() != allPValues.size() ||
-                allTargetRxns.size() != allUpstreamRxns.size() ||
-                allTargetRxns.size() != allFIs.size()) {
-            throw new IllegalStateException(String.format("These should all have size == %d",
-                    targetPValues.size()));
-        }
-
-        double combinedPValue = 1.0;
-        try {
-            combinedPValue = MathUtilities.combinePValuesWithFisherMethod(targetPValues);
-        } catch (IllegalArgumentException iae) {
-            int debug = 1;
-        }
-        allTargetRxns.add(targetRxnId);
-        allPValues.add(combinedPValue);
-        allUpstreamRxns.add(targetUpstreamRxns);
-        allFIs.add(targetUpstreamRxnFIs);
-        allUpstreamPairSamples.add(targetAnyUpstreamPairSamples);
-        allExcludedUpstreamPairSamples.add(targetExcludedUpstreamPairSamples);
-        allUpstreamRxnMutationsExlcuded.add(targetUpstreamRxnMutationsExcluded);
-        allUpstreamRxnMutationsIncluded.add(targetUpstreamRxnMutationsIncluded);
+        return new CooccurrenceResult(
+                allTargetRxns,
+                allUpstreamRxns,
+                allUpstreamReactionFIs,
+                allSamplesW0MutatedUpstreamRxns,
+                allSamplesW1MutatedUpstreamRxn,
+                allSamplesW2plusMutatedUpstreamRxns,
+                allSuperIndirectMutatedGenes,
+                allIndirectMutatedGenes,
+                allSuperDirectMutatedGenes,
+                allDirectMutatedGenes,
+                allPValues);
     }
 
     private Set<String> findSampleFIsSupportingRxn(Set<String> samples,
@@ -1870,17 +1879,17 @@ public class MechismoAnalyzer {
 
     private void WriteTargetReactionSummariesToFile(String outputDir,
                                                     String outputFilePrefix,
-                                                    Set<TargetReactionSummary> targetReactionSummaries) {
+                                                    Set<TargetReactionCandidate> targetReactionSummaries) {
         //write targetReactionSummaries to file
         FileUtility fileUtility = new FileUtility();
         String outFilePath = outputDir + outputFilePrefix + "dnUpReactions.csv";
         try {
             fileUtility.setOutput(outFilePath);
-            fileUtility.printLine(TargetReactionSummary.getHeaderLine());
-            Iterator<TargetReactionSummary> trsItr = targetReactionSummaries.iterator();
+            fileUtility.printLine(TargetReactionCandidate.getHeaderLine());
+            Iterator<TargetReactionCandidate> trsItr = targetReactionSummaries.iterator();
             while (trsItr.hasNext()) {
-                TargetReactionSummary targetReactionSummary = trsItr.next();
-                fileUtility.printLine(targetReactionSummary.toString());
+                TargetReactionCandidate targetReactionCandidate = trsItr.next();
+                fileUtility.printLine(targetReactionCandidate.toString());
             }
             fileUtility.close();
         } catch (IOException ioe) {

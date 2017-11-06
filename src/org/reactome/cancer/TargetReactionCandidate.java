@@ -1,12 +1,10 @@
 package org.reactome.cancer;
 
-import org.reactome.cancer.driver.MechismoAnalyzer;
-
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
-public class TargetReactionSummary {
+public class TargetReactionCandidate {
     private static final String headerLine =
             "RxnId," +
                     "Num Sup Dn/Up Rxns," +
@@ -26,14 +24,14 @@ public class TargetReactionSummary {
     private Set<String> supportingFIs;
     private Map<Long, String> longRxnDbIdToName;
 
-    public TargetReactionSummary(Long rxnId,
-                                 Integer numSupportedUpstreamRxns,
-                                 Integer numUpstreamRxns,
-                                 Double supportedUpstreamRxnRatio,
-                                 Set<Long> supportedUpstreamRxns,
-                                 Set<Long> upstreamRxns,
-                                 Set<String> supportingFIs,
-                                 Map<Long, String> longRxnDbIdToName) {
+    public TargetReactionCandidate(Long rxnId,
+                                   Integer numSupportedUpstreamRxns,
+                                   Integer numUpstreamRxns,
+                                   Double supportedUpstreamRxnRatio,
+                                   Set<Long> supportedUpstreamRxns,
+                                   Set<Long> upstreamRxns,
+                                   Set<String> supportingFIs,
+                                   Map<Long, String> longRxnDbIdToName) {
         this.rxnId = rxnId;
         this.numSupportedUpstreamRxns = numSupportedUpstreamRxns;
         this.numUpstreamRxns = numUpstreamRxns;
@@ -51,17 +49,17 @@ public class TargetReactionSummary {
     @Override
     public boolean equals(Object o) {
         if (o == this) return true;
-        if (!(o instanceof TargetReactionSummary)) {
+        if (!(o instanceof TargetReactionCandidate)) {
             return false;
         }
-        TargetReactionSummary targetReactionSummary = (TargetReactionSummary) o;
-        return Objects.equals(this.rxnId, targetReactionSummary.rxnId) &&
-                Objects.equals(this.numSupportedUpstreamRxns, targetReactionSummary.numSupportedUpstreamRxns) &&
-                Objects.equals(this.numUpstreamRxns, targetReactionSummary.numUpstreamRxns) &&
-                Objects.equals(this.supportedUpstreamRxnRatio, targetReactionSummary.supportedUpstreamRxnRatio) &&
-                Objects.equals(this.supportedUpstreamRxns, targetReactionSummary.supportedUpstreamRxns) &&
-                Objects.equals(this.upstreamRxns, targetReactionSummary.upstreamRxns) &&
-                Objects.equals(this.supportingFIs, targetReactionSummary.supportingFIs);
+        TargetReactionCandidate targetReactionCandidate = (TargetReactionCandidate) o;
+        return Objects.equals(this.rxnId, targetReactionCandidate.rxnId) &&
+                Objects.equals(this.numSupportedUpstreamRxns, targetReactionCandidate.numSupportedUpstreamRxns) &&
+                Objects.equals(this.numUpstreamRxns, targetReactionCandidate.numUpstreamRxns) &&
+                Objects.equals(this.supportedUpstreamRxnRatio, targetReactionCandidate.supportedUpstreamRxnRatio) &&
+                Objects.equals(this.supportedUpstreamRxns, targetReactionCandidate.supportedUpstreamRxns) &&
+                Objects.equals(this.upstreamRxns, targetReactionCandidate.upstreamRxns) &&
+                Objects.equals(this.supportingFIs, targetReactionCandidate.supportingFIs);
     }
 
     @Override

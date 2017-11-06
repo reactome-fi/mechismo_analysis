@@ -507,7 +507,15 @@ public class MathUtilities {
         }
         return fdrs;
     }
-    
+
+    public static Double boundDouble01(Double val){
+        return val > 1.0d
+                ? 1.0d
+                : (val <= 0.0d
+                ? Double.MIN_NORMAL
+                : val);
+    }
+
     /**
      * This method is used to combine a collection of pvalues using Fisher's method.
      * (see http://en.wikipedia.org/wiki/Fisher's_method).
