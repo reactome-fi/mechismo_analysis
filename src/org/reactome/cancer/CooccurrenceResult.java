@@ -6,11 +6,12 @@ import java.util.*;
 
 public class CooccurrenceResult {
     private List<Long> targetRxns;
-    private List<Set<Long>> upstreamRxns;
-    private List<Set<String>> upstreamRxnFIs;
+    private List<Set<Long>> cooccurringUpstreamRxns;
+    private List<Set<String>> cooccurringUpstreamRxnFIs;
     private List<Integer> numSamplesW0MutatedUpstreamRxns;
     private List<Set<String>> samplesW1MutatedUpstreamRxn;
-    private List<Set<String>> samplesW2plusMutatedUpstreamRxns;
+    private List<Set<String>> samplesW2MutatedUpstreamRxns;
+    private List<Set<String>> samplesW3plusMutatedUpstreamRxns;
     private List<Set<List<String>>> superIndirectMutations;
     private List<Set<List<String>>> indirectMutations;
     private List<Set<List<String>>> superDirectMutations;
@@ -25,11 +26,12 @@ public class CooccurrenceResult {
 
     public CooccurrenceResult(
             List<Long> targetRxns,
-            List<Set<Long>> upstreamRxns,
-            List<Set<String>> upstreamRxnFIs,
+            List<Set<Long>> cooccurringUpstreamRxns,
+            List<Set<String>> cooccurringUpstreamRxnFIs,
             List<Integer> numSamplesW0MutatedUpstreamRxns,
             List<Set<String>> samplesW1MutatedUpstreamRxn,
-            List<Set<String>> samplesW2plusMutatedUpstreamRxns,
+            List<Set<String>> samplesW2MutatedUpstreamRxns,
+            List<Set<String>> samplesW3plusMutatedUpstreamRxns,
             List<Set<List<String>>> superIndirectMutations,
             List<Set<List<String>>> indirectMutations,
             List<Set<List<String>>> superDirectMutations,
@@ -37,11 +39,12 @@ public class CooccurrenceResult {
             List<Double> pValues
     ) {
         this.targetRxns = targetRxns;
-        this.upstreamRxns = upstreamRxns;
-        this.upstreamRxnFIs = upstreamRxnFIs;
+        this.cooccurringUpstreamRxns = cooccurringUpstreamRxns;
+        this.cooccurringUpstreamRxnFIs = cooccurringUpstreamRxnFIs;
         this.numSamplesW0MutatedUpstreamRxns = numSamplesW0MutatedUpstreamRxns;
         this.samplesW1MutatedUpstreamRxn = samplesW1MutatedUpstreamRxn;
-        this.samplesW2plusMutatedUpstreamRxns = samplesW2plusMutatedUpstreamRxns;
+        this.samplesW2MutatedUpstreamRxns = samplesW2MutatedUpstreamRxns;
+        this.samplesW3plusMutatedUpstreamRxns = samplesW3plusMutatedUpstreamRxns;
         this.superIndirectMutations = superIndirectMutations;
         this.indirectMutations = indirectMutations;
         this.superDirectMutations = superDirectMutations;
@@ -189,11 +192,11 @@ public class CooccurrenceResult {
     public void MagicallyShrinkMemoryFootprint() {
         //leave only this.pValues
         this.targetRxns.clear();
-        this.upstreamRxns.clear();
-        this.upstreamRxnFIs.clear();
+        this.cooccurringUpstreamRxns.clear();
+        this.cooccurringUpstreamRxnFIs.clear();
         this.numSamplesW0MutatedUpstreamRxns.clear();
         this.samplesW1MutatedUpstreamRxn.clear();
-        this.samplesW2plusMutatedUpstreamRxns.clear();
+        this.samplesW3plusMutatedUpstreamRxns.clear();
         this.superIndirectMutations.clear();
         this.indirectMutations.clear();
         this.superDirectMutations.clear();
@@ -205,16 +208,16 @@ public class CooccurrenceResult {
         return pValues;
     }
 
-    public List<Set<String>> getUpstreamRxnFIs() {
-        return upstreamRxnFIs;
+    public List<Set<String>> getCooccurringUpstreamRxnFIs() {
+        return cooccurringUpstreamRxnFIs;
     }
 
     public List<Long> getTargetRxns() {
         return targetRxns;
     }
 
-    public List<Set<Long>> getUpstreamRxns() {
-        return upstreamRxns;
+    public List<Set<Long>> getCooccurringUpstreamRxns() {
+        return cooccurringUpstreamRxns;
     }
 
     public Map<Double, Double> getpValue2BHAdjustedPValueMap() {
@@ -233,8 +236,8 @@ public class CooccurrenceResult {
         return samplesW1MutatedUpstreamRxn;
     }
 
-    public List<Set<String>> getSamplesW2plusMutatedUpstreamRxns() {
-        return samplesW2plusMutatedUpstreamRxns;
+    public List<Set<String>> getSamplesW3plusMutatedUpstreamRxns() {
+        return samplesW3plusMutatedUpstreamRxns;
     }
 
     public List<Set<List<String>>> getSuperIndirectMutations() {
@@ -251,5 +254,9 @@ public class CooccurrenceResult {
 
     public List<Set<List<String>>> getDirectMutations() {
         return directMutations;
+    }
+
+    public List<Set<String>> getSamplesW2MutatedUpstreamRxns() {
+        return samplesW2MutatedUpstreamRxns;
     }
 }

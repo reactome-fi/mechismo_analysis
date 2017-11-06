@@ -121,7 +121,7 @@ public class ProcessDatasetsDriver {
                         "/home/burkhart/Software/Ogmios/results/Mechismo/",
                         "",
                         1,
-                        100,
+                        10,
                         0.0,
                         1.0,
                         true, // Ignore Dependent
