@@ -1459,7 +1459,7 @@ public class MechismoAnalyzer {
         List<Set<String>> allSamplesW1MutatedUpstreamRxn = new ArrayList<>();
         List<Set<String>> allSamplesW2MutatedUpstreamRxns = new ArrayList<>();
         List<Set<String>> allSamplesW3plusMutatedUpstreamRxns = new ArrayList<>();
-        List<Set<List<String>>> allSuperIndirectMutatedGenes = new ArrayList<>();
+        List<Set<List<String>>> allSuperIndirectMutatations = new ArrayList<>();
         List<Set<List<String>>> allIndirectMutations = new ArrayList<>();
         List<Set<List<String>>> allSuperDirectMutations = new ArrayList<>();
         List<Set<List<String>>> allDirectMutations = new ArrayList<>();
@@ -1680,7 +1680,7 @@ public class MechismoAnalyzer {
                     allSamplesW1MutatedUpstreamRxn.add(targetSamplesW1MutatedUpstreamRxn);
                     allSamplesW2MutatedUpstreamRxns.add(targetSamplesW2MutatedUpstreamRxns);
                     allSamplesW3plusMutatedUpstreamRxns.add(targetSamplesW3plusMutatedUpstreamRxns);
-                    allSuperIndirectMutatedGenes.add(targetSuperIndirectMutations);
+                    allSuperIndirectMutatations.add(targetSuperIndirectMutations);
                     allIndirectMutations.add(targetIndirectMutations);
                     allSuperDirectMutations.add(targetSuperDirectMutations);
                     allDirectMutations.add(targetDirectMutations);
@@ -1706,7 +1706,7 @@ public class MechismoAnalyzer {
                 allSamplesW1MutatedUpstreamRxn,
                 allSamplesW2MutatedUpstreamRxns,
                 allSamplesW3plusMutatedUpstreamRxns,
-                allSuperIndirectMutatedGenes,
+                allSuperIndirectMutatations,
                 allIndirectMutations,
                 allSuperDirectMutations,
                 allDirectMutations,
