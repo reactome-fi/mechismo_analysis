@@ -27,28 +27,21 @@ public class MechismoOutputLoader {
     private final int resB1Idx = 38;
     private final int ebIdx = 43;
     private final String rxnKlass = "hetero";
-    private final String sampleIDPatternString = "(TCGA-[0-9A-Z-]+)";
+    private final String patientPatternString = "([A-Z]+:TCGA-[0-9A-Z-]+)";
     private double mechScoreLowerBoundInclusive;
     private double eThresh;
     private String mechismoOuputFilePath = null;
     private String mechismoFIFilterFilePath = null;
-    private Set<String> fis = null;
+    private Set<FI> fis = null;
     private Set<String> fiFilter = null;
-    private Map<List<String>, Integer> mut2SampleCount = null;
-    private Map<String, Integer> gene2SampleCount = null;
-    private Map<String, Set<String>> samples2fis = null;
-    private Map<String, Set<String>> fis2Samples = null;
+    private Map<Mutation, Integer> mut2SampleCount = null;
+    private Map<Gene, Integer> gene2SampleCount = null;
+    private Map<Patient, Set<FI>> samples2fis = null;
+    private Map<FI, Set<Patient>> fis2Samples = null;
     //TODO: decide whether or not to add protein B pos/res info to muts?
-    private Map<String, Map<String, Set<List<String>>>> samples2fis2muts = null;
+    private Map<Patient, Map<FI, Set<Mutation>>> samples2fis2muts = null;
     private Pattern sampleIDPattern = null;
     private Matcher sampleIDMatcher = null;
-
-    public MechismoOutputLoader() {
-        this(null,
-                null,
-                1.0,
-                1e-5);
-    }
 
     public MechismoOutputLoader(String mechismoOutputFilePath,
                                 String mechismoFIFilterFilePath,
@@ -58,7 +51,7 @@ public class MechismoOutputLoader {
         this.mechismoFIFilterFilePath = mechismoFIFilterFilePath;
         this.mechScoreLowerBoundInclusive = mechScoreLowerBoundInclusive;
         this.eThresh = eThresh;
-        this.sampleIDPattern = Pattern.compile(this.sampleIDPatternString);
+        this.sampleIDPattern = Pattern.compile(this.patientPatternString);
     }
 
     private void ParseMechismoFIFilterFile() {
@@ -67,9 +60,9 @@ public class MechismoOutputLoader {
             FileUtility fileUtility = new FileUtility();
             try {
                 fileUtility.setInput(mechismoFIFilterFilePath);
-                String line = null;
-                String[] tokens = null;
-                line = fileUtility.readLine(); //skip header line
+                String line;
+                String[] tokens;
+                fileUtility.readLine(); //skip header line
                 while ((line = fileUtility.readLine()) != null) {
                     tokens = line.split("\t");
                     if (Integer.parseInt(tokens[2]) > Integer.parseInt(tokens[3]) &&
@@ -92,10 +85,6 @@ public class MechismoOutputLoader {
         }
     }
 
-    private void ParseMechismoOutputFile() {
-        this.ParseMechismoOutputFile(this.mechismoOuputFilePath);
-    }
-
     private void ParseMechismoOutputFile(String mechismoOuputFilePath) {
         ParseMechismoFIFilterFile();
         this.fis = new HashSet<>();
@@ -107,46 +96,46 @@ public class MechismoOutputLoader {
         FileUtility fileUtility = new FileUtility();
         try {
             fileUtility.setInput(mechismoOuputFilePath);
-            String line = null;
-            String[] tokens = null;
+            String line;
+            String[] tokens;
             while ((line = fileUtility.readLine()) != null) {
                 tokens = line.split("\t");
                 if (tokens.length > ebIdx &&
                         rxnKlass.equals(tokens[rxnKlassIdx]) &&
                         new Double(tokens[eaIdx]) < eThresh &&
                         new Double(tokens[ebIdx]) < eThresh) {
-                    String nameA = tokens[nameA1Idx];
-                    String nameB = tokens[nameB1Idx];
-                    if (this.fiFilter == null || this.fiFilter.contains(String.format("%s\t%s",
-                            nameA,
-                            nameB))) {
-                        String protA = tokens[primaryIdA1Idx];
-                        String protB = tokens[primaryIdB1Idx];
+                    String hgncNameA = tokens[nameA1Idx];
+                    String hgncNameB = tokens[nameB1Idx];
+                    if (this.fiFilter == null ||
+                            this.fiFilter.contains(String.format("%s\t%s",
+                            hgncNameA,
+                            hgncNameB))) {
                         Double mechScore = new Double(tokens[mechScoreIdx]);
                         if (Math.abs(mechScore) >= mechScoreLowerBoundInclusive) {
-                            String forwardFI = String.format("%s\t%s",
-                                    protA,
-                                    protB);
-                            String backwardFI = String.format("%s\t%s",
-                                    protB,
-                                    protA);
+                            String uniprotIDA = tokens[primaryIdA1Idx];
+                            String uniprotIDB = tokens[primaryIdB1Idx];
+                            Integer position = Integer.parseInt(tokens[posA1Idx]);
+                            Character normalResidue = new Character(tokens[resA1Idx].charAt(0));
+                            Character mutationResidue = new Character(tokens[mutA1Idx].charAt(0));
+                            Gene gene1 = new Gene(hgncNameA,uniprotIDA);
+                            Gene gene2 = new Gene(hgncNameB,uniprotIDB);
+                            FI fi = new FI(gene1,gene2);
                             String userInput = tokens[userInputIdx];
                             //mutated gene is always the first one listed (partner A)
-                            List<String> mutation = new ArrayList<String>(
-                                    Arrays.asList(nameA, //HGNC gene name
-                                            protA, //protein uniprot ID
-                                            tokens[posA1Idx], //position
-                                            tokens[resA1Idx], //normal residue
-                                            tokens[mutA1Idx])); //mutated residue
+                            Mutation mutation = new Mutation(
+                                    gene1,
+                                    position,
+                                    normalResidue,
+                                    mutationResidue);
                             this.sampleIDMatcher = this.sampleIDPattern.matcher(userInput);
                             while (this.sampleIDMatcher.find()) {
-                                String sampleID = this.sampleIDMatcher.group();
+                                String[] patientData = this.sampleIDMatcher.group().split(":");
 
                                 Integer geneCount = 1;
-                                if (this.gene2SampleCount.containsKey(nameA)) {
-                                    geneCount += this.gene2SampleCount.get(nameA);
+                                if (this.gene2SampleCount.containsKey(gene1)) {
+                                    geneCount += this.gene2SampleCount.get(gene1);
                                 }
-                                this.gene2SampleCount.put(nameA, geneCount);
+                                this.gene2SampleCount.put(gene1, geneCount);
 
                                 Integer mutationCount = 1;
                                 if (this.mut2SampleCount.containsKey(mutation)) {
@@ -155,52 +144,44 @@ public class MechismoOutputLoader {
                                 this.mut2SampleCount.put(mutation, mutationCount);
 
                                 //update samples2fis
-                                Set<String> sampleFIs;
-                                if (samples2fis.containsKey(sampleID)) {
-                                    sampleFIs = samples2fis.get(sampleID);
+                                Patient patient = new Patient(patientData[1],patientData[0]);
+                                Set<FI> sampleFIs;
+                                if (samples2fis.containsKey(patient)) {
+                                    sampleFIs = samples2fis.get(patient);
                                 } else {
                                     sampleFIs = new HashSet<>();
                                 }
-                                sampleFIs.add(forwardFI);
-                                sampleFIs.add(backwardFI);
-                                samples2fis.put(sampleID, sampleFIs);
+                                sampleFIs.add(fi);
+                                samples2fis.put(patient, sampleFIs);
 
                                 //update fis2samples
-                                Set<String> fiSamples;
-                                if (fis2Samples.containsKey(forwardFI) ||
-                                        fis2Samples.containsKey(backwardFI)) {
-                                    if (!fis2Samples.get(forwardFI)
-                                            .equals(fis2Samples.get(backwardFI))) {
-                                        throw new IllegalStateException("These should always match");
-                                    }
-                                    fiSamples = fis2Samples.get(forwardFI);
+                                Set<Patient> fiSamples;
+                                if (fis2Samples.containsKey(fi)){
+                                    fiSamples = fis2Samples.get(fi);
                                 } else {
                                     fiSamples = new HashSet<>();
                                 }
-                                fiSamples.add(sampleID);
-                                fis2Samples.put(forwardFI, fiSamples);
-                                fis2Samples.put(backwardFI, fiSamples);
+                                fiSamples.add(patient);
+                                fis2Samples.put(fi, fiSamples);
 
                                 //update samples2fis2muts
-                                Map<String, Set<List<String>>> fis2muts;
-                                if (samples2fis2muts.containsKey(sampleID)) {
-                                    fis2muts = samples2fis2muts.get(sampleID);
+                                Map<FI, Set<Mutation>> fis2muts;
+                                if (samples2fis2muts.containsKey(patient)) {
+                                    fis2muts = samples2fis2muts.get(patient);
                                 } else {
                                     fis2muts = new HashMap<>();
                                 }
-                                Set<List<String>> muts;
-                                if (fis2muts.containsKey(forwardFI)) {
-                                    muts = fis2muts.get(forwardFI);
+                                Set<Mutation> muts;
+                                if (fis2muts.containsKey(fi)) {
+                                    muts = fis2muts.get(fi);
                                 } else {
                                     muts = new HashSet<>();
                                 }
                                 muts.add(mutation);
-                                fis2muts.put(forwardFI, muts);
-                                fis2muts.put(backwardFI, muts);
-                                samples2fis2muts.put(sampleID, fis2muts);
+                                fis2muts.put(fi, muts);
+                                samples2fis2muts.put(patient, fis2muts);
                             }
-                            fis.add(forwardFI);
-                            fis.add(backwardFI);
+                            fis.add(fi);
                         }
                     }
                 }
@@ -214,55 +195,55 @@ public class MechismoOutputLoader {
         }
     }
 
-    public Map<String, Map<String, Set<List<String>>>> ExtractSamples2FIs2Muts() {
+    public Map<Patient, Map<FI, Set<Mutation>>> ExtractSamples2FIs2Muts() {
         return this.ExtractSamples2FIs2Muts(this.mechismoOuputFilePath);
     }
 
-    public Map<String, Map<String, Set<List<String>>>> ExtractSamples2FIs2Muts(String mechismoOuputFilePath) {
+    public Map<Patient, Map<FI, Set<Mutation>>> ExtractSamples2FIs2Muts(String mechismoOuputFilePath) {
         if (this.samples2fis2muts == null) {
             this.ParseMechismoOutputFile(mechismoOuputFilePath);
         }
         return this.samples2fis2muts;
     }
 
-    public Map<String, Set<String>> ExtractFIs2Samples() {
+    public Map<FI, Set<Patient>> ExtractFIs2Samples() {
         return this.ExtractFIs2Samples(this.mechismoOuputFilePath);
     }
 
-    public Map<String, Set<String>> ExtractFIs2Samples(String mechismoOuputFilePath) {
+    public Map<FI, Set<Patient>> ExtractFIs2Samples(String mechismoOuputFilePath) {
         if (this.fis2Samples == null) {
             this.ParseMechismoOutputFile(mechismoOuputFilePath);
         }
         return this.fis2Samples;
     }
 
-    public Map<String, Set<String>> ExtractSamples2FIs() {
+    public Map<Patient, Set<FI>> ExtractSamples2FIs() {
         return this.ExtractSamples2FIs(this.mechismoOuputFilePath);
     }
 
-    public Map<String, Set<String>> ExtractSamples2FIs(String mechismoOuputFilePath) {
+    public Map<Patient, Set<FI>> ExtractSamples2FIs(String mechismoOuputFilePath) {
         if (this.samples2fis == null) {
             this.ParseMechismoOutputFile(mechismoOuputFilePath);
         }
         return this.samples2fis;
     }
 
-    public Set<String> ExtractMechismoFIs() {
+    public Set<FI> ExtractMechismoFIs() {
         return this.ExtractMechismoFIs(this.mechismoOuputFilePath);
     }
 
-    public Set<String> ExtractMechismoFIs(String mechismoOuputFilePath) {
+    public Set<FI> ExtractMechismoFIs(String mechismoOuputFilePath) {
         if (this.fis == null) {
             this.ParseMechismoOutputFile(mechismoOuputFilePath);
         }
         return this.fis;
     }
 
-    public Map<List<String>, Integer> getMut2SampleCount() {
+    public Map<Mutation, Integer> getMut2SampleCount() {
         return mut2SampleCount;
     }
 
-    public Map<String, Integer> getGene2SampleCount() {
+    public Map<Gene, Integer> getGene2SampleCount() {
         return gene2SampleCount;
     }
 }

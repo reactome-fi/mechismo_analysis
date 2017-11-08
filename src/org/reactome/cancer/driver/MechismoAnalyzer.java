@@ -19,10 +19,7 @@ import org.junit.Test;
 import org.reactome.annotate.AnnotationHelper;
 import org.reactome.annotate.GeneSetAnnotation;
 import org.reactome.annotate.PathwayBasedAnnotator;
-import org.reactome.cancer.CooccurrenceResult;
-import org.reactome.cancer.MechismoOutputLoader;
-import org.reactome.cancer.ReactomeReactionGraphLoader;
-import org.reactome.cancer.TargetReactionCandidate;
+import org.reactome.cancer.*;
 import org.reactome.px.util.InteractionUtilities;
 import org.reactome.r3.Interactome3dAnalyzer;
 import org.reactome.r3.ReactomeAnalyzer;
@@ -794,51 +791,6 @@ public class MechismoAnalyzer {
         }*/
     }
 
-    private void MapReactionFIs(Map<String, Set<Long>> fi2ReactionSet,
-                                Map<Long, Set<String>> reaction2FiSet,
-                                Set<Long> rxns,
-                                Set<String> fis,
-                                MySQLAdaptor dba) throws Exception {
-        Iterator<Long> rxnItr = rxns.iterator();
-        int itCounter = 0;
-        ReactomeAnalyzer reactomeAnalyzer = new ReactomeAnalyzer();
-        Long rxnDbId;
-        System.out.println("Processing Reactions...");
-        System.out.flush();
-        while (rxnItr.hasNext()) {
-            rxnDbId = rxnItr.next();
-            Set<String> rxnInteractions = new HashSet<>();
-            reactomeAnalyzer.generateFIsForReactionsWithFeatures(dba,
-                    new ArrayList<>(Arrays.asList(new Long[]{rxnDbId})),
-                    null,
-                    rxnInteractions);
-            //reaction FIs now in interactions set
-            Set<String> intersection = new HashSet<>(rxnInteractions);
-            intersection.retainAll(fis);
-            if (intersection.size() > 0) {
-                //if Mechismo FIs in reaction interactions
-                reaction2FiSet.put(rxnDbId, intersection);
-                for (String interaction :
-                        intersection) {
-                    Set<Long> interactionRxns;
-                    if (fi2ReactionSet.containsKey(interaction)) {
-                        interactionRxns = fi2ReactionSet.get(interaction);
-                    } else {
-                        interactionRxns = new HashSet<>();
-                    }
-                    interactionRxns.add(rxnDbId);
-                    fi2ReactionSet.put(interaction, interactionRxns);
-                }
-            }
-            itCounter++;
-            if (itCounter % 100 == 0) {
-                //System.out.println(String.format("Processed %d of %d Reactions...",
-                //        itCounter, rxns.size()));
-                //System.out.flush();
-            }
-        }
-    }
-
     private void SearchUpstreamReactions(int depth,
                                          Set<DefaultEdge> incomingEdges,
                                          DirectedGraph<Long, DefaultEdge> reactionGraph,
@@ -937,27 +889,6 @@ public class MechismoAnalyzer {
         }
     }
 
-
-    private void MapReactionsToSamples(Map<Long, Set<String>> reaction2FiSet,
-                                       Map<Long, Set<String>> rxn2Samples,
-                                       Map<String, Set<String>> fis2Samples) {
-        for (Map.Entry<Long, Set<String>> pair : reaction2FiSet.entrySet()) {
-            Long rxn = pair.getKey();
-            Set<String> rxnFis = pair.getValue();
-            for (String rxnFi : rxnFis) {
-                Set<String> rxnSamples;
-                if (rxn2Samples.containsKey(rxn)) {
-                    rxnSamples = new HashSet<>(rxn2Samples.get(rxn));
-                } else {
-                    rxnSamples = new HashSet<>();
-                }
-                rxnSamples.addAll(fis2Samples.get(rxnFi));
-                rxn2Samples.put(rxn, rxnSamples);
-            }
-        }
-    }
-
-
     public void mapReactomeReactions(CancerDriverReactomeAnalyzer cancerDriverReactomeAnalyzer,
                                      String mechismoOutputFilePath,
                                      String reactomeReactionNetworkFilePath,
@@ -975,70 +906,31 @@ public class MechismoAnalyzer {
                                      String rxnFilter) throws Exception {
         long startMethodTime = System.currentTimeMillis();
 
-        //build jgrapht network from reaction file
         ReactomeReactionGraphLoader reactomeReactionGraphLoader =
-                new ReactomeReactionGraphLoader(reactomeReactionNetworkFilePath,
+                new ReactomeReactionGraphLoader(
+                        reactomeReactionNetworkFilePath,
                         mechismoSamples2SigReactionsFilePath,
                         rxnFilter);
 
-
-        //extract FIs from Mechismo output
         MechismoOutputLoader mechismoOutputLoader =
                 new MechismoOutputLoader(mechismoOutputFilePath,
                         mechismoFIFilterFilePath,
                         mechScoreLowerBoundInclusive,
                         eThresh);
 
-        //Set<FI>
-        Set<String> fis = mechismoOutputLoader.ExtractMechismoFIs();
-
-        System.out.println(String.format("Loaded %d Mechismo FIs",
-                fis.size()));
-
-        //Map<Sample Barcode,Set<FI>>
-        Map<String, Set<String>> samples2FIs = mechismoOutputLoader.ExtractSamples2FIs();
-
-        System.out.println(String.format("%s samples mapped to FIs",
-                samples2FIs.keySet().size()));
-
-        //Map<FI,Set<Sample Barcode>>
-        Map<String, Set<String>> fis2Samples = mechismoOutputLoader.ExtractFIs2Samples();
-
-        System.out.println(String.format("%s FIs mapped to samples",
-                fis2Samples.keySet().size()));
-
-        //find reactions containing Mechismo FIs
-        //FI -> Set<Reaction Id>
-        Map<String, Set<Long>> fi2ReactionSet = new HashMap<>();
-        //Reaction Id -> Set<FIs>
-        Map<Long, Set<String>> reaction2FiSet = new HashMap<>();
-        MapReactionFIs(fi2ReactionSet,
-                reaction2FiSet,
-                reactomeReactionGraphLoader.getReactionSet(),
-                fis,
-                cancerDriverReactomeAnalyzer.getDBA());
-
-        System.out.println(String.format("Mapped %d FIs to %d reactions",
-                fi2ReactionSet.keySet().size(),
-                reaction2FiSet.keySet().size()));
-
-        Map<Long, String> longRxnDbIdToName =
-                cancerDriverReactomeAnalyzer.loadReactionLongDBIDToName();
-
-        Map<Long, Set<String>> rxn2Samples = new HashMap<>();
-        MapReactionsToSamples(reaction2FiSet,
-                rxn2Samples,
-                fis2Samples);
+        ReactomeMechismoDataMap reactomeMechismoDataMap =
+                new ReactomeMechismoDataMap(cancerDriverReactomeAnalyzer,
+                        mechismoOutputLoader,
+                        reactomeReactionGraphLoader);
 
         List<CooccurrenceResult> rewiredNetworkResults = new ArrayList<>();
 
         DefaultDirectedGraph<Long, DefaultEdge> reactionGraph =
                 reactomeReactionGraphLoader.getReactionGraph();
 
-        FisherExact fisherExact = new FisherExact(samples2FIs.keySet().size());
+        FisherExact fisherExact = new FisherExact(reactomeMechismoDataMap.getNumPatients());
 
         Random prng = new Random(88L);
-        Map<String, Map<String, Set<List<String>>>> samples2FIs2Muts = mechismoOutputLoader.ExtractSamples2FIs2Muts();
         double maxMemUsed = CalculateJavaMemFootprintGiB();
         for (int i = 0; i < numPermutations; i++) {
             long startLoopTime = System.currentTimeMillis();
@@ -1060,12 +952,8 @@ public class MechismoAnalyzer {
 
             CooccurrenceResult rewiredNetworkResult = CalculateCooccurrencePValues(
                     fisherExact,
-                    longRxnDbIdToName,
                     rewiredReactionGraph,
-                    samples2FIs,
-                    reaction2FiSet,
-                    rxn2Samples,
-                    samples2FIs2Muts,
+                    reactomeMechismoDataMap,
                     depth,
                     ignoreDependentUpstreamReactions,
                     ignoreIndependentUpstreamReactions,
@@ -1076,10 +964,7 @@ public class MechismoAnalyzer {
             WriteCooccurrenceToFile(rewiredNetworkResult,
                     outputDir,
                     i + 1 + "",
-                    mechismoOutputLoader.getMut2SampleCount(),
-                    mechismoOutputLoader.getGene2SampleCount(),
-                    longRxnDbIdToName,
-                    rxn2Samples);
+                    reactomeMechismoDataMap);
 
             double curMemUsed = CalculateJavaMemFootprintGiB();
             maxMemUsed = curMemUsed > maxMemUsed ?
@@ -1102,12 +987,8 @@ public class MechismoAnalyzer {
 
         CooccurrenceResult realResult = CalculateCooccurrencePValues(
                 fisherExact,
-                longRxnDbIdToName,
                 reactionGraph,
-                samples2FIs,
-                reaction2FiSet,
-                rxn2Samples,
-                samples2FIs2Muts,
+                reactomeMechismoDataMap,
                 depth,
                 ignoreDependentUpstreamReactions,
                 ignoreIndependentUpstreamReactions,
@@ -1116,16 +997,13 @@ public class MechismoAnalyzer {
         realResult.CalculateBHAdjustedPValues();
         realResult.CalculateEmpiricalPValues(rewiredNetworkResults);
 
-        WriteRxn2SamplesToFile(outputDir,"",rxn2Samples,samples2FIs);
+        WriteRxn2SamplesToFile(outputDir,"",reactomeMechismoDataMap);
 
         WriteCooccurrenceToFile(
                 realResult,
                 outputDir,
                 outputFilePrefix,
-                mechismoOutputLoader.getMut2SampleCount(),
-                mechismoOutputLoader.getGene2SampleCount(),
-                longRxnDbIdToName,
-                rxn2Samples);
+                reactomeMechismoDataMap);
 
         double curMemUsed = CalculateJavaMemFootprintGiB();
         maxMemUsed = curMemUsed > maxMemUsed ?
@@ -1151,10 +1029,7 @@ public class MechismoAnalyzer {
     private void WriteCooccurrenceToFile(CooccurrenceResult cooccurrenceResult,
                                          String outputDir,
                                          String outputFilePrefix,
-                                         Map<List<String>, Integer> mut2SampleCount,
-                                         Map<String, Integer> gene2SampleCount,
-                                         Map<Long, String> longRxnDbIdToName,
-                                         Map<Long, Set<String>> reaction2Samples) {
+                                         ReactomeMechismoDataMap reactomeMechismoDataMap) {
 
         String outFilePath5 = outputDir + outputFilePrefix + "rxnCooccurrence.csv";
         FileUtility fileUtility = new FileUtility();
@@ -1199,10 +1074,7 @@ public class MechismoAnalyzer {
                 WriteLineToFile(
                         fileUtility,
                         i,
-                        longRxnDbIdToName,
-                        mut2SampleCount,
-                        gene2SampleCount,
-                        reaction2Samples,
+                        reactomeMechismoDataMap,
                         cooccurrenceResult);
             }
             fileUtility.close();
@@ -1214,112 +1086,10 @@ public class MechismoAnalyzer {
         }
     }
 
-    private Set<String> ConvertMutationSetToStringSet(Set<List<String>> rxnMutations,
-                                                      Map<List<String>, Integer> mut2SampleCount) {
-        Set<String> rxnMutationStringSet = new HashSet<>();
-
-        //0 = gene name, 1 = uniprot ID, 2 = position, 3 = normal residue, 4 = mutated residue
-        for (List<String> mutation : rxnMutations) {
-            rxnMutationStringSet.add(String.format("(%d)hgnc=%s:uniprot=%s:pos=%s:res=%s:mut=%s",
-                    mut2SampleCount.get(mutation),
-                    mutation.get(0),
-                    mutation.get(1),
-                    mutation.get(2),
-                    mutation.get(3),
-                    mutation.get(4)));
-        }
-        return rxnMutationStringSet;
-    }
-
-    private String ConvertLongRxnIDToString(Long rxnID,
-                                            Map<Long, String> longRxnDbIdToName,
-                                            Map<Long, Set<String>> reaction2Samples) {
-        Integer reactionCount = reaction2Samples.containsKey(rxnID)
-                ? reaction2Samples.get(rxnID).size()
-                : 0;
-
-        return String.format("(%d)%d:%s",
-                reactionCount,
-                rxnID,
-                longRxnDbIdToName.get(
-                        rxnID).replace(
-                        ",", "~"));
-    }
-
-    private Set<String> ConvertLongRxnIDSetToStringSet(Set<Long> rxnIDSet,
-                                                       Map<Long, String> longRxnDbIdToName,
-                                                       Map<Long, Set<String>> reaction2Samples) {
-        Set<String> rxnIDStringSet = new HashSet<>();
-        for (Long rxnID : rxnIDSet) {
-            rxnIDStringSet.add(
-                    ConvertLongRxnIDToString(
-                            rxnID,
-                            longRxnDbIdToName,
-                            reaction2Samples));
-        }
-        return rxnIDStringSet;
-    }
-
-    private Set<String> ConvertGeneSetToStringSet(Set<String> genes,
-                                                  Map<String, Integer> gene2SampleCount) {
-        Set<String> geneStringSet = new HashSet<>();
-        for (String gene : genes) {
-            geneStringSet.add(String.format("(%d)%s",
-                    gene2SampleCount.get(gene),
-                    gene));
-        }
-        return geneStringSet;
-    }
-
     private void WriteLineToFile(FileUtility fileUtility,
                                  int i,
-                                 Map<Long, String> longRxnDbIdToName,
-                                 Map<List<String>, Integer> mut2SampleCount,
-                                 Map<String, Integer> gene2SampleCount,
-                                 Map<Long, Set<String>> reaction2Samples,
+                                 ReactomeMechismoDataMap reactomeMechismoDataMap,
                                  CooccurrenceResult cr) throws IOException {
-
-        //TODO: add sample counts for mutations and whatnot
-
-        Set<String> upstreamReactionNames = ConvertLongRxnIDSetToStringSet(
-                cr.getCooccurringUpstreamRxns().get(i),
-                longRxnDbIdToName,
-                reaction2Samples
-        );
-
-        Set<String> superIndirectMutationNames = ConvertMutationSetToStringSet(
-                cr.getSuperIndirectMutations().get(i),
-                mut2SampleCount);
-
-        Set<String> indirectMutationNames = ConvertMutationSetToStringSet(
-                cr.getIndirectMutations().get(i),
-                mut2SampleCount);
-
-        Set<String> superDirectMutationNames = ConvertMutationSetToStringSet(
-                cr.getSuperDirectMutations().get(i),
-                mut2SampleCount
-        );
-        Set<String> directMutationNames = ConvertMutationSetToStringSet(
-                cr.getDirectMutations().get(i),
-                mut2SampleCount
-        );
-
-        Set<String> superIndirectMutationGenes = ConvertGeneSetToStringSet(
-                cr.getSuperIndirectMutatedGenes().get(i),
-                gene2SampleCount
-        );
-        Set<String> indirectMutationGenes = ConvertGeneSetToStringSet(
-                cr.getIndirectMutatedGenes().get(i),
-                gene2SampleCount
-        );
-        Set<String> superDirectMutationGenes = ConvertGeneSetToStringSet(
-                cr.getSuperDirectMutatedGenes().get(i),
-                gene2SampleCount
-        );
-        Set<String> directMutationGenes = ConvertGeneSetToStringSet(
-                cr.getDirectMutatedGenes().get(i),
-                gene2SampleCount
-        );
 
         Double bhAdjustedP = cr.getpValue2BHAdjustedPValueMap() == null
                 ? 1.0d
@@ -1328,6 +1098,8 @@ public class MechismoAnalyzer {
         Double empiricalP = cr.getpValue2EmpiricalPValueMap() == null
                 ? 1.0d
                 : cr.getpValue2EmpiricalPValueMap().get(cr.getpValues().get(i));
+
+        //TODO: add sample support to entity classes
 
         fileUtility.printLine(String.format(
                 "%s," + //Target Reaction
@@ -1362,10 +1134,7 @@ public class MechismoAnalyzer {
                         "%.100e," + //Fishers Method Combined P-value
                         "%.100e," + //BH Adjusted P-value
                         "%.100e", //Permutation-Based Empirical P-value
-                ConvertLongRxnIDToString(
                         cr.getTargetRxns().get(i),
-                        longRxnDbIdToName,
-                        reaction2Samples),
                 cr.getCooccurringUpstreamRxns().get(i).size(),
                 cr.getCooccurringUpstreamRxnFIs().get(i).size(),
                 cr.getNumSamplesW0MutatedUpstreamRxns().get(i),
@@ -1381,10 +1150,10 @@ public class MechismoAnalyzer {
                 cr.getSuperDirectMutations().get(i).size(),
                 cr.getDirectMutations().get(i).size(),
                 cr.getCooccurringUpstreamRxns().get(i).hashCode(),
-                upstreamReactionNames.size() > 1
+                cr.getCooccurringUpstreamRxns().get(i).size() > 1
                         ? org.gk.util.StringUtils.join("|",
-                        new ArrayList<>(upstreamReactionNames))
-                        : Collections.singletonList(upstreamReactionNames).get(0).toString()
+                        new ArrayList<>(cr.getCooccurringUpstreamRxns().get(i)))
+                        : Collections.singletonList(cr.getCooccurringUpstreamRxns().get(i)).get(0).toString()
                         .replace("[", "")
                         .replace("]", ""),
                 cr.getCooccurringUpstreamRxnFIs().get(i).size() > 1
@@ -1467,12 +1236,8 @@ public class MechismoAnalyzer {
 
     private CooccurrenceResult CalculateCooccurrencePValues(
             FisherExact fisherExact,
-            Map<Long, String> longRxnDbIdToName,
             DirectedGraph<Long, DefaultEdge> reactionGraph,
-            Map<String, Set<String>> samples2FIs,
-            Map<Long, Set<String>> reaction2FiSet,
-            Map<Long, Set<String>> rxn2Samples,
-            Map<String, Map<String, Set<List<String>>>> samples2fis2muts,
+            ReactomeMechismoDataMap reactomeMechismoDataMap,
             int depth,
             boolean ignoreDependentUpstreamReactions,
             boolean ignoreIndependentUpstreamReactions,
@@ -1531,7 +1296,7 @@ public class MechismoAnalyzer {
             Map<Long, Set<String>> rxnToSamplesMap,
             Map<String, Set<String>> sampleToFIsMap,
             Map<String, Map<String, Set<List<String>>>> sampleToFIsToMutsMap,
-            Set<TargetReactionCandidate> targetReactionSummaries,
+            Set<TargetReactionCandidate> targetReactionCandidates,
             boolean ignoreDependentUpstreamReactions,
             boolean ignoreIndependentUpstreamReactions,
             boolean excludeMultipleImmediateUpstreamReactions) throws MathException {
@@ -1549,7 +1314,7 @@ public class MechismoAnalyzer {
         List<Set<List<String>>> allDirectMutations = new ArrayList<>();
         List<Double> allPValues = new ArrayList<>();
 
-        Iterator<TargetReactionCandidate> targetReactionCandidateIterator = targetReactionSummaries.iterator();
+        Iterator<TargetReactionCandidate> targetReactionCandidateIterator = targetReactionCandidates.iterator();
         int iterationCounter = 0;
         while (targetReactionCandidateIterator.hasNext()) {
             TargetReactionCandidate targetReactionCandidate = targetReactionCandidateIterator.next();
@@ -1782,7 +1547,7 @@ public class MechismoAnalyzer {
             iterationCounter++;
             if (iterationCounter % 500 == 0) {
                 System.out.println(String.format("Processed %d of %d Target Reactions...",
-                        iterationCounter, targetReactionSummaries.size()));
+                        iterationCounter, targetReactionCandidates.size()));
                 System.out.flush();
             }
         }
@@ -2031,41 +1796,32 @@ public class MechismoAnalyzer {
 
     private void WriteRxn2SamplesToFile(String outputDir,
                                         String outputFilePrefix,
-                                        Map<Long, Set<String>> rxn2Samples,
-                                        Map<String, Set<String>> samples2FIs) {
+                                        ReactomeMechismoDataMap reactomeMechismoDataMap) {
         //write rxn2Samples to file
-        FileUtility fileUtility4 = new FileUtility();
-        String outFilePath4 = outputDir + outputFilePrefix + "rxn2Samples.csv";
+        FileUtility fileUtility = new FileUtility();
+        String outFilePath = outputDir + outputFilePrefix + "rxn2Samples.csv";
         try {
-            fileUtility4.setOutput(outFilePath4);
-            fileUtility4.printLine("Rxn,Num Samples,Rxn Frequency,Mapped Samples");
-            Iterator<Map.Entry<Long, Set<String>>> rxn2SampleItr = rxn2Samples.entrySet().iterator();
-            while (rxn2SampleItr.hasNext()) {
-                Map.Entry<Long, Set<String>> pair = rxn2SampleItr.next();
-                Long rxn = new Long(pair.getKey());
-                Set<String> mappedSamples = pair.getValue();
-                if (mappedSamples.size() != rxn2Samples.get(
-                        new Long(rxn.toString())).size() ||
-                        mappedSamples.size() < 1) {
-                    throw new IllegalStateException("These should always match");
-                }
-                fileUtility4.printLine(String.format("%s,%d,%f,%s",
-                        rxn.toString(),
+            fileUtility.setOutput(outFilePath);
+            fileUtility.printLine("Rxn,Num Samples,Rxn Frequency,Mapped Samples");
+            for(Reaction reaction : reactomeMechismoDataMap.getSupportedReactions()) {
+                Set<Patient> mappedSamples = reactomeMechismoDataMap.getPatients(reaction);
+                fileUtility.printLine(String.format("%s,%d,%f,%s",
+                        reaction.toString(),
                         mappedSamples.size(),
-                        new Double(mappedSamples.size()) /
-                                new Double(samples2FIs.keySet().size()),
+                        (double) mappedSamples.size() /
+                                (double) reactomeMechismoDataMap.getSupportedReactions().size(),
                         mappedSamples.size() > 1
                                 ? org.gk.util.StringUtils.join(" ",
-                                new ArrayList(mappedSamples)).replace("\t", " ")
-                                : Arrays.asList(mappedSamples).get(0).toString()
+                                new ArrayList<>(mappedSamples)).replace("\t", " ")
+                                : Collections.singletonList(mappedSamples).get(0).toString()
                                 .replace("[", "")
                                 .replace("]", "")
                                 .replace("\t", " ")));
             }
-            fileUtility4.close();
+            fileUtility.close();
         } catch (IOException ioe) {
             logger.error(String.format("Couldn't use %s, %s: %s",
-                    outFilePath4.toString(),
+                    outFilePath,
                     ioe.getMessage(),
                     Arrays.toString(ioe.getStackTrace())));
         }
