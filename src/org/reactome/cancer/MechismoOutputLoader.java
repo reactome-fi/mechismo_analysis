@@ -34,6 +34,8 @@ public class MechismoOutputLoader {
     private String mechismoFIFilterFilePath = null;
     private Set<String> fis = null;
     private Set<String> fiFilter = null;
+    private Map<List<String>, Integer> mut2SampleCount = null;
+    private Map<String, Integer> gene2SampleCount = null;
     private Map<String, Set<String>> samples2fis = null;
     private Map<String, Set<String>> fis2Samples = null;
     //TODO: decide whether or not to add protein B pos/res info to muts?
@@ -99,6 +101,8 @@ public class MechismoOutputLoader {
         this.fis = new HashSet<>();
         this.samples2fis = new HashMap<>();
         this.fis2Samples = new HashMap<>();
+        this.mut2SampleCount = new HashMap<>();
+        this.gene2SampleCount = new HashMap<>();
         this.samples2fis2muts = new HashMap<>();
         FileUtility fileUtility = new FileUtility();
         try {
@@ -137,6 +141,18 @@ public class MechismoOutputLoader {
                             this.sampleIDMatcher = this.sampleIDPattern.matcher(userInput);
                             while (this.sampleIDMatcher.find()) {
                                 String sampleID = this.sampleIDMatcher.group();
+
+                                Integer geneCount = 1;
+                                if (this.gene2SampleCount.containsKey(nameA)) {
+                                    geneCount += this.gene2SampleCount.get(nameA);
+                                }
+                                this.gene2SampleCount.put(nameA, geneCount);
+
+                                Integer mutationCount = 1;
+                                if (this.mut2SampleCount.containsKey(mutation)) {
+                                    mutationCount += this.mut2SampleCount.get(mutation);
+                                }
+                                this.mut2SampleCount.put(mutation, mutationCount);
 
                                 //update samples2fis
                                 Set<String> sampleFIs;
@@ -240,5 +256,13 @@ public class MechismoOutputLoader {
             this.ParseMechismoOutputFile(mechismoOuputFilePath);
         }
         return this.fis;
+    }
+
+    public Map<List<String>, Integer> getMut2SampleCount() {
+        return mut2SampleCount;
+    }
+
+    public Map<String, Integer> getGene2SampleCount() {
+        return gene2SampleCount;
     }
 }

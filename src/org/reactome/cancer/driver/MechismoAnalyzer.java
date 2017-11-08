@@ -1071,14 +1071,24 @@ public class MechismoAnalyzer {
                     ignoreIndependentUpstreamReactions,
                     excludeMultipleImmediateUpstreamReactions);
 
-            rewiredNetworkResult.MagicallyShrinkMemoryFootprint();
+            rewiredNetworkResult.CalculateBHAdjustedPValues();
 
-            rewiredNetworkResults.add(rewiredNetworkResult);
+            WriteCooccurrenceToFile(rewiredNetworkResult,
+                    outputDir,
+                    i + 1 + "",
+                    mechismoOutputLoader.getMut2SampleCount(),
+                    mechismoOutputLoader.getGene2SampleCount(),
+                    longRxnDbIdToName,
+                    rxn2Samples);
 
             double curMemUsed = CalculateJavaMemFootprintGiB();
             maxMemUsed = curMemUsed > maxMemUsed ?
                     curMemUsed :
                     maxMemUsed;
+
+            rewiredNetworkResult.MagicallyShrinkMemoryFootprint();
+
+            rewiredNetworkResults.add(rewiredNetworkResult);
 
             long endLoopTime = System.currentTimeMillis();
             System.out.println(String.format("Completed permutation iteration %d in %.2f minutes\n" +
@@ -1106,11 +1116,16 @@ public class MechismoAnalyzer {
         realResult.CalculateBHAdjustedPValues();
         realResult.CalculateEmpiricalPValues(rewiredNetworkResults);
 
+        WriteRxn2SamplesToFile(outputDir,"",rxn2Samples,samples2FIs);
+
         WriteCooccurrenceToFile(
                 realResult,
                 outputDir,
                 outputFilePrefix,
-                longRxnDbIdToName);
+                mechismoOutputLoader.getMut2SampleCount(),
+                mechismoOutputLoader.getGene2SampleCount(),
+                longRxnDbIdToName,
+                rxn2Samples);
 
         double curMemUsed = CalculateJavaMemFootprintGiB();
         maxMemUsed = curMemUsed > maxMemUsed ?
@@ -1136,7 +1151,10 @@ public class MechismoAnalyzer {
     private void WriteCooccurrenceToFile(CooccurrenceResult cooccurrenceResult,
                                          String outputDir,
                                          String outputFilePrefix,
-                                         Map<Long, String> longRxnDbIdToName) {
+                                         Map<List<String>, Integer> mut2SampleCount,
+                                         Map<String, Integer> gene2SampleCount,
+                                         Map<Long, String> longRxnDbIdToName,
+                                         Map<Long, Set<String>> reaction2Samples) {
 
         String outFilePath5 = outputDir + outputFilePrefix + "rxnCooccurrence.csv";
         FileUtility fileUtility = new FileUtility();
@@ -1182,6 +1200,9 @@ public class MechismoAnalyzer {
                         fileUtility,
                         i,
                         longRxnDbIdToName,
+                        mut2SampleCount,
+                        gene2SampleCount,
+                        reaction2Samples,
                         cooccurrenceResult);
             }
             fileUtility.close();
@@ -1193,12 +1214,14 @@ public class MechismoAnalyzer {
         }
     }
 
-    private Set<String> ConvertMutationSetToStringSet(Set<List<String>> rxnMutations) {
+    private Set<String> ConvertMutationSetToStringSet(Set<List<String>> rxnMutations,
+                                                      Map<List<String>, Integer> mut2SampleCount) {
         Set<String> rxnMutationStringSet = new HashSet<>();
 
         //0 = gene name, 1 = uniprot ID, 2 = position, 3 = normal residue, 4 = mutated residue
         for (List<String> mutation : rxnMutations) {
-            rxnMutationStringSet.add(String.format("hgnc(%s):uniprot(%s):pos(%s):res(%s):mut(%s)",
+            rxnMutationStringSet.add(String.format("(%d)hgnc=%s:uniprot=%s:pos=%s:res=%s:mut=%s",
+                    mut2SampleCount.get(mutation),
                     mutation.get(0),
                     mutation.get(1),
                     mutation.get(2),
@@ -1208,8 +1231,15 @@ public class MechismoAnalyzer {
         return rxnMutationStringSet;
     }
 
-    private String ConvertLongRxnIDToString(Long rxnID, Map<Long, String> longRxnDbIdToName) {
-        return String.format("%d:%s",
+    private String ConvertLongRxnIDToString(Long rxnID,
+                                            Map<Long, String> longRxnDbIdToName,
+                                            Map<Long, Set<String>> reaction2Samples) {
+        Integer reactionCount = reaction2Samples.containsKey(rxnID)
+                ? reaction2Samples.get(rxnID).size()
+                : 0;
+
+        return String.format("(%d)%d:%s",
+                reactionCount,
                 rxnID,
                 longRxnDbIdToName.get(
                         rxnID).replace(
@@ -1217,37 +1247,87 @@ public class MechismoAnalyzer {
     }
 
     private Set<String> ConvertLongRxnIDSetToStringSet(Set<Long> rxnIDSet,
-                                                       Map<Long, String> longRxnDbIdToName) {
+                                                       Map<Long, String> longRxnDbIdToName,
+                                                       Map<Long, Set<String>> reaction2Samples) {
         Set<String> rxnIDStringSet = new HashSet<>();
         for (Long rxnID : rxnIDSet) {
-            rxnIDStringSet.add(ConvertLongRxnIDToString(rxnID, longRxnDbIdToName));
+            rxnIDStringSet.add(
+                    ConvertLongRxnIDToString(
+                            rxnID,
+                            longRxnDbIdToName,
+                            reaction2Samples));
         }
         return rxnIDStringSet;
+    }
+
+    private Set<String> ConvertGeneSetToStringSet(Set<String> genes,
+                                                  Map<String, Integer> gene2SampleCount) {
+        Set<String> geneStringSet = new HashSet<>();
+        for (String gene : genes) {
+            geneStringSet.add(String.format("(%d)%s",
+                    gene2SampleCount.get(gene),
+                    gene));
+        }
+        return geneStringSet;
     }
 
     private void WriteLineToFile(FileUtility fileUtility,
                                  int i,
                                  Map<Long, String> longRxnDbIdToName,
+                                 Map<List<String>, Integer> mut2SampleCount,
+                                 Map<String, Integer> gene2SampleCount,
+                                 Map<Long, Set<String>> reaction2Samples,
                                  CooccurrenceResult cr) throws IOException {
 
         //TODO: add sample counts for mutations and whatnot
 
         Set<String> upstreamReactionNames = ConvertLongRxnIDSetToStringSet(
                 cr.getCooccurringUpstreamRxns().get(i),
-                longRxnDbIdToName);
+                longRxnDbIdToName,
+                reaction2Samples
+        );
 
         Set<String> superIndirectMutationNames = ConvertMutationSetToStringSet(
-                cr.getSuperIndirectMutations().get(i));
+                cr.getSuperIndirectMutations().get(i),
+                mut2SampleCount);
 
         Set<String> indirectMutationNames = ConvertMutationSetToStringSet(
-                cr.getIndirectMutations().get(i));
+                cr.getIndirectMutations().get(i),
+                mut2SampleCount);
 
         Set<String> superDirectMutationNames = ConvertMutationSetToStringSet(
-                cr.getSuperDirectMutations().get(i)
+                cr.getSuperDirectMutations().get(i),
+                mut2SampleCount
         );
         Set<String> directMutationNames = ConvertMutationSetToStringSet(
-                cr.getDirectMutations().get(i)
+                cr.getDirectMutations().get(i),
+                mut2SampleCount
         );
+
+        Set<String> superIndirectMutationGenes = ConvertGeneSetToStringSet(
+                cr.getSuperIndirectMutatedGenes().get(i),
+                gene2SampleCount
+        );
+        Set<String> indirectMutationGenes = ConvertGeneSetToStringSet(
+                cr.getIndirectMutatedGenes().get(i),
+                gene2SampleCount
+        );
+        Set<String> superDirectMutationGenes = ConvertGeneSetToStringSet(
+                cr.getSuperDirectMutatedGenes().get(i),
+                gene2SampleCount
+        );
+        Set<String> directMutationGenes = ConvertGeneSetToStringSet(
+                cr.getDirectMutatedGenes().get(i),
+                gene2SampleCount
+        );
+
+        Double bhAdjustedP = cr.getpValue2BHAdjustedPValueMap() == null
+                ? 1.0d
+                : cr.getpValue2BHAdjustedPValueMap().get(cr.getpValues().get(i));
+
+        Double empiricalP = cr.getpValue2EmpiricalPValueMap() == null
+                ? 1.0d
+                : cr.getpValue2EmpiricalPValueMap().get(cr.getpValues().get(i));
 
         fileUtility.printLine(String.format(
                 "%s," + //Target Reaction
@@ -1282,7 +1362,10 @@ public class MechismoAnalyzer {
                         "%.100e," + //Fishers Method Combined P-value
                         "%.100e," + //BH Adjusted P-value
                         "%.100e", //Permutation-Based Empirical P-value
-                ConvertLongRxnIDToString(cr.getTargetRxns().get(i), longRxnDbIdToName),
+                ConvertLongRxnIDToString(
+                        cr.getTargetRxns().get(i),
+                        longRxnDbIdToName,
+                        reaction2Samples),
                 cr.getCooccurringUpstreamRxns().get(i).size(),
                 cr.getCooccurringUpstreamRxnFIs().get(i).size(),
                 cr.getNumSamplesW0MutatedUpstreamRxns().get(i),
@@ -1328,28 +1411,28 @@ public class MechismoAnalyzer {
                         : Collections.singletonList(cr.getSamplesW3plusMutatedUpstreamRxns().get(i)).get(0).toString()
                         .replace("[", "")
                         .replace("]", ""),
-                cr.getSuperIndirectMutatedGenes().get(i).size() > 1
+                superIndirectMutationGenes.size() > 1
                         ? org.gk.util.StringUtils.join(" ", //space for copy-pasting
-                        new ArrayList<>(cr.getSuperIndirectMutatedGenes().get(i)))
-                        : Collections.singletonList(cr.getSuperIndirectMutatedGenes().get(i)).get(0).toString()
+                        new ArrayList<>(superIndirectMutationGenes))
+                        : Collections.singletonList(superIndirectMutationGenes).get(0).toString()
                         .replace("[", "")
                         .replace("]", ""),
-                cr.getIndirectMutatedGenes().get(i).size() > 1
+                indirectMutationGenes.size() > 1
                         ? org.gk.util.StringUtils.join(" ", //space for copy-pasting
-                        new ArrayList<>(cr.getIndirectMutatedGenes().get(i)))
-                        : Collections.singletonList(cr.getIndirectMutatedGenes().get(i)).get(0).toString()
+                        new ArrayList<>(indirectMutationGenes))
+                        : Collections.singletonList(indirectMutationGenes).get(0).toString()
                         .replace("[", "")
                         .replace("]", ""),
-                cr.getSuperDirectMutatedGenes().get(i).size() > 1
+                superDirectMutationGenes.size() > 1
                         ? org.gk.util.StringUtils.join(" ", //space for copy-pasting
-                        new ArrayList<>(cr.getSuperDirectMutatedGenes().get(i)))
-                        : Collections.singletonList(cr.getSuperDirectMutatedGenes().get(i)).get(0).toString()
+                        new ArrayList<>(superDirectMutationGenes))
+                        : Collections.singletonList(superDirectMutationGenes).get(0).toString()
                         .replace("[", "")
                         .replace("]", ""),
-                cr.getDirectMutatedGenes().get(i).size() > 1
+                directMutationGenes.size() > 1
                         ? org.gk.util.StringUtils.join(" ", //space for copy-pasting
-                        new ArrayList<>(cr.getDirectMutatedGenes().get(i)))
-                        : Collections.singletonList(cr.getDirectMutatedGenes().get(i)).get(0).toString()
+                        new ArrayList<>(directMutationGenes))
+                        : Collections.singletonList(directMutationGenes).get(0).toString()
                         .replace("[", "")
                         .replace("]", ""),
                 superIndirectMutationNames.size() > 1
@@ -1377,9 +1460,10 @@ public class MechismoAnalyzer {
                         .replace("[", "")
                         .replace("]", ""),
                 cr.getpValues().get(i),
-                cr.getpValue2BHAdjustedPValueMap().get(cr.getpValues().get(i)),
-                cr.getpValue2EmpiricalPValueMap().get(cr.getpValues().get(i))));
+                bhAdjustedP,
+                empiricalP));
     }
+
 
     private CooccurrenceResult CalculateCooccurrencePValues(
             FisherExact fisherExact,
@@ -1591,7 +1675,7 @@ public class MechismoAnalyzer {
                             Set<String> abcSamples = new HashSet<>(A);
                             abcSamples.addAll(B);
                             abcSamples.addAll(C);
-                            for(String abcSample : abcSamples) {
+                            for (String abcSample : abcSamples) {
                                 Set<String> sampleFIsSupportingTargetRxn = findSampleFIsSupportingRxn(
                                         abcSample,
                                         sampleToFIsMap,
@@ -1604,10 +1688,14 @@ public class MechismoAnalyzer {
                             }
                         }
 
+                        //upstream intersection
+                        Set<List<String>> sampleRxnMutIntersection = new HashSet<>(upstreamRxn1Mutations);
+                        sampleRxnMutIntersection.retainAll(upstreamRxn2Mutations);
+
                         //upstream union & target intersection
                         Set<List<String>> sampleRxnMutUnionCpy = new HashSet<>(sampleRxnMutUnion);
                         sampleRxnMutUnionCpy.retainAll(targetRxnmuts);
-                        targetSuperDirectMutations.addAll(sampleRxnMutUnion);
+                        targetSuperDirectMutations.addAll(sampleRxnMutUnionCpy);
 
                         //target - upstream union
                         Set<List<String>> targetRxnmutsCpy = new HashSet<>(targetRxnmuts);
@@ -1615,15 +1703,15 @@ public class MechismoAnalyzer {
                         targetDirectMutations.addAll(targetRxnmutsCpy);
 
                         //upstream intersection - target
-                        Set<List<String>> sampleRxnMutIntersection = new HashSet<>(upstreamRxn1Mutations);
-                        sampleRxnMutIntersection.retainAll(upstreamRxn2Mutations);
-                        sampleRxnMutIntersection.removeAll(targetRxnmuts);
-                        targetSuperIndirectMutations.addAll(sampleRxnMutIntersection);
+                        Set<List<String>> sampleRxnMutIntersectionCpy = new HashSet<>(sampleRxnMutIntersection);
+                        sampleRxnMutIntersectionCpy.removeAll(targetRxnmuts);
+                        targetSuperIndirectMutations.addAll(sampleRxnMutIntersectionCpy);
 
                         //upstream union - upstream intersection - target
-                        sampleRxnMutUnion.removeAll(sampleRxnMutIntersection);
-                        sampleRxnMutUnion.removeAll(targetRxnmuts);
-                        targetIndirectMutations.addAll(sampleRxnMutUnion);
+                        sampleRxnMutUnionCpy = new HashSet<>(sampleRxnMutUnion);
+                        sampleRxnMutUnionCpy.removeAll(sampleRxnMutIntersection);
+                        sampleRxnMutUnionCpy.removeAll(targetRxnmuts);
+                        targetIndirectMutations.addAll(sampleRxnMutUnionCpy);
 
                         //samplesW2 D intersection
                         Set<String> samplesW2Dintersection = new HashSet<>(D);
@@ -1716,11 +1804,11 @@ public class MechismoAnalyzer {
     private Set<String> findSampleFIsSupportingRxn(Set<String> samples,
                                                    Map<String, Set<String>> samples2FIs,
                                                    Map<Long, Set<String>> reaction2FiSet,
-                                                   Long upstreamReactionId) {
+                                                   Long reactionId) {
         Set<String> sampleFIsSupportingRxn = new HashSet<>();
         for (String sample : samples) {
             Set<String> sampleFIs = new HashSet<>(samples2FIs.get(sample));
-            Set<String> supportingFIs = new HashSet<>(reaction2FiSet.get(upstreamReactionId));
+            Set<String> supportingFIs = new HashSet<>(reaction2FiSet.get(reactionId));
             sampleFIs.retainAll(supportingFIs);
             sampleFIsSupportingRxn.addAll(sampleFIs);
         }
@@ -1730,13 +1818,13 @@ public class MechismoAnalyzer {
     private Set<String> findSampleFIsSupportingRxn(String sample,
                                                    Map<String, Set<String>> samples2FIs,
                                                    Map<Long, Set<String>> reaction2FiSet,
-                                                   Long upstreamReactionId) {
+                                                   Long reactionId) {
         Set<String> sampleSet = new HashSet<>();
         sampleSet.add(sample);
         return findSampleFIsSupportingRxn(sampleSet,
                 samples2FIs,
                 reaction2FiSet,
-                upstreamReactionId);
+                reactionId);
     }
 
 
@@ -1766,12 +1854,12 @@ public class MechismoAnalyzer {
         Double max = min;
         Double sum = max;
         while (fiClusterItr.hasNext()) {
-            Double sz = new Double(fiClusterItr.next().size());
+            Double sz = (double) fiClusterItr.next().size();
             min = sz < min ? sz : min;
             max = sz > max ? sz : max;
             sum += sz;
         }
-        Double mean = sum / new Double(fiIntersectingSetUnionClusters.size());
+        Double mean = sum / (double) fiIntersectingSetUnionClusters.size();
 
         System.out.println(String.format("Clusters min = %f, max = %f, mean = %f, sum = %f",
                 min,

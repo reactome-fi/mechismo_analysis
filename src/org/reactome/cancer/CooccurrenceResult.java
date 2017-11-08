@@ -67,26 +67,26 @@ public class CooccurrenceResult {
         this.directMutatedGenes = new ArrayList<>();
 
         for (int i = 0; i < this.pValues.size(); i++) {
-            Set<String> superIndirectTargetMutations = new HashSet<>();
-            Set<String> indirectTargetMutations = new HashSet<>();
-            Set<String> superDirectTargetMutations = new HashSet<>();
-            Set<String> directTargetMutations = new HashSet<>();
+            Set<String> superIndirectTargetMutatatedGenes = new HashSet<>();
+            Set<String> indirectTargetMutatedGenes = new HashSet<>();
+            Set<String> superDirectTargetMutatedGenes = new HashSet<>();
+            Set<String> directTargetMutatedGenes = new HashSet<>();
             for (List<String> mutation : this.superIndirectMutations.get(i)) {
-                superIndirectTargetMutations.add(mutation.get(0));
+                superIndirectTargetMutatatedGenes.add(mutation.get(0));
             }
             for (List<String> mutation : this.indirectMutations.get(i)) {
-                indirectTargetMutations.add(mutation.get(0));
+                indirectTargetMutatedGenes.add(mutation.get(0));
             }
             for (List<String> mutation : this.superDirectMutations.get(i)) {
-                superDirectTargetMutations.add(mutation.get(0));
+                superDirectTargetMutatedGenes.add(mutation.get(0));
             }
             for (List<String> mutation : this.directMutations.get(i)) {
-                directTargetMutations.add(mutation.get(0));
+                directTargetMutatedGenes.add(mutation.get(0));
             }
-            this.superIndirectMutatedGenes.add(superIndirectTargetMutations);
-            this.indirectMutatedGenes.add(indirectTargetMutations);
-            this.superDirectMutatedGenes.add(superDirectTargetMutations);
-            this.directMutatedGenes.add(directTargetMutations);
+            this.superIndirectMutatedGenes.add(superIndirectTargetMutatatedGenes);
+            this.indirectMutatedGenes.add(indirectTargetMutatedGenes);
+            this.superDirectMutatedGenes.add(superDirectTargetMutatedGenes);
+            this.directMutatedGenes.add(directTargetMutatedGenes);
         }
     }
 
