@@ -14,7 +14,7 @@ plot.tcga.cancer <- function(tcga.dist.file, main = "TCGA Cancers") {
     tcga.matrix <- as.matrix(tcga.dist.df[2:length(tcga.dist.df)])
     # print(tcga.matrix)
     tcga.dist <- as.dist(tcga.matrix)
-    print(tcga.dist)
+    # print(tcga.dist)
     tcga.clust <- hclust(tcga.dist,
                          method = "ward.D")
     # tcga.clust <- hclust(reaction.dist, method = "ward.D")
@@ -126,7 +126,7 @@ calculate.sample.dist <- function(file.name, cancer) {
 # Plot the cancer types
 result.dir <- "/Users/wug/git/Ogmios/results"
 sample.to.reaction.file <- paste(result.dir, "MechismoSamplesToReactions_103017.txt", sep = "/")
-reaction.dist <- calculate.sample.dist(sample.to.reaction.file, "SKCM")
+reaction.dist <- calculate.sample.dist(sample.to.reaction.file, "UCEC")
 # print(summary(dist))
 
 # tcga.dist.file <- paste(result.dir, "TCGACancerPairWiseReactionNetworkDist_092617.txt", sep="/")
