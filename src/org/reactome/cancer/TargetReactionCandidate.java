@@ -1,6 +1,5 @@
 package org.reactome.cancer;
 
-import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -15,31 +14,20 @@ public class TargetReactionCandidate {
                     "Sup Dn/Up Combos," +
                     "All Dn/Up Rxns," +
                     "Supporting FIs";
-    private Long rxnId;
-    private Integer numSupportedUpstreamRxns;
+    private Reaction targetReaction;
     private Integer numUpstreamRxns;
-    private Double supportedUpstreamRxnRatio;
-    private Set<Long> supportedUpstreamRxns;
-    private Set<Long> upstreamRxns;
-    private Set<String> supportingFIs;
-    private Map<Long, String> longRxnDbIdToName;
+    private Set<Reaction> supportedUpstreamRxns;
+    private Set<Reaction> upstreamRxns;
+    private Set<FI> supportingFIs;
 
-    public TargetReactionCandidate(Long rxnId,
-                                   Integer numSupportedUpstreamRxns,
-                                   Integer numUpstreamRxns,
-                                   Double supportedUpstreamRxnRatio,
-                                   Set<Long> supportedUpstreamRxns,
-                                   Set<Long> upstreamRxns,
-                                   Set<String> supportingFIs,
-                                   Map<Long, String> longRxnDbIdToName) {
-        this.rxnId = rxnId;
-        this.numSupportedUpstreamRxns = numSupportedUpstreamRxns;
-        this.numUpstreamRxns = numUpstreamRxns;
-        this.supportedUpstreamRxnRatio = supportedUpstreamRxnRatio;
+    public TargetReactionCandidate(Reaction targetReaction,
+                                   Set<Reaction> supportedUpstreamRxns,
+                                   Set<Reaction> upstreamRxns,
+                                   Set<FI> supportingFIs) {
+        this.targetReaction = targetReaction;
         this.supportedUpstreamRxns = supportedUpstreamRxns;
         this.upstreamRxns = upstreamRxns;
         this.supportingFIs = supportingFIs;
-        this.longRxnDbIdToName = longRxnDbIdToName;
     }
 
     public static String getHeaderLine() {
@@ -53,10 +41,8 @@ public class TargetReactionCandidate {
             return false;
         }
         TargetReactionCandidate targetReactionCandidate = (TargetReactionCandidate) o;
-        return Objects.equals(this.rxnId, targetReactionCandidate.rxnId) &&
-                Objects.equals(this.numSupportedUpstreamRxns, targetReactionCandidate.numSupportedUpstreamRxns) &&
+        return Objects.equals(this.targetReaction, targetReactionCandidate.targetReaction) &&
                 Objects.equals(this.numUpstreamRxns, targetReactionCandidate.numUpstreamRxns) &&
-                Objects.equals(this.supportedUpstreamRxnRatio, targetReactionCandidate.supportedUpstreamRxnRatio) &&
                 Objects.equals(this.supportedUpstreamRxns, targetReactionCandidate.supportedUpstreamRxns) &&
                 Objects.equals(this.upstreamRxns, targetReactionCandidate.upstreamRxns) &&
                 Objects.equals(this.supportingFIs, targetReactionCandidate.supportingFIs);
@@ -64,43 +50,29 @@ public class TargetReactionCandidate {
 
     @Override
     public int hashCode() {
-        return Objects.hash(this.rxnId,
-                this.numSupportedUpstreamRxns,
+        return Objects.hash(this.targetReaction,
                 this.numUpstreamRxns,
-                this.supportedUpstreamRxnRatio,
                 this.supportedUpstreamRxns,
                 this.supportingFIs);
     }
 
-    public Long getRxnId() {
-        return rxnId;
-    }
-
-    public Integer getNumSupportedUpstreamRxns() {
-        return numSupportedUpstreamRxns;
-    }
-
-    public Integer getNumUpstreamRxns() {
-        return numUpstreamRxns;
+    public Reaction getTargetReaction() {
+        return targetReaction;
     }
 
     public Double getSupportedUpstreamRxnRatio() {
-        return supportedUpstreamRxnRatio;
+        return (double) this.supportedUpstreamRxns.size() / (double) this.upstreamRxns.size();
     }
 
-    public Set<Long> getSupportedUpstreamRxns() {
+    public Set<Reaction> getSupportedUpstreamRxns() {
         return supportedUpstreamRxns;
     }
 
-    public Set<Long> getUpstreamRxns() {
+    public Set<Reaction> getUpstreamRxns() {
         return upstreamRxns;
     }
 
-    public Set<String> getSupportingFIs() {
+    public Set<FI> getSupportingFIs() {
         return supportingFIs;
-    }
-
-    public Map<Long, String> getLongRxnDbIdToName() {
-        return longRxnDbIdToName;
     }
 }

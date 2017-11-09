@@ -9,7 +9,6 @@ import org.apache.commons.math.stat.correlation.PearsonsCorrelation;
 import org.apache.commons.math.stat.correlation.SpearmansCorrelation;
 import org.apache.log4j.Logger;
 import org.gk.model.GKInstance;
-import org.gk.persistence.MySQLAdaptor;
 import org.jgrapht.DirectedGraph;
 import org.jgrapht.Graphs;
 import org.jgrapht.alg.ConnectivityInspector;
@@ -792,99 +791,65 @@ public class MechismoAnalyzer {
     }
 
     private void SearchUpstreamReactions(int depth,
-                                         Set<DefaultEdge> incomingEdges,
                                          DirectedGraph<Long, DefaultEdge> reactionGraph,
-                                         Map<Long, Set<String>> reaction2FiSet,
-                                         Long currentReactionId,
-                                         Set<Set<String>> allFIs,
+                                         Set<DefaultEdge> incomingEdges,
+                                         Reaction targetReactionCandidate,
                                          Set<TargetReactionCandidate> targetReactionCandidates,
-                                         Long targetReactionId,
-                                         Map<Long, String> longRxnDbIdToName) {
+                                         ReactomeMechismoDataMap reactomeMechismoDataMap) {
         Set<DefaultEdge> incomingEdgesCpy = new HashSet<>(incomingEdges);
-        Set<Long> upstreamReactions = new HashSet<>();
-        List<Set<Long>> upstreamReactionsByDepth = new ArrayList<>();
+        Set<Reaction> upstreamReactions = new HashSet<>();
+        List<Set<Reaction>> upstreamReactionsByDepth = new ArrayList<>();
         for (int i = 1; i <= depth; i++) {
-            Iterator<DefaultEdge> incomingEdgeItr = incomingEdgesCpy.iterator();
-            while (incomingEdgeItr.hasNext()) {
-                DefaultEdge incomingEdge = incomingEdgeItr.next();
-                Long upstreamReactionId = reactionGraph.getEdgeSource(incomingEdge);
-                if (upstreamReactions.contains(upstreamReactionId)) {
-                    throw new IllegalStateException(String.format(
-                            "The same upstream reaction (%d) should not be discovered twice",
-                            upstreamReactionId));
-                } else {
-                    upstreamReactions.add(upstreamReactionId);
-                }
+            for (DefaultEdge incomingEdge : incomingEdgesCpy) {
+                Reaction upstreamReaction = reactomeMechismoDataMap.getReaction(reactionGraph.getEdgeSource(incomingEdge));
+                upstreamReactions.add(upstreamReaction);
             }
             if (i < depth) {
                 upstreamReactionsByDepth.add(new HashSet<>(upstreamReactions));
                 incomingEdgesCpy = new HashSet<>();
-                Iterator<Long> upstreamReactionItr = upstreamReactionsByDepth.get(i - 1).iterator();
-                while (upstreamReactionItr.hasNext()) {
-                    Long upstreamReactionId = upstreamReactionItr.next();
-                    incomingEdgesCpy.addAll(reactionGraph.incomingEdgesOf(upstreamReactionId));
+                for (Reaction upstreamReaction : upstreamReactionsByDepth.get(i - 1)) {
+                    incomingEdgesCpy.addAll(reactionGraph.incomingEdgesOf(upstreamReaction.getReactionID()));
                 }
             }
         }
         upstreamReactionsByDepth.clear();
 
         //find intersection of upstream reactions and supported reactions
-        Set<Long> supportedUpstreamReactions = new HashSet<>(upstreamReactions);
-        supportedUpstreamReactions.retainAll(reaction2FiSet.keySet());
-        /*if (!supportedUpstreamReactions.contains(currentReactionId)) {
-            throw new IllegalStateException(
-                    String.format("Initial rxn ID '%d' not in downstream upstream rxns",
-                            currentReactionId)
-            );
-        }*/
-        Set<String> supportedFIs = new HashSet<>();
-        Iterator<Long> supportedUpstreamReactionItr = supportedUpstreamReactions.iterator();
-        while (supportedUpstreamReactionItr.hasNext()) {
-            Long supportedUpstreamReactionId = supportedUpstreamReactionItr.next();
-            supportedFIs.addAll(reaction2FiSet.get(supportedUpstreamReactionId));
+        Set<Reaction> supportedUpstreamReactions = new HashSet<>(upstreamReactions);
+        supportedUpstreamReactions.retainAll(reactomeMechismoDataMap.getSupportedReactions());
+
+        Set<FI> supportedFIs = new HashSet<>();
+        for (Reaction supportedUpstreamReaction : supportedUpstreamReactions) {
+            supportedFIs.addAll(reactomeMechismoDataMap.getFIs(supportedUpstreamReaction));
         }
-        allFIs.add(supportedFIs);
 
         targetReactionCandidates.add(new TargetReactionCandidate(
-                targetReactionId,
-                supportedUpstreamReactions.size(),
-                upstreamReactions.size(),
-                (double) supportedUpstreamReactions.size() /
-                        (double) upstreamReactions.size(),
+                targetReactionCandidate,
                 supportedUpstreamReactions,
                 upstreamReactions,
-                supportedFIs,
-                longRxnDbIdToName));
+                supportedFIs));
     }
 
     private void SearchRxnNetworkForTargetReactionCandidates(Set<TargetReactionCandidate> targetReactionCandidates,
-                                                             Set<Set<String>> allFIs,
-                                                             Map<Long, Set<String>> reaction2FiSet,
                                                              DirectedGraph<Long, DefaultEdge> reactionGraph,
-                                                             Map<Long, String> longRxnDbIdToName,
+                                                             ReactomeMechismoDataMap reactomeMechismoDataMap,
                                                              int depth) {
         //foreach SupReaction in reaction2FiSet
-        Iterator<Map.Entry<Long, Set<String>>> rxn2FiItr = reaction2FiSet.entrySet().iterator();
-        while (rxn2FiItr.hasNext()) {
-            Map.Entry<Long, Set<String>> pair = rxn2FiItr.next();
-            Long currentReactionId = pair.getKey();
+        for (Reaction reaction : reactomeMechismoDataMap.getSupportedReactions()) {
             //http://jgrapht.org/javadoc/org/jgrapht/graph/DefaultDirectedGraph.html
-            //go one DnReaction downstream from SupReaction and
-            Set<DefaultEdge> outgoingEdges = reactionGraph.outgoingEdgesOf(currentReactionId);
-            Iterator<DefaultEdge> outgoingEdgeItr = outgoingEdges.iterator();
-            while (outgoingEdgeItr.hasNext()) {
-                DefaultEdge outgoingEdge = outgoingEdgeItr.next();
-                Long targetReactionId = reactionGraph.getEdgeTarget(outgoingEdge);
-                //one UpReaction from DnReaction
-                SearchUpstreamReactions(depth,
-                        reactionGraph.incomingEdgesOf(targetReactionId),
+            //go one reaction downstream
+            Set<DefaultEdge> outgoingEdges = reactionGraph.outgoingEdgesOf(reaction.getReactionID());
+            for (DefaultEdge outgoingEdge : outgoingEdges) {
+                Reaction targetReactionCandidate = reactomeMechismoDataMap.getReaction(
+                        reactionGraph.getEdgeTarget(outgoingEdge));
+                //one reaction upstream
+                SearchUpstreamReactions(
+                        depth,
                         reactionGraph,
-                        reaction2FiSet,
-                        currentReactionId,
-                        allFIs,
+                        reactionGraph.incomingEdgesOf(targetReactionCandidate.getReactionID()),
+                        targetReactionCandidate,
                         targetReactionCandidates,
-                        targetReactionId,
-                        longRxnDbIdToName);
+                        reactomeMechismoDataMap);
             }
         }
     }
@@ -997,7 +962,7 @@ public class MechismoAnalyzer {
         realResult.CalculateBHAdjustedPValues();
         realResult.CalculateEmpiricalPValues(rewiredNetworkResults);
 
-        WriteRxn2SamplesToFile(outputDir,"",reactomeMechismoDataMap);
+        WriteRxn2SamplesToFile(outputDir, "", reactomeMechismoDataMap);
 
         WriteCooccurrenceToFile(
                 realResult,
@@ -1134,7 +1099,7 @@ public class MechismoAnalyzer {
                         "%.100e," + //Fishers Method Combined P-value
                         "%.100e," + //BH Adjusted P-value
                         "%.100e", //Permutation-Based Empirical P-value
-                        cr.getTargetRxns().get(i),
+                cr.getTargetRxns().get(i),
                 cr.getCooccurringUpstreamRxns().get(i).size(),
                 cr.getCooccurringUpstreamRxnFIs().get(i).size(),
                 cr.getNumSamplesW0MutatedUpstreamRxns().get(i),
@@ -1318,7 +1283,7 @@ public class MechismoAnalyzer {
         int iterationCounter = 0;
         while (targetReactionCandidateIterator.hasNext()) {
             TargetReactionCandidate targetReactionCandidate = targetReactionCandidateIterator.next();
-            Long targetRxnId = targetReactionCandidate.getRxnId();
+            Long targetRxnId = targetReactionCandidate.getTargetReaction();
             List<Long[]> targetUpstreamReactionPairs =
                     new ArrayList<>(GenerateReactionSetPairs(targetReactionCandidate.getSupportedUpstreamRxns()));
             Set<Long> targetCooccurringUpstreamRxns = new HashSet<>();
@@ -1803,7 +1768,7 @@ public class MechismoAnalyzer {
         try {
             fileUtility.setOutput(outFilePath);
             fileUtility.printLine("Rxn,Num Samples,Rxn Frequency,Mapped Samples");
-            for(Reaction reaction : reactomeMechismoDataMap.getSupportedReactions()) {
+            for (Reaction reaction : reactomeMechismoDataMap.getSupportedReactions()) {
                 Set<Patient> mappedSamples = reactomeMechismoDataMap.getPatients(reaction);
                 fileUtility.printLine(String.format("%s,%d,%f,%s",
                         reaction.toString(),

@@ -9,6 +9,7 @@ public class ReactomeMechismoDataMap {
     private Set<FI> fis;
     private Map<String,FI> alphaUniprotsToFI;
     private Set<Reaction> reactions;
+    private Map<Long,Reaction> reactionIDToReaction;
     private Map<Patient,Set<FI>> samples2FIs;
     private Map<FI,Set<Patient>> fis2Samples;
     private Map<FI,Set<Reaction>> fisToReactions;
@@ -40,9 +41,12 @@ public class ReactomeMechismoDataMap {
 
     private void BuildReactions() throws Exception {
         this.reactions = new HashSet<>();
+        this.reactionIDToReaction = new HashMap<>();
         Map<Long,String> reactionLongDBIDToName = cancerDriverReactomeAnalyzer.loadReactionLongDBIDToName();
         for(Long reactionID : reactionLongDBIDToName.keySet()){
-            this.reactions.add(new Reaction(reactionID,reactionLongDBIDToName.get(reactionID)));
+            Reaction reaction = new Reaction(reactionID,reactionLongDBIDToName.get(reactionID));
+            this.reactions.add(reaction);
+            this.reactionIDToReaction.put(reactionID,reaction);
         }
     }
 
@@ -65,6 +69,10 @@ public class ReactomeMechismoDataMap {
             String key = String.format("%s:%s",uniprots[0],uniprots[1]);
             alphaUniprotsToFI.put(key,fi);
         }
+    }
+
+    public Reaction getReaction(Long reactionID){
+        return this.reactionIDToReaction.get(reactionID);
     }
 
     public Set<FI> getFIs(Patient patient){
