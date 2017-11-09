@@ -7,113 +7,113 @@ import java.util.*;
 
 public class ReactomeMechismoDataMap {
     private Set<FI> fis;
-    private Map<String,FI> alphaUniprotsToFI;
+    private Map<String, FI> alphaUniprotsToFI;
     private Set<Reaction> reactions;
-    private Map<Long,Reaction> reactionIDToReaction;
-    private Map<Patient,Set<FI>> samples2FIs;
-    private Map<FI,Set<Patient>> fis2Samples;
-    private Map<FI,Set<Reaction>> fisToReactions;
-    private Map<Reaction,Set<FI>> reactionToFIs;
-    private Map<Reaction,Set<Patient>> reactionToPatientMap;
-    private Map<Patient, Map<FI, Set<Mutation>>> reactionToFIToMutationMap;
+    private Map<Long, Reaction> reactionIDToReaction;
+    private Map<Patient, Set<FI>> patientsToFIs;
+    private Map<FI, Set<Patient>> fisToPatients;
+    private Map<Reaction, Set<FI>> reactionToFIs;
+    private Map<Reaction, Set<Patient>> reactionToPatients;
+    private Map<Patient, Map<FI, Set<Mutation>>> patientToFIsToMutations;
     private CancerDriverReactomeAnalyzer cancerDriverReactomeAnalyzer;
-    private Map<Mutation, Integer> mut2SampleCount;
-    private Map<Gene, Integer> gene2SampleCount;
-    private MechismoOutputLoader mechismoOutputLoader;
-    private ReactomeReactionGraphLoader reactomeReactionGraphLoader;
+
     public ReactomeMechismoDataMap(CancerDriverReactomeAnalyzer cancerDriverReactomeAnalyzer,
-                                   MechismoOutputLoader mechismoOutputLoader,
-                                   ReactomeReactionGraphLoader reactomeReactionGraphLoader) throws Exception {
+                                   MechismoOutputLoader mechismoOutputLoader) throws Exception {
         this.cancerDriverReactomeAnalyzer = cancerDriverReactomeAnalyzer;
-        this.mechismoOutputLoader = mechismoOutputLoader;
-        this.reactomeReactionGraphLoader = reactomeReactionGraphLoader;
-        this.samples2FIs = this.mechismoOutputLoader.ExtractSamples2FIs();
-        this.fis2Samples = this.mechismoOutputLoader.ExtractFIs2Samples();
+        MechismoOutputLoader mechismoOutputLoader1 = mechismoOutputLoader;
+        this.patientsToFIs = mechismoOutputLoader1.ExtractPatientsToFIs();
+        this.fisToPatients = mechismoOutputLoader1.ExtractFIs2Samples();
         this.fis = mechismoOutputLoader.ExtractMechismoFIs();
-        this.mut2SampleCount = mechismoOutputLoader.getMut2SampleCount();
-        this.gene2SampleCount = mechismoOutputLoader.getGene2SampleCount();
         BuildReactions();
         BuildSortedUniprotsToFIs();
         BuildReactionToFIs();
-        BuildReactionToSamples();
-        this.reactionToFIToMutationMap = mechismoOutputLoader.ExtractSamples2FIs2Muts();
+        BuildReactionToPatients();
+        this.patientToFIsToMutations = mechismoOutputLoader.ExtractSamples2FIs2Muts();
+    }
+
+    private Set<Mutation> getReactionPatientMutations(Reaction reaction, Patient patient){
+       Set<Mutation> mutations = new HashSet<>();
+       Set<FI> patientFIs = new HashSet<>(this.patientsToFIs.get(patient));
+       patientFIs.retainAll(this.reactionToFIs.get(reaction));
+       for(FI fi : patientFIs){
+           if(this.patientToFIsToMutations.containsKey(patient)) {
+               mutations.addAll(this.patientToFIsToMutations.get(patient).get(fi));
+           }
+       }
+       return mutations;
+    }
+
+    public Set<Mutation> getReactionPatientsMutations(Reaction reaction, Set<Patient> patients){
+        Set<Mutation> mutations = new HashSet<>();
+        for(Patient patient : patients){
+            mutations.addAll(getReactionPatientMutations(reaction,patient));
+        }
+        return mutations;
+    }
+
+    public Set<FI> getReactionPatientsFIs(Reaction reaction, Set<Patient> patients) {
+        Set<FI> reactionPatientsFIs = new HashSet<>();
+        for (Patient patient : patients) {
+            Set<FI> patientFIs = new HashSet<>(this.patientsToFIs.get(patient));
+            patientFIs.retainAll(this.reactionToFIs.get(reaction));
+            reactionPatientsFIs.addAll(patientFIs);
+        }
+        return reactionPatientsFIs;
     }
 
     private void BuildReactions() throws Exception {
         this.reactions = new HashSet<>();
         this.reactionIDToReaction = new HashMap<>();
-        Map<Long,String> reactionLongDBIDToName = cancerDriverReactomeAnalyzer.loadReactionLongDBIDToName();
-        for(Long reactionID : reactionLongDBIDToName.keySet()){
-            Reaction reaction = new Reaction(reactionID,reactionLongDBIDToName.get(reactionID));
+        Map<Long, String> reactionLongDBIDToName = cancerDriverReactomeAnalyzer.loadReactionLongDBIDToName();
+        for (Long reactionID : reactionLongDBIDToName.keySet()) {
+            Reaction reaction = new Reaction(reactionID, reactionLongDBIDToName.get(reactionID));
             this.reactions.add(reaction);
-            this.reactionIDToReaction.put(reactionID,reaction);
+            this.reactionIDToReaction.put(reactionID, reaction);
         }
     }
 
-    private Integer getSampleCount(Mutation mutation){
-        return this.mut2SampleCount.get(mutation);
-    }
-
-    private Integer getSampleCount(Gene gene){
-        return this.gene2SampleCount.get(gene);
-    }
-
-    private void BuildSortedUniprotsToFIs(){
+    private void BuildSortedUniprotsToFIs() {
         this.alphaUniprotsToFI = new HashMap<>();
-        for(FI fi : this.fis){
+        for (FI fi : this.fis) {
             Gene[] genes = fi.getGenes();
             String uniprot1 = genes[0].getUniprotID();
             String uniprot2 = genes[1].getUniprotID();
-            String[] uniprots = new String[]{uniprot1,uniprot2};
+            String[] uniprots = new String[]{uniprot1, uniprot2};
             Arrays.sort(uniprots);
-            String key = String.format("%s:%s",uniprots[0],uniprots[1]);
-            alphaUniprotsToFI.put(key,fi);
+            String key = String.format("%s:%s", uniprots[0], uniprots[1]);
+            alphaUniprotsToFI.put(key, fi);
         }
     }
 
-    public Reaction getReaction(Long reactionID){
+    public Set<Patient> getPatients() {
+        return this.patientsToFIs.keySet();
+    }
+
+    public Reaction getReaction(Long reactionID) {
         return this.reactionIDToReaction.get(reactionID);
     }
 
-    public Set<FI> getFIs(Patient patient){
-        return this.samples2FIs.get(patient);
-    }
-
-    public Set<FI> getFIs(Reaction reaction){
+    public Set<FI> getFIs(Reaction reaction) {
         return this.reactionToFIs.get(reaction);
     }
 
-    public Set<Patient> getPatients(FI fi){
-        return this.fis2Samples.get(fi);
+    public Set<Patient> getPatients(Reaction reaction) {
+        return this.reactionToPatients.get(reaction);
     }
 
-    public Set<Reaction> getReactions(FI fi){
-        return this.fisToReactions.get(fi);
-    }
-
-    public Set<Patient> getPatients(Reaction reaction){
-        return this.reactionToPatientMap.get(reaction);
-    }
-
-    public Set<Mutation> getMutations(Patient patient,FI fi){
-        return this.reactionToFIToMutationMap.get(patient).get(fi);
-    }
-
-    public Set<FI> getFIs(){
+    public Set<FI> getFIs() {
         return this.fis;
     }
 
-    public Integer getNumPatients(){
-        return this.samples2FIs.keySet().size();
+    public Integer getNumPatients() {
+        return this.patientsToFIs.keySet().size();
     }
 
     private void BuildReactionToFIs() throws Exception {
         this.reactionToFIs = new HashMap<>();
-        this.fisToReactions = new HashMap<>();
+        Map<FI, Set<Reaction>> fisToReactions = new HashMap<>();
         ReactomeAnalyzer reactomeAnalyzer = new ReactomeAnalyzer();
-        Iterator<Reaction> rxnItr = this.reactions.iterator();
-        while (rxnItr.hasNext()) {
-            Reaction reaction = rxnItr.next();
+        for(Reaction reaction : this.reactions) {
             List<Long> reactionIDList = new ArrayList<>();
             reactionIDList.add(reaction.getReactionID());
             Set<String> reactionFIStrings = new HashSet<>();
@@ -124,10 +124,10 @@ public class ReactomeMechismoDataMap {
                     reactionFIStrings);
 
             Set<FI> reactionFIs = new HashSet<>();
-            for(String fiString : reactionFIStrings){
+            for (String fiString : reactionFIStrings) {
                 String[] uniprots = fiString.split("\t");
                 Arrays.sort(uniprots);
-                String key = String.format("%s:%s",uniprots[0],uniprots[1]);
+                String key = String.format("%s:%s", uniprots[0], uniprots[1]);
                 reactionFIs.add(this.alphaUniprotsToFI.get(key));
             }
 
@@ -152,23 +152,23 @@ public class ReactomeMechismoDataMap {
         }
     }
 
-    public Set<Reaction> getSupportedReactions(){
+    public Set<Reaction> getSupportedReactions() {
         return this.reactionToFIs.keySet();
     }
 
-    private void BuildReactionToSamples() {
-        this.reactionToPatientMap = new HashMap<>();
+    private void BuildReactionToPatients() {
+        this.reactionToPatients = new HashMap<>();
         for (Reaction reaction : this.reactionToFIs.keySet()) {
             Set<FI> rxnFis = this.reactionToFIs.get(reaction);
             for (FI rxnFi : rxnFis) {
                 Set<Patient> rxnSamples;
-                if (reactionToPatientMap.containsKey(reaction)) {
-                    rxnSamples = new HashSet<>(reactionToPatientMap.get(reaction));
+                if (reactionToPatients.containsKey(reaction)) {
+                    rxnSamples = new HashSet<>(reactionToPatients.get(reaction));
                 } else {
                     rxnSamples = new HashSet<>();
                 }
-                rxnSamples.addAll(fis2Samples.get(rxnFi));
-                reactionToPatientMap.put(reaction, rxnSamples);
+                rxnSamples.addAll(fisToPatients.get(rxnFi));
+                reactionToPatients.put(reaction, rxnSamples);
             }
         }
     }

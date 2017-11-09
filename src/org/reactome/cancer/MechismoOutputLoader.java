@@ -115,8 +115,8 @@ public class MechismoOutputLoader {
                             String uniprotIDA = tokens[primaryIdA1Idx];
                             String uniprotIDB = tokens[primaryIdB1Idx];
                             Integer position = Integer.parseInt(tokens[posA1Idx]);
-                            Character normalResidue = new Character(tokens[resA1Idx].charAt(0));
-                            Character mutationResidue = new Character(tokens[mutA1Idx].charAt(0));
+                            Character normalResidue = tokens[resA1Idx].charAt(0);
+                            Character mutationResidue = tokens[mutA1Idx].charAt(0);
                             Gene gene1 = new Gene(hgncNameA,uniprotIDA);
                             Gene gene2 = new Gene(hgncNameB,uniprotIDB);
                             FI fi = new FI(gene1,gene2);
@@ -217,11 +217,11 @@ public class MechismoOutputLoader {
         return this.fis2Samples;
     }
 
-    public Map<Patient, Set<FI>> ExtractSamples2FIs() {
-        return this.ExtractSamples2FIs(this.mechismoOuputFilePath);
+    public Map<Patient, Set<FI>> ExtractPatientsToFIs() {
+        return this.ExtractPatientsToFIs(this.mechismoOuputFilePath);
     }
 
-    public Map<Patient, Set<FI>> ExtractSamples2FIs(String mechismoOuputFilePath) {
+    public Map<Patient, Set<FI>> ExtractPatientsToFIs(String mechismoOuputFilePath) {
         if (this.samples2fis == null) {
             this.ParseMechismoOutputFile(mechismoOuputFilePath);
         }
