@@ -887,8 +887,10 @@ public class MechismoAnalyzer {
 
         System.out.println("Mapping reactome & mechismo data...");
         ReactomeMechismoDataMap reactomeMechismoDataMap =
-                new ReactomeMechismoDataMap(cancerDriverReactomeAnalyzer,
-                        mechismoOutputLoader);
+                new ReactomeMechismoDataMap(
+                        cancerDriverReactomeAnalyzer,
+                        mechismoOutputLoader,
+                        reactomeReactionGraphLoader);
 
         List<CooccurrenceResult> rewiredNetworkResults = new ArrayList<>();
 
@@ -913,10 +915,6 @@ public class MechismoAnalyzer {
                     rewiredReactionGraph.vertexSet().size(),
                     rewiredReactionGraph.edgeSet().size(),
                     connectivityInspector.connectedSets().size()));
-
-            //for(Set<Long> component : connectivityInspector.connectedSets()){
-            //    System.out.println(component.size());
-            //}
 
             CooccurrenceResult rewiredNetworkResult = CalculateCooccurrencePValues(
                     fisherExact,

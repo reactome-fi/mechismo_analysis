@@ -14,9 +14,6 @@ import java.util.Scanner;
  */
 public class ProcessDatasetsDriver {
 
-//    public ProcessDatasetsDriver(String[] args){
-//    }
-
     public ProcessDatasetsDriver() {
     }
 
@@ -47,7 +44,7 @@ public class ProcessDatasetsDriver {
     }
 
 
-    public void run() {
+    void run() {
         System.out.print("Interface Enrichment 0\n" +
                 "Mechismo/Reactome Overlay 1\n" +
                 "Mechismo/Reactome Interface Enrichment 2\n" +
@@ -61,7 +58,7 @@ public class ProcessDatasetsDriver {
         run(ex);
     }
 
-    public void run(String ex) {
+    private void run(String ex) {
         Interactome3dDriverAnalyzer interactome3dDriverAnalyzer = new Interactome3dDriverAnalyzer();
         try {
             MySQLAdaptor dba = getReactomeDBA();

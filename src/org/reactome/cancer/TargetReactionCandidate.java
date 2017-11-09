@@ -15,7 +15,6 @@ public class TargetReactionCandidate {
                     "All Dn/Up Rxns," +
                     "Supporting FIs";
     private Reaction targetReaction;
-    private Integer numUpstreamRxns;
     private Set<Reaction> supportedUpstreamRxns;
     private Set<Reaction> upstreamRxns;
     private Set<FI> supportingFIs;
@@ -42,7 +41,6 @@ public class TargetReactionCandidate {
         }
         TargetReactionCandidate targetReactionCandidate = (TargetReactionCandidate) o;
         return Objects.equals(this.targetReaction, targetReactionCandidate.targetReaction) &&
-                Objects.equals(this.numUpstreamRxns, targetReactionCandidate.numUpstreamRxns) &&
                 Objects.equals(this.supportedUpstreamRxns, targetReactionCandidate.supportedUpstreamRxns) &&
                 Objects.equals(this.upstreamRxns, targetReactionCandidate.upstreamRxns) &&
                 Objects.equals(this.supportingFIs, targetReactionCandidate.supportingFIs);
@@ -51,7 +49,6 @@ public class TargetReactionCandidate {
     @Override
     public int hashCode() {
         return Objects.hash(this.targetReaction,
-                this.numUpstreamRxns,
                 this.supportedUpstreamRxns,
                 this.supportingFIs);
     }
@@ -60,19 +57,7 @@ public class TargetReactionCandidate {
         return targetReaction;
     }
 
-    public Double getSupportedUpstreamRxnRatio() {
-        return (double) this.supportedUpstreamRxns.size() / (double) this.upstreamRxns.size();
-    }
-
     public Set<Reaction> getSupportedUpstreamRxns() {
         return supportedUpstreamRxns;
-    }
-
-    public Set<Reaction> getUpstreamRxns() {
-        return upstreamRxns;
-    }
-
-    public Set<FI> getSupportingFIs() {
-        return supportingFIs;
     }
 }

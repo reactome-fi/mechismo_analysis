@@ -37,4 +37,11 @@ public class Mutation{
     public int hashCode(){
         return Objects.hash(this.gene,this.position,this.normalResidue,this.mutResidue);
     }
+
+    @Override
+    public boolean equals(Object o){
+        return o == null
+                ? false
+                : o.hashCode() == this.hashCode();
+    }
 }

@@ -24,6 +24,13 @@ public class Patient {
     }
 
     @Override
+    public boolean equals(Object o){
+        return o == null
+                ? false
+                : o.hashCode() == this.hashCode();
+    }
+
+    @Override
     public String toString(){
         return this.tcgaBarcode;
     }

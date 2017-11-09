@@ -18,4 +18,11 @@ public class FI{
     public int hashCode(){
         return Objects.hash(this.genes);
     }
+
+    @Override
+    public boolean equals(Object o){
+        return o == null
+                ? false
+                : o.hashCode() == this.hashCode();
+    }
 }

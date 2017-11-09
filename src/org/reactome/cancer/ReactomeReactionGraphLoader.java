@@ -12,8 +12,6 @@ import java.util.Set;
 
 public class ReactomeReactionGraphLoader {
     private final static Logger logger = Logger.getLogger(MechismoOutputLoader.class);
-    private final int rxn1DbIdIdx = 0;
-    private final int rxn2DbIdIdx = 2;
     private String rxnFilter = null;
     private String reactomeReactionNetworkFilePath = null;
     private String mechismoSamples2SigReactionsFilePath = null;
@@ -34,8 +32,8 @@ public class ReactomeReactionGraphLoader {
         this.sigReactionSet = new HashSet<>();
         try {
             fileUtility.setInput(this.mechismoSamples2SigReactionsFilePath);
-            String line = null;
-            String[] tokens = null;
+            String line;
+            String[] tokens;
             line = fileUtility.readLine();
             tokens = line.split("\t");
             for (int i = 2; i < tokens.length; i++) {
@@ -44,26 +42,28 @@ public class ReactomeReactionGraphLoader {
             fileUtility.close();
         } catch (IOException ioe) {
             logger.error(String.format("Couldn't use %s, %s: %s",
-                    this.reactomeReactionNetworkFilePath.toString(),
+                    this.reactomeReactionNetworkFilePath,
                     ioe.getMessage(),
                     Arrays.toString(ioe.getStackTrace())));
         }
     }
 
-    public void ParseReactomeReactionFile() {
+    private void ParseReactomeReactionFile() {
         ParseMechismoSamples2SigReactionsFile();
         FileUtility fileUtility = new FileUtility();
         this.reactionGraph = new DefaultDirectedGraph<>(DefaultEdge.class);
         this.reactionSet = new HashSet<>();
         try {
             fileUtility.setInput(this.reactomeReactionNetworkFilePath);
-            String line = null;
-            String[] tokens = null;
-            boolean includeRxns = false;
+            String line;
+            String[] tokens;
+            boolean includeRxns;
             while ((line = fileUtility.readLine()) != null) {
                 tokens = line.split(" ");
-                Long rxn1DbId = Long.parseLong(tokens[this.rxn1DbIdIdx]);
-                Long rxn2DbId = Long.parseLong(tokens[this.rxn2DbIdIdx]);
+                int rxn1DbIdIdx = 0;
+                Long rxn1DbId = Long.parseLong(tokens[rxn1DbIdIdx]);
+                int rxn2DbIdIdx = 2;
+                Long rxn2DbId = Long.parseLong(tokens[rxn2DbIdIdx]);
                 includeRxns = false;
 
                 if (rxnFilter.equals("Yes") &&
@@ -95,7 +95,7 @@ public class ReactomeReactionGraphLoader {
             fileUtility.close();
         } catch (IOException ioe) {
             logger.error(String.format("Couldn't use %s, %s: %s",
-                    this.reactomeReactionNetworkFilePath.toString(),
+                    this.reactomeReactionNetworkFilePath,
                     ioe.getMessage(),
                     Arrays.toString(ioe.getStackTrace())));
         }
@@ -108,7 +108,7 @@ public class ReactomeReactionGraphLoader {
         return this.reactionGraph;
     }
 
-    public Set<Long> getReactionSet() {
+    Set<Long> getReactionSet() {
         if (this.reactionSet == null) {
             this.ParseReactomeReactionFile();
         }

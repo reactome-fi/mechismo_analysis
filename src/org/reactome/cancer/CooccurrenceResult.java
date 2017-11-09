@@ -92,28 +92,28 @@ public class CooccurrenceResult {
         }
     }
 
-    public List<Set<Gene>> getSuperIndirectMutatedGenes() {
+    private List<Set<Gene>> getSuperIndirectMutatedGenes() {
         if (this.superIndirectMutatedGenes == null) {
             FillMutatedGeneSets();
         }
         return this.superIndirectMutatedGenes;
     }
 
-    public List<Set<Gene>> getIndirectMutatedGenes() {
+    private List<Set<Gene>> getIndirectMutatedGenes() {
         if (this.indirectMutatedGenes == null) {
             FillMutatedGeneSets();
         }
         return this.indirectMutatedGenes;
     }
 
-    public List<Set<Gene>> getSuperDirectMutatedGenes() {
+    private List<Set<Gene>> getSuperDirectMutatedGenes() {
         if (this.superDirectMutatedGenes == null) {
             FillMutatedGeneSets();
         }
         return this.superDirectMutatedGenes;
     }
 
-    public List<Set<Gene>> getDirectMutatedGenes() {
+    private List<Set<Gene>> getDirectMutatedGenes() {
         if (this.directMutatedGenes == null) {
             FillMutatedGeneSets();
         }
@@ -206,59 +206,59 @@ public class CooccurrenceResult {
         System.gc();
     }
 
-    public List<Double> getpValues() {
+    private List<Double> getpValues() {
         return pValues;
     }
 
-    public List<Set<FI>> getCooccurringUpstreamRxnFIs() {
+    private List<Set<FI>> getCooccurringUpstreamRxnFIs() {
         return cooccurringUpstreamRxnFIs;
     }
 
-    public List<Reaction> getTargetRxns() {
+    private List<Reaction> getTargetRxns() {
         return targetRxns;
     }
 
-    public List<Set<Reaction>> getCooccurringUpstreamRxns() {
+    private List<Set<Reaction>> getCooccurringUpstreamRxns() {
         return cooccurringUpstreamRxns;
     }
 
-    public Map<Double, Double> getpValue2BHAdjustedPValueMap() {
+    private Map<Double, Double> getpValue2BHAdjustedPValueMap() {
         return pValue2BHAdjustedPValueMap;
     }
 
-    public Map<Double, Double> getpValue2EmpiricalPValueMap() {
+    private Map<Double, Double> getpValue2EmpiricalPValueMap() {
         return pValue2EmpiricalPValueMap;
     }
 
-    public List<Integer> getNumSamplesW0MutatedUpstreamRxns() {
+    private List<Integer> getNumSamplesW0MutatedUpstreamRxns() {
         return numSamplesW0MutatedUpstreamRxns;
     }
 
-    public List<Set<Patient>> getSamplesW1MutatedUpstreamRxn() {
+    private List<Set<Patient>> getSamplesW1MutatedUpstreamRxn() {
         return samplesW1MutatedUpstreamRxn;
     }
 
-    public List<Set<Patient>> getSamplesW3plusMutatedUpstreamRxns() {
+    private List<Set<Patient>> getSamplesW3plusMutatedUpstreamRxns() {
         return samplesW3plusMutatedUpstreamRxns;
     }
 
-    public List<Set<Mutation>> getSuperIndirectMutations() {
+    private List<Set<Mutation>> getSuperIndirectMutations() {
         return superIndirectMutations;
     }
 
-    public List<Set<Mutation>> getIndirectMutations() {
+    private List<Set<Mutation>> getIndirectMutations() {
         return indirectMutations;
     }
 
-    public List<Set<Mutation>> getSuperDirectMutations() {
+    private List<Set<Mutation>> getSuperDirectMutations() {
         return superDirectMutations;
     }
 
-    public List<Set<Mutation>> getDirectMutations() {
+    private List<Set<Mutation>> getDirectMutations() {
         return directMutations;
     }
 
-    public List<Set<Patient>> getSamplesW2MutatedUpstreamRxns() {
+    private List<Set<Patient>> getSamplesW2MutatedUpstreamRxns() {
         return samplesW2MutatedUpstreamRxns;
     }
 
@@ -319,11 +319,11 @@ public class CooccurrenceResult {
     private void WriteLineToFile(FileUtility fileUtility,
                                  int i) throws IOException {
 
-        Double bhAdjustedP = getpValue2BHAdjustedPValueMap() == null
+        Double bhAdjustedP = (getpValue2BHAdjustedPValueMap() == null)
                 ? 1.0d
                 : getpValue2BHAdjustedPValueMap().get(getpValues().get(i));
 
-        Double empiricalP = getpValue2EmpiricalPValueMap() == null
+        Double empiricalP = (getpValue2EmpiricalPValueMap() == null)
                 ? 1.0d
                 : getpValue2EmpiricalPValueMap().get(getpValues().get(i));
 

@@ -25,6 +25,13 @@ public class Reaction{
     }
 
     @Override
+    public boolean equals(Object o){
+        return o == null
+        ? false
+        : o.hashCode() == this.hashCode();
+    }
+
+    @Override
     public String toString(){
         return String.format("%d:%s",this.reactionID,this.reactionName).replace(
                 ",", "~");

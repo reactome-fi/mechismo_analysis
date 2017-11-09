@@ -7,22 +7,24 @@ import java.util.*;
 
 public class ReactomeMechismoDataMap {
     private Set<FI> fis;
-    private Map<String, FI> alphaUniprotsToFI;
     private Set<Reaction> reactions;
     private Map<Long, Reaction> reactionIDToReaction;
+    private Map<String, FI> alphaUniprotsToFI;
     private Map<Patient, Set<FI>> patientsToFIs;
     private Map<FI, Set<Patient>> fisToPatients;
+    private Map<Patient, Map<FI, Set<Mutation>>> patientToFIsToMutations;
     private Map<Reaction, Set<FI>> reactionToFIs;
     private Map<Reaction, Set<Patient>> reactionToPatients;
-    private Map<Patient, Map<FI, Set<Mutation>>> patientToFIsToMutations;
     private CancerDriverReactomeAnalyzer cancerDriverReactomeAnalyzer;
+    private ReactomeReactionGraphLoader reactomeReactionGraphLoader;
 
     public ReactomeMechismoDataMap(CancerDriverReactomeAnalyzer cancerDriverReactomeAnalyzer,
-                                   MechismoOutputLoader mechismoOutputLoader) throws Exception {
+                                   MechismoOutputLoader mechismoOutputLoader,
+                                   ReactomeReactionGraphLoader reactomeReactionGraphLoader) throws Exception {
         this.cancerDriverReactomeAnalyzer = cancerDriverReactomeAnalyzer;
-        MechismoOutputLoader mechismoOutputLoader1 = mechismoOutputLoader;
-        this.patientsToFIs = mechismoOutputLoader1.ExtractPatientsToFIs();
-        this.fisToPatients = mechismoOutputLoader1.ExtractFIs2Samples();
+        this.reactomeReactionGraphLoader = reactomeReactionGraphLoader;
+        this.patientsToFIs = mechismoOutputLoader.ExtractPatientsToFIs();
+        this.fisToPatients = mechismoOutputLoader.ExtractFIs2Samples();
         this.fis = mechismoOutputLoader.ExtractMechismoFIs();
         BuildReactions();
         BuildSortedUniprotsToFIs();
@@ -64,11 +66,15 @@ public class ReactomeMechismoDataMap {
     private void BuildReactions() throws Exception {
         this.reactions = new HashSet<>();
         this.reactionIDToReaction = new HashMap<>();
-        Map<Long, String> reactionLongDBIDToName = cancerDriverReactomeAnalyzer.loadReactionLongDBIDToName();
-        for (Long reactionID : reactionLongDBIDToName.keySet()) {
-            Reaction reaction = new Reaction(reactionID, reactionLongDBIDToName.get(reactionID));
-            this.reactions.add(reaction);
-            this.reactionIDToReaction.put(reactionID, reaction);
+        Map<Long,String> reactionIDToName = cancerDriverReactomeAnalyzer.loadReactionLongDBIDToName();
+        for (Long reactionID : this.reactomeReactionGraphLoader.getReactionSet()) {
+            if(reactionIDToName.containsKey(reactionID)) {
+                Reaction reaction = new Reaction(
+                        reactionID,
+                        reactionIDToName.get(reactionID));
+                this.reactions.add(reaction);
+                this.reactionIDToReaction.put(reactionID, reaction);
+            }
         }
     }
 
