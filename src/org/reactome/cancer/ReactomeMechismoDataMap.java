@@ -35,11 +35,13 @@ public class ReactomeMechismoDataMap {
 
     private Set<Mutation> getReactionPatientMutations(Reaction reaction, Patient patient){
        Set<Mutation> mutations = new HashSet<>();
-       Set<FI> patientFIs = new HashSet<>(this.patientsToFIs.get(patient));
-       patientFIs.retainAll(this.reactionToFIs.get(reaction));
-       for(FI fi : patientFIs){
-           if(this.patientToFIsToMutations.containsKey(patient)) {
-               mutations.addAll(this.patientToFIsToMutations.get(patient).get(fi));
+       if(this.reactionToFIs.keySet().contains(reaction)) {
+           Set<FI> reactionFIs = new HashSet<>(this.reactionToFIs.get(reaction));
+           reactionFIs.retainAll(this.patientsToFIs.get(patient));
+           for (FI fi : reactionFIs) {
+               if (this.patientToFIsToMutations.containsKey(patient)) {
+                   mutations.addAll(this.patientToFIsToMutations.get(patient).get(fi));
+               }
            }
        }
        return mutations;

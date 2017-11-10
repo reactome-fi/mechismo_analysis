@@ -23,6 +23,13 @@ public class FI{
     public boolean equals(Object o){
         return o == null
                 ? false
-                : o.hashCode() == this.hashCode();
+                : o instanceof  FI && o.hashCode() == this.hashCode();
+    }
+
+    @Override
+    public String toString(){
+        return String.format("%s-%s",
+                genes[0].getHgncName(),
+                genes[1].getHgncName());
     }
 }

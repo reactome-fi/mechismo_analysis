@@ -30,4 +30,17 @@ public class Gene implements Comparable<Gene> {
         return Objects.hash(this.hgncName,
                 this.uniprotID);
     }
+
+    @Override
+    public boolean equals(Object o){
+        return o == null
+                ? false
+                : o instanceof  Gene && o.hashCode() == this.hashCode();
+    }
+
+    @Override
+    public String toString(){
+        return String.format("%s",
+                this.hgncName);
+    }
 }

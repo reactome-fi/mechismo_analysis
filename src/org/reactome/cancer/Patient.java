@@ -27,11 +27,13 @@ public class Patient {
     public boolean equals(Object o){
         return o == null
                 ? false
-                : o.hashCode() == this.hashCode();
+                : o instanceof Patient && o.hashCode() == this.hashCode();
     }
 
     @Override
     public String toString(){
-        return this.tcgaBarcode;
+        return String.format("%s:%s",
+                this.cancerType,
+                this.tcgaBarcode);
     }
 }

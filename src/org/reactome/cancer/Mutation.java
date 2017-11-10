@@ -42,6 +42,15 @@ public class Mutation{
     public boolean equals(Object o){
         return o == null
                 ? false
-                : o.hashCode() == this.hashCode();
+                : o instanceof Mutation && o.hashCode() == this.hashCode();
+    }
+
+    @Override
+    public String toString(){
+        return String.format("gene=%s:position=%d:residue=%c:mutation=%c",
+                this.gene,
+                this.position,
+                this.normalResidue,
+                this.mutResidue);
     }
 }

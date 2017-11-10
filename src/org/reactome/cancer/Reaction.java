@@ -28,7 +28,7 @@ public class Reaction{
     public boolean equals(Object o){
         return o == null
         ? false
-        : o.hashCode() == this.hashCode();
+        : o instanceof Reaction && o.hashCode() == this.hashCode();
     }
 
     @Override
