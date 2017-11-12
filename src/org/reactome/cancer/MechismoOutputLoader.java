@@ -30,6 +30,7 @@ public class MechismoOutputLoader {
     private final String patientPatternString = "([A-Z]+:TCGA-[0-9A-Z-]+)";
     private double mechScoreLowerBoundInclusive;
     private double eThresh;
+    private String tcgaCancerType = null;
     private String mechismoOuputFilePath = null;
     private String mechismoFIFilterFilePath = null;
     private Set<FI> fis = null;
@@ -45,10 +46,12 @@ public class MechismoOutputLoader {
 
     public MechismoOutputLoader(String mechismoOutputFilePath,
                                 String mechismoFIFilterFilePath,
+                                String tcgaCancerType,
                                 double mechScoreLowerBoundInclusive,
                                 double eThresh) {
         this.mechismoOuputFilePath = mechismoOutputFilePath;
         this.mechismoFIFilterFilePath = mechismoFIFilterFilePath;
+        this.tcgaCancerType = tcgaCancerType;
         this.mechScoreLowerBoundInclusive = mechScoreLowerBoundInclusive;
         this.eThresh = eThresh;
         this.sampleIDPattern = Pattern.compile(this.patientPatternString);
@@ -132,60 +135,62 @@ public class MechismoOutputLoader {
                                 this.sampleIDMatcher = this.sampleIDPattern.matcher(userInput);
                                 while (this.sampleIDMatcher.find()) {
                                     String[] patientData = this.sampleIDMatcher.group().split(":");
+                                    if (this.tcgaCancerType == null ||
+                                            patientData[0].toUpperCase().contains(this.tcgaCancerType)) {
+                                        Integer geneCount = 1;
+                                        if (this.gene2SampleCount.containsKey(gene1)) {
+                                            geneCount += this.gene2SampleCount.get(gene1);
+                                        }
+                                        this.gene2SampleCount.put(gene1, geneCount);
 
-                                    Integer geneCount = 1;
-                                    if (this.gene2SampleCount.containsKey(gene1)) {
-                                        geneCount += this.gene2SampleCount.get(gene1);
-                                    }
-                                    this.gene2SampleCount.put(gene1, geneCount);
+                                        Integer mutationCount = 1;
+                                        if (this.mut2SampleCount.containsKey(mutation)) {
+                                            mutationCount += this.mut2SampleCount.get(mutation);
+                                        }
+                                        this.mut2SampleCount.put(mutation, mutationCount);
 
-                                    Integer mutationCount = 1;
-                                    if (this.mut2SampleCount.containsKey(mutation)) {
-                                        mutationCount += this.mut2SampleCount.get(mutation);
-                                    }
-                                    this.mut2SampleCount.put(mutation, mutationCount);
+                                        //update samples2fis
+                                        Patient patient = new Patient(
+                                                patientData[1].trim().toUpperCase(),
+                                                patientData[0].trim().toUpperCase());
+                                        Set<FI> sampleFIs;
+                                        if (samples2fis.containsKey(patient)) {
+                                            sampleFIs = samples2fis.get(patient);
+                                        } else {
+                                            sampleFIs = new HashSet<>();
+                                        }
+                                        sampleFIs.add(fi);
+                                        samples2fis.put(patient, sampleFIs);
 
-                                    //update samples2fis
-                                    Patient patient = new Patient(
-                                            patientData[1].trim().toUpperCase(),
-                                            patientData[0].trim().toUpperCase());
-                                    Set<FI> sampleFIs;
-                                    if (samples2fis.containsKey(patient)) {
-                                        sampleFIs = samples2fis.get(patient);
-                                    } else {
-                                        sampleFIs = new HashSet<>();
-                                    }
-                                    sampleFIs.add(fi);
-                                    samples2fis.put(patient, sampleFIs);
+                                        //update fis2samples
+                                        Set<Patient> fiSamples;
+                                        if (fis2Samples.containsKey(fi)) {
+                                            fiSamples = fis2Samples.get(fi);
+                                        } else {
+                                            fiSamples = new HashSet<>();
+                                        }
+                                        fiSamples.add(patient);
+                                        fis2Samples.put(fi, fiSamples);
 
-                                    //update fis2samples
-                                    Set<Patient> fiSamples;
-                                    if (fis2Samples.containsKey(fi)) {
-                                        fiSamples = fis2Samples.get(fi);
-                                    } else {
-                                        fiSamples = new HashSet<>();
+                                        //update samples2fis2muts
+                                        Map<FI, Set<Mutation>> fis2muts;
+                                        if (samples2fis2muts.containsKey(patient)) {
+                                            fis2muts = samples2fis2muts.get(patient);
+                                        } else {
+                                            fis2muts = new HashMap<>();
+                                        }
+                                        Set<Mutation> muts;
+                                        if (fis2muts.containsKey(fi)) {
+                                            muts = fis2muts.get(fi);
+                                        } else {
+                                            muts = new HashSet<>();
+                                        }
+                                        muts.add(mutation);
+                                        fis2muts.put(fi, muts);
+                                        samples2fis2muts.put(patient, fis2muts);
+                                        fis.add(fi);
                                     }
-                                    fiSamples.add(patient);
-                                    fis2Samples.put(fi, fiSamples);
-
-                                    //update samples2fis2muts
-                                    Map<FI, Set<Mutation>> fis2muts;
-                                    if (samples2fis2muts.containsKey(patient)) {
-                                        fis2muts = samples2fis2muts.get(patient);
-                                    } else {
-                                        fis2muts = new HashMap<>();
-                                    }
-                                    Set<Mutation> muts;
-                                    if (fis2muts.containsKey(fi)) {
-                                        muts = fis2muts.get(fi);
-                                    } else {
-                                        muts = new HashSet<>();
-                                    }
-                                    muts.add(mutation);
-                                    fis2muts.put(fi, muts);
-                                    samples2fis2muts.put(patient, fis2muts);
                                 }
-                                fis.add(fi);
                             }
                         }
                     }

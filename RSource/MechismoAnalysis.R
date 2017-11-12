@@ -28,10 +28,12 @@ create.survival.data <- function(clin,
     dplyr::mutate(group = ifelse(tcga_participant_barcode %in% affected.samples$X1,
                                  1,
                                  ifelse(tcga_participant_barcode %in% affected.samples$X2,
-                                        2,
+                                        1,
                                         ifelse(tcga_participant_barcode %in% affected.samples$X3,
-                                               3,
-                                               0))))
+                                               1,
+                                               ifelse(tcga_participant_barcode %in% affected.samples$X4,
+                                                      2,
+                                                      0)))))
   clin2
 }
 
@@ -47,12 +49,12 @@ run.survival.analysis <- function(clin,
                          event=surv.clin$CLI_vital_status,
                          type="right");
   surv.bycluster <- survival::survfit(surv ~ surv.clin$group);
-  png(paste("/Users/joshuaburkhart/SoftwareProjects/Ogmios/results/Mechismo/Figs/",
+  png(paste("/home/burkhart/Software/Ogmios/results/Mechismo/Figs/",
             cancer,
             ".png",
             sep=""))
   par(mfrow = c(1, 1));
-  colors <- c("red", "green", "blue", "cyan", "yellow", "purple");
+  colors <- c("red", "green", "blue", "cyan", "orange", "purple");
   plot(surv.bycluster,
        col=colors,
        xlab="Survival Time (Days)",
@@ -83,16 +85,16 @@ run.survival.analysis <- function(clin,
   print(summary(coxphresult));
 }
 
-result.dir <- "/Users/joshuaburkhart/SoftwareProjects/Ogmios/results/Mechismo/"
-data.dir <- "/Users/joshuaburkhart/SoftwareProjects/Ogmios/datasets/FirehoseClinical/"
-clin.file <- paste(data.dir,"pancancer.samplefeatures.txt",sep="")
-cancer = "pancancer"
+result.dir <- "/home/burkhart/Software/Ogmios/results/Mechismo/"
+data.dir <- "/home/burkhart/Software/Ogmios/datasets/FirehoseClinical/"
+clin.file <- paste(data.dir,"THCA-TP.samplefeatures.txt",sep="")
+cancer = "THCA"
 clin <- read.csv(clin.file,
                  header = TRUE,
                  sep = "\t",
                  check.names = FALSE)
 
-filenames <- list.files(result.dir,pattern="*.csv",full.names = TRUE)
+filenames <- list.files(result.dir,pattern="THCAgroup.*\\.csv",full.names = TRUE)
 all_pvals <<- data.frame(File=character(),
                          logtest=numeric(),
                          waldtest=numeric(),
@@ -106,7 +108,8 @@ for(f in filenames){
     dplyr::rowwise() %>% 
     dplyr::mutate(X1 = ifelse(is.na(X1),NA,stringr::str_extract(X1,"TCGA-[0-9A-Z]{2}-[0-9A-Z]{4}")),
                   X2 = ifelse(is.na(X2),NA,stringr::str_extract(X2,"TCGA-[0-9A-Z]{2}-[0-9A-Z]{4}")),
-                  X3 = ifelse(is.na(X3),NA,stringr::str_extract(X3,"TCGA-[0-9A-Z]{2}-[0-9A-Z]{4}")))
+                  X3 = ifelse(is.na(X3),NA,stringr::str_extract(X3,"TCGA-[0-9A-Z]{2}-[0-9A-Z]{4}")),
+                  X4 = ifelse(is.na(X4),NA,stringr::str_extract(X4,"TCGA-[0-9A-Z]{2}-[0-9A-Z]{4}")))
   
   cancer2 <- paste(cancer,basename(f),sep=" ")
   print(paste("Generating survival plot for",cancer2,sep=" "))
@@ -115,10 +118,13 @@ for(f in filenames){
                         affected.samples)
 }
 
+all_pvals <- cbind(all_pvals,qvalue::qvalue(all_pvals$sctest)$qvalue)
+
 colnames(all_pvals) <- c("Group",
                          "CoxPH Log Test pvalue",
                          "CoxPH Wald Test pvalue",
-                         "CoxPH Score Test pvalue")
+                         "CoxPH Score Test pvalue",
+                         "qvalue")
 all_pvals %>%
   write.table(paste(result.dir,
                   cancer,

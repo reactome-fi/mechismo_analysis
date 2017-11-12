@@ -106,7 +106,10 @@ public class ReactomeMechismoDataMap {
     }
 
     public Set<Patient> getPatients(Reaction reaction) {
-        return this.reactionToPatients.get(reaction);
+        Set<Patient> rxnPatients = this.reactionToPatients.get(reaction);
+        return rxnPatients == null
+                ? new HashSet<>()
+                : rxnPatients;
     }
 
     public Set<FI> getFIs() {

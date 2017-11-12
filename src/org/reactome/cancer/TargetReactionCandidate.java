@@ -16,16 +16,13 @@ public class TargetReactionCandidate {
                     "Supporting FIs";
     private Reaction targetReaction;
     private Set<Reaction> supportedUpstreamRxns;
-    private Set<Reaction> upstreamRxns;
     private Set<FI> supportingFIs;
 
     public TargetReactionCandidate(Reaction targetReaction,
                                    Set<Reaction> supportedUpstreamRxns,
-                                   Set<Reaction> upstreamRxns,
                                    Set<FI> supportingFIs) {
         this.targetReaction = targetReaction;
         this.supportedUpstreamRxns = supportedUpstreamRxns;
-        this.upstreamRxns = upstreamRxns;
         this.supportingFIs = supportingFIs;
     }
 
@@ -42,7 +39,6 @@ public class TargetReactionCandidate {
         TargetReactionCandidate targetReactionCandidate = (TargetReactionCandidate) o;
         return Objects.equals(this.targetReaction, targetReactionCandidate.targetReaction) &&
                 Objects.equals(this.supportedUpstreamRxns, targetReactionCandidate.supportedUpstreamRxns) &&
-                Objects.equals(this.upstreamRxns, targetReactionCandidate.upstreamRxns) &&
                 Objects.equals(this.supportingFIs, targetReactionCandidate.supportingFIs);
     }
 

@@ -18,9 +18,13 @@ public class Patient {
         return cancerType;
     }
 
+    /* I don't think we should include cancertype here bc
+    some patients are included more than once (e.g. COAD
+    and COADREAD).
+    */
     @Override
     public int hashCode(){
-        return Objects.hash(this.tcgaBarcode,this.cancerType);
+        return Objects.hash(this.tcgaBarcode);
     }
 
     @Override

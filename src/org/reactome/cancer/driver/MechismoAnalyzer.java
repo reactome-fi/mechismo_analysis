@@ -649,7 +649,7 @@ public class MechismoAnalyzer {
                         randEdge2 = componentEdgesAry.get(prng.nextInt(E));
                     }
 
-                    boolean success1 = rewiredReactionGraph.removeEdge(randEdge1);
+                    rewiredReactionGraph.removeEdge(randEdge1);
                     componentEdgesAry.remove(randEdge1);
 
                     int curEdgeCount1 = rewiredReactionGraph.edgeSet().size();
@@ -660,7 +660,7 @@ public class MechismoAnalyzer {
                                 initialEdgeCount - 1));
                     }
 
-                    boolean success2 = rewiredReactionGraph.removeEdge(randEdge2);
+                    rewiredReactionGraph.removeEdge(randEdge2);
                     componentEdgesAry.remove(randEdge2);
 
                     int curEdgeCount2 = rewiredReactionGraph.edgeSet().size();
@@ -690,8 +690,7 @@ public class MechismoAnalyzer {
 
                     //randomly flip edge direction
                     //rewire edge 1
-                    WireEdge(prng.nextInt(V),
-                            V,
+                    WireEdge(V,
                             prng,
                             sourceVtx1,
                             targetVtx2,
@@ -708,8 +707,7 @@ public class MechismoAnalyzer {
                     }
 
                     //rewire edge 2
-                    WireEdge(prng.nextInt(V),
-                            V,
+                    WireEdge(V,
                             prng,
                             sourceVtx2,
                             targetVtx1,
@@ -724,11 +722,6 @@ public class MechismoAnalyzer {
                                 curEdgeCount4,
                                 initialEdgeCount));
                     }
-
-                    //if (i % 10000 == 0) {
-                    //    System.out.println(String.format("Rewired %d of %d Edges...",
-                    //            i, rewires));
-                    //}
                 }
             }
         }
@@ -758,15 +751,14 @@ public class MechismoAnalyzer {
         }
     }
 
-    private void WireEdge(int rand,
-                          int V,
+    private void WireEdge(int V,
                           Random prng,
                           Long sourceVtx,
                           Long targetVtx,
                           DefaultDirectedGraph<Long, DefaultEdge> graph,
                           ArrayList<DefaultEdge> edgeAry,
                           ArrayList<Long> vtxAry) {
-        //if (rand % 2 == 0) {
+        int rand;
         while (graph.getEdge(sourceVtx, targetVtx) != null) {
             rand = prng.nextInt(V);
             sourceVtx = vtxAry.get(rand);
@@ -776,18 +768,6 @@ public class MechismoAnalyzer {
         graph.addEdge(sourceVtx, targetVtx);
         edgeAry.add(
                 graph.getEdge(sourceVtx, targetVtx));
-        /*}
-        else {
-            while(graph.getEdge(targetVtx, sourceVtx) != null){
-                rand = prng.nextInt(V);
-                sourceVtx = vtxAry.get(rand);
-                rand = prng.nextInt(V);
-                targetVtx = vtxAry.get(rand);
-            }
-            graph.addEdge(targetVtx, sourceVtx);
-            edgeAry.add(
-                    graph.getEdge(targetVtx, sourceVtx));
-        }*/
     }
 
     private void SearchUpstreamReactions(int depth,
@@ -798,25 +778,38 @@ public class MechismoAnalyzer {
                                          ReactomeMechismoDataMap reactomeMechismoDataMap) {
         Set<DefaultEdge> incomingEdgesCpy = new HashSet<>(incomingEdges);
         Set<Reaction> upstreamReactions = new HashSet<>();
+        Set<Reaction> allUpstreamReactions = new HashSet<>();
         List<Set<Reaction>> upstreamReactionsByDepth = new ArrayList<>();
         for (int i = 1; i <= depth; i++) {
             for (DefaultEdge incomingEdge : incomingEdgesCpy) {
-                Reaction upstreamReaction = reactomeMechismoDataMap.getReaction(reactionGraph.getEdgeSource(incomingEdge));
-                upstreamReactions.add(upstreamReaction);
+                upstreamReactions.add(reactomeMechismoDataMap.getReaction(reactionGraph.getEdgeSource(incomingEdge)));
             }
+            upstreamReactions.removeAll(allUpstreamReactions);
+            allUpstreamReactions.addAll(upstreamReactions);
             if (i < depth) {
                 upstreamReactionsByDepth.add(new HashSet<>(upstreamReactions));
-                incomingEdgesCpy = new HashSet<>();
+                upstreamReactions.clear();
+                incomingEdgesCpy.clear();
                 for (Reaction upstreamReaction : upstreamReactionsByDepth.get(i - 1)) {
                     incomingEdgesCpy.addAll(reactionGraph.incomingEdgesOf(upstreamReaction.getReactionID()));
                 }
             }
         }
+        incomingEdgesCpy.clear();
+        upstreamReactions.clear();
         upstreamReactionsByDepth.clear();
 
+        allUpstreamReactions.remove(targetReactionCandidate);
+
         //find intersection of upstream reactions and supported reactions
-        Set<Reaction> supportedUpstreamReactions = new HashSet<>(upstreamReactions);
+        Set<Reaction> supportedUpstreamReactions = new HashSet<>(allUpstreamReactions);
         supportedUpstreamReactions.retainAll(reactomeMechismoDataMap.getSupportedReactions());
+
+        //remove upstream reactions directly activated by target
+        supportedUpstreamReactions.removeIf(
+                upstreamReaction -> !reactionGraph.getAllEdges(
+                        targetReactionCandidate.getReactionID(),
+                        upstreamReaction.getReactionID()).isEmpty());
 
         Set<FI> supportedFIs = new HashSet<>();
         for (Reaction supportedUpstreamReaction : supportedUpstreamReactions) {
@@ -826,7 +819,6 @@ public class MechismoAnalyzer {
         targetReactionCandidates.add(new TargetReactionCandidate(
                 targetReactionCandidate,
                 supportedUpstreamReactions,
-                upstreamReactions,
                 supportedFIs));
     }
 
@@ -834,23 +826,27 @@ public class MechismoAnalyzer {
                                                              DirectedGraph<Long, DefaultEdge> reactionGraph,
                                                              ReactomeMechismoDataMap reactomeMechismoDataMap,
                                                              int depth) {
-        //foreach SupReaction in reaction2FiSet
+        Set<DefaultEdge> outgoingEdges = new HashSet<>();
+        Set<Reaction> targetReactionCandidateSet = new HashSet<>();
+
         for (Reaction reaction : reactomeMechismoDataMap.getSupportedReactions()) {
             //http://jgrapht.org/javadoc/org/jgrapht/graph/DefaultDirectedGraph.html
             //go one reaction downstream
-            Set<DefaultEdge> outgoingEdges = reactionGraph.outgoingEdgesOf(reaction.getReactionID());
-            for (DefaultEdge outgoingEdge : outgoingEdges) {
-                Reaction targetReactionCandidate = reactomeMechismoDataMap.getReaction(
-                        reactionGraph.getEdgeTarget(outgoingEdge));
-                //one reaction upstream
-                SearchUpstreamReactions(
-                        depth,
-                        reactionGraph,
-                        reactionGraph.incomingEdgesOf(targetReactionCandidate.getReactionID()),
-                        targetReactionCandidate,
-                        targetReactionCandidates,
-                        reactomeMechismoDataMap);
-            }
+            outgoingEdges.addAll(reactionGraph.outgoingEdgesOf(reaction.getReactionID()));
+        }
+        for (DefaultEdge outgoingEdge : outgoingEdges) {
+            targetReactionCandidateSet.add(
+                    reactomeMechismoDataMap.getReaction(
+                            reactionGraph.getEdgeTarget(outgoingEdge)));
+        }
+        for (Reaction targetReactionCandidate : targetReactionCandidateSet) {
+            SearchUpstreamReactions(
+                    depth,
+                    reactionGraph,
+                    reactionGraph.incomingEdgesOf(targetReactionCandidate.getReactionID()),
+                    targetReactionCandidate,
+                    targetReactionCandidates,
+                    reactomeMechismoDataMap);
         }
     }
 
@@ -861,6 +857,7 @@ public class MechismoAnalyzer {
                                      String mechismoFIFilterFilePath,
                                      String outputDir,
                                      String outputFilePrefix,
+                                     String tcgaCancerType,
                                      int depth,
                                      int numPermutations,
                                      double mechScoreLowerBoundInclusive,
@@ -882,6 +879,7 @@ public class MechismoAnalyzer {
         MechismoOutputLoader mechismoOutputLoader =
                 new MechismoOutputLoader(mechismoOutputFilePath,
                         mechismoFIFilterFilePath,
+                        tcgaCancerType,
                         mechScoreLowerBoundInclusive,
                         eThresh);
 
@@ -927,7 +925,7 @@ public class MechismoAnalyzer {
 
             rewiredNetworkResult.CalculateBHAdjustedPValues();
 
-            rewiredNetworkResult.writeToFile(outputDir,i+1+"");
+            rewiredNetworkResult.writeToFile(outputDir, i + 1 + "");
 
             double curMemUsed = CalculateJavaMemFootprintGiB();
             maxMemUsed = curMemUsed > maxMemUsed ?
@@ -962,7 +960,8 @@ public class MechismoAnalyzer {
 
         WriteRxn2SamplesToFile(outputDir, "", reactomeMechismoDataMap);
 
-        realResult.writeToFile(outputDir,outputFilePrefix);
+        realResult.writeToFile(outputDir, outputFilePrefix);
+        realResult.writePatientGroupingsToFile(outputDir, outputFilePrefix);
 
         double curMemUsed = CalculateJavaMemFootprintGiB();
         maxMemUsed = curMemUsed > maxMemUsed ?
@@ -1026,6 +1025,7 @@ public class MechismoAnalyzer {
         List<Reaction> allTargetRxns = new ArrayList<>();
         List<Set<Reaction>> allCooccurringUpstreamRxns = new ArrayList<>();
         List<Set<FI>> allCooccurringUpstreamReactionFIs = new ArrayList<>();
+        List<Set<Patient>> allSamplesWTargetRxnMutations = new ArrayList<>();
         List<Integer> allSamplesW0MutatedUpstreamRxns = new ArrayList<>();
         List<Set<Patient>> allSamplesW1MutatedUpstreamRxn = new ArrayList<>();
         List<Set<Patient>> allSamplesW2MutatedUpstreamRxns = new ArrayList<>();
@@ -1037,12 +1037,13 @@ public class MechismoAnalyzer {
         List<Double> allPValues = new ArrayList<>();
 
         int iterationCounter = 0;
-        for (TargetReactionCandidate targetReactionCandidate : targetReactionCandidates){
+        for (TargetReactionCandidate targetReactionCandidate : targetReactionCandidates) {
             Reaction targetRxn = targetReactionCandidate.getTargetReaction();
             List<Reaction[]> targetUpstreamReactionPairs =
                     new ArrayList<>(GenerateReactionSetPairs(targetReactionCandidate.getSupportedUpstreamRxns()));
             Set<Reaction> targetCooccurringUpstreamRxns = new HashSet<>();
             Set<FI> targetCooccurringUpstreamReactionFIs = new HashSet<>();
+            Set<Patient> targetSamplesWTargetRxnMutations = new HashSet<>();
             Set<Patient> targetSamplesW0MutatedUpstreamRxns = new HashSet<>();
             Set<Patient> targetSamplesW1MutatedUpstreamRxn = new HashSet<>();
             Set<Patient> targetSamplesW2MutatedUpstreamRxns = new HashSet<>();
@@ -1060,18 +1061,22 @@ public class MechismoAnalyzer {
                     Reaction upstreamReaction2 = upstreamReactionPair[1];
 
                     if (ignoreDependentUpstreamReactions &&
-                            (!reactionGraph.getAllEdges(upstreamReaction1.getReactionID(), upstreamReaction2.getReactionID()).isEmpty() ||
-                                    !reactionGraph.getAllEdges(upstreamReaction2.getReactionID(), upstreamReaction1.getReactionID()).isEmpty() ||
-                                    !reactionGraph.getAllEdges(targetRxn.getReactionID(), upstreamReaction1.getReactionID()).isEmpty() ||
-                                    !reactionGraph.getAllEdges(targetRxn.getReactionID(), upstreamReaction2.getReactionID()).isEmpty())) {
+                            (!reactionGraph.getAllEdges(upstreamReaction1.getReactionID(),
+                                    upstreamReaction2.getReactionID()).isEmpty() ||
+                                    !reactionGraph.getAllEdges(upstreamReaction2.getReactionID(),
+                                            upstreamReaction1.getReactionID()).isEmpty())) {
                         continue;
                     } else if (ignoreIndependentUpstreamReactions &&
-                            (reactionGraph.getAllEdges(upstreamReaction1.getReactionID(), upstreamReaction2.getReactionID()).isEmpty() &&
-                                    reactionGraph.getAllEdges(upstreamReaction2.getReactionID(), upstreamReaction1.getReactionID()).isEmpty())) {
+                            (reactionGraph.getAllEdges(upstreamReaction1.getReactionID(),
+                                    upstreamReaction2.getReactionID()).isEmpty() &&
+                                    reactionGraph.getAllEdges(upstreamReaction2.getReactionID(),
+                                            upstreamReaction1.getReactionID()).isEmpty())) {
                         continue;
                     } else if (excludeMultipleImmediateUpstreamReactions &&
-                            (!reactionGraph.getAllEdges(upstreamReaction1.getReactionID(), targetRxn.getReactionID()).isEmpty() &&
-                                    !reactionGraph.getAllEdges(upstreamReaction2.getReactionID(), targetRxn.getReactionID()).isEmpty())) {
+                            (!reactionGraph.getAllEdges(upstreamReaction1.getReactionID(),
+                                    targetRxn.getReactionID()).isEmpty() &&
+                                    !reactionGraph.getAllEdges(upstreamReaction2.getReactionID(),
+                                            targetRxn.getReactionID()).isEmpty())) {
                         continue;
                     } else {
                         targetReactionDetected = true;
@@ -1117,9 +1122,9 @@ public class MechismoAnalyzer {
                             targetCooccurringUpstreamRxns.add(upstreamReaction2);
 
                             targetCooccurringUpstreamReactionFIs.addAll(
-                              reactomeMechismoDataMap.getReactionPatientsFIs(upstreamReaction1,D));
+                                    reactomeMechismoDataMap.getReactionPatientsFIs(upstreamReaction1, D));
                             targetCooccurringUpstreamReactionFIs.addAll(
-                                    reactomeMechismoDataMap.getReactionPatientsFIs(upstreamReaction2,D));
+                                    reactomeMechismoDataMap.getReactionPatientsFIs(upstreamReaction2, D));
 
                             upstreamRxn1Mutations.addAll(
                                     reactomeMechismoDataMap.getReactionPatientsMutations(
@@ -1134,6 +1139,9 @@ public class MechismoAnalyzer {
                                             targetRxn,
                                             D));
                         }
+
+                        targetSamplesWTargetRxnMutations.addAll(
+                                reactomeMechismoDataMap.getPatients(targetRxn));
 
                         //upstream union
                         Set<Mutation> patientRxnMutUnion = new HashSet<>(upstreamRxn1Mutations);
@@ -1198,11 +1206,16 @@ public class MechismoAnalyzer {
                     targetSamplesW0MutatedUpstreamRxns.removeAll(targetSamplesW1MutatedUpstreamRxn);
                     targetSamplesW0MutatedUpstreamRxns.removeAll(targetSamplesW2MutatedUpstreamRxns);
                     targetSamplesW0MutatedUpstreamRxns.removeAll(targetSamplesW3plusMutatedUpstreamRxns);
+                    targetSamplesW0MutatedUpstreamRxns.removeAll(targetSamplesWTargetRxnMutations);
 
                     targetSamplesW1MutatedUpstreamRxn.removeAll(targetSamplesW2MutatedUpstreamRxns);
                     targetSamplesW1MutatedUpstreamRxn.removeAll(targetSamplesW3plusMutatedUpstreamRxns);
+                    targetSamplesW1MutatedUpstreamRxn.removeAll(targetSamplesWTargetRxnMutations);
 
                     targetSamplesW2MutatedUpstreamRxns.removeAll(targetSamplesW3plusMutatedUpstreamRxns);
+                    targetSamplesW2MutatedUpstreamRxns.removeAll(targetSamplesWTargetRxnMutations);
+
+                    targetSamplesW3plusMutatedUpstreamRxns.removeAll(targetSamplesWTargetRxnMutations);
 
                     //we lose track of super relationships in upstream reaction pair context
                     targetIndirectMutations.removeAll(targetSuperIndirectMutations);
@@ -1215,6 +1228,7 @@ public class MechismoAnalyzer {
                     allTargetRxns.add(targetRxn);
                     allCooccurringUpstreamRxns.add(targetCooccurringUpstreamRxns);
                     allCooccurringUpstreamReactionFIs.add(targetCooccurringUpstreamReactionFIs);
+                    allSamplesWTargetRxnMutations.add(targetSamplesWTargetRxnMutations);
                     allSamplesW0MutatedUpstreamRxns.add(targetSamplesW0MutatedUpstreamRxns.size());
                     allSamplesW1MutatedUpstreamRxn.add(targetSamplesW1MutatedUpstreamRxn);
                     allSamplesW2MutatedUpstreamRxns.add(targetSamplesW2MutatedUpstreamRxns);
@@ -1241,6 +1255,7 @@ public class MechismoAnalyzer {
                 allTargetRxns,
                 allCooccurringUpstreamRxns,
                 allCooccurringUpstreamReactionFIs,
+                allSamplesWTargetRxnMutations,
                 allSamplesW0MutatedUpstreamRxns,
                 allSamplesW1MutatedUpstreamRxn,
                 allSamplesW2MutatedUpstreamRxns,

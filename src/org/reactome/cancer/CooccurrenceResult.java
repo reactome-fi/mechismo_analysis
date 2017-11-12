@@ -7,9 +7,11 @@ import java.io.IOException;
 import java.util.*;
 
 public class CooccurrenceResult {
+    private final Double MAX_CLUSTER_EMPIRICAL_P_VALUE = 0.01;
     private List<Reaction> targetRxns;
     private List<Set<Reaction>> cooccurringUpstreamRxns;
     private List<Set<FI>> cooccurringUpstreamRxnFIs;
+    private List<Set<Patient>> samplesWTargetRxnMutations;
     private List<Integer> numSamplesW0MutatedUpstreamRxns;
     private List<Set<Patient>> samplesW1MutatedUpstreamRxn;
     private List<Set<Patient>> samplesW2MutatedUpstreamRxns;
@@ -30,6 +32,7 @@ public class CooccurrenceResult {
             List<Reaction> targetRxns,
             List<Set<Reaction>> cooccurringUpstreamRxns,
             List<Set<FI>> cooccurringUpstreamRxnFIs,
+            List<Set<Patient>> samplesWTargetRxnMutations,
             List<Integer> numSamplesW0MutatedUpstreamRxns,
             List<Set<Patient>> samplesW1MutatedUpstreamRxn,
             List<Set<Patient>> samplesW2MutatedUpstreamRxns,
@@ -43,6 +46,7 @@ public class CooccurrenceResult {
         this.targetRxns = targetRxns;
         this.cooccurringUpstreamRxns = cooccurringUpstreamRxns;
         this.cooccurringUpstreamRxnFIs = cooccurringUpstreamRxnFIs;
+        this.samplesWTargetRxnMutations = samplesWTargetRxnMutations;
         this.numSamplesW0MutatedUpstreamRxns = numSamplesW0MutatedUpstreamRxns;
         this.samplesW1MutatedUpstreamRxn = samplesW1MutatedUpstreamRxn;
         this.samplesW2MutatedUpstreamRxns = samplesW2MutatedUpstreamRxns;
@@ -193,16 +197,24 @@ public class CooccurrenceResult {
 
     public void MagicallyShrinkMemoryFootprint() {
         //leave only this.pValues
-        this.targetRxns.clear();
-        this.cooccurringUpstreamRxns.clear();
-        this.cooccurringUpstreamRxnFIs.clear();
-        this.numSamplesW0MutatedUpstreamRxns.clear();
-        this.samplesW1MutatedUpstreamRxn.clear();
-        this.samplesW3plusMutatedUpstreamRxns.clear();
-        this.superIndirectMutations.clear();
-        this.indirectMutations.clear();
-        this.superDirectMutations.clear();
-        this.directMutations.clear();
+        if (targetRxns != null) targetRxns.clear();
+        if (cooccurringUpstreamRxns != null) cooccurringUpstreamRxns.clear();
+        if (cooccurringUpstreamRxnFIs != null) cooccurringUpstreamRxnFIs.clear();
+        if (samplesWTargetRxnMutations != null) samplesWTargetRxnMutations.clear();
+        if (numSamplesW0MutatedUpstreamRxns != null) numSamplesW0MutatedUpstreamRxns.clear();
+        if (samplesW1MutatedUpstreamRxn != null) samplesW1MutatedUpstreamRxn.clear();
+        if (samplesW2MutatedUpstreamRxns != null) samplesW2MutatedUpstreamRxns.clear();
+        if (samplesW3plusMutatedUpstreamRxns != null) samplesW3plusMutatedUpstreamRxns.clear();
+        if (superIndirectMutations != null) superIndirectMutations.clear();
+        if (indirectMutations != null) indirectMutations.clear();
+        if (superDirectMutations != null) superDirectMutations.clear();
+        if (directMutations != null) directMutations.clear();
+        if (superIndirectMutatedGenes != null) superIndirectMutatedGenes.clear();
+        if (indirectMutatedGenes != null) indirectMutatedGenes.clear();
+        if (superDirectMutatedGenes != null) superDirectMutatedGenes.clear();
+        if (directMutatedGenes != null) directMutatedGenes.clear();
+        if (pValue2BHAdjustedPValueMap != null) pValue2BHAdjustedPValueMap.clear();
+        if (pValue2EmpiricalPValueMap != null) pValue2EmpiricalPValueMap.clear();
         System.gc();
     }
 
@@ -262,16 +274,97 @@ public class CooccurrenceResult {
         return samplesW2MutatedUpstreamRxns;
     }
 
-    public void writeToFile(String outputDir,String outputFilePrefix){
-        String outFilePath5 = outputDir + outputFilePrefix + "rxnCooccurrence.csv";
+    public void writePatientGroupingsToFile(String outputDir, String outputFilePrefix) {
+        //TODO: use a 'cancertype' argument as file prefix
+        Set<Patient> affectedBy1Patients = new HashSet<>();
+        Set<Patient> affectedBy2Patients = new HashSet<>();
+        Set<Patient> affectedBy3Patients = new HashSet<>();
+        Set<Patient> affectedByTPatients = new HashSet<>();
+        Map<Integer, List<List<Patient>>> clusterIDToPatients = new HashMap<>();
+        for (int i = 0; i < getTargetRxns().size(); i++) {
+            if (getpValue2EmpiricalPValueMap().get(getpValues().get(i)) <= MAX_CLUSTER_EMPIRICAL_P_VALUE) {
+                affectedBy1Patients.addAll(getSamplesW1MutatedUpstreamRxn().get(i));
+                      affectedBy2Patients.addAll(getSamplesW2MutatedUpstreamRxns().get(i));
+                      affectedBy3Patients.addAll(getSamplesW3plusMutatedUpstreamRxns().get(i));
+                      affectedByTPatients.addAll(getSamplesWTargetRxnMutations().get(i));
+                Integer clusterID = Math.abs(getCooccurringUpstreamRxns().get(i).hashCode());
+                if (!clusterIDToPatients.containsKey(clusterID)) {
+                    List<List<Patient>> patientSetList = new ArrayList<>();
+                    patientSetList.add(new ArrayList<>(getSamplesW1MutatedUpstreamRxn().get(i)));
+                    patientSetList.add(new ArrayList<>(getSamplesW2MutatedUpstreamRxns().get(i)));
+                    patientSetList.add(new ArrayList<>(getSamplesW3plusMutatedUpstreamRxns().get(i)));
+                    patientSetList.add(new ArrayList<>(getSamplesWTargetRxnMutations().get(i)));
+                    clusterIDToPatients.put(clusterID, patientSetList);
+                }
+            }
+        }
+        affectedBy1Patients.removeAll(affectedBy2Patients);
+        affectedBy1Patients.removeAll(affectedBy3Patients);
+        affectedBy1Patients.removeAll(affectedByTPatients);
+
+        affectedBy2Patients.removeAll(affectedBy3Patients);
+        affectedBy2Patients.removeAll(affectedByTPatients);
+
+        affectedBy3Patients.removeAll(affectedByTPatients);
+
+        List<List<Patient>> patientSetList = new ArrayList<>();
+        patientSetList.add(new ArrayList<>(affectedBy1Patients));
+        patientSetList.add(new ArrayList<>(affectedBy2Patients));
+        patientSetList.add(new ArrayList<>(affectedBy3Patients));
+        patientSetList.add(new ArrayList<>(affectedByTPatients));
+
+        clusterIDToPatients.put(0,patientSetList);
+
+        for (Integer clusterID : clusterIDToPatients.keySet()) {
+            String outFilePath = outputDir + outputFilePrefix + "group" + clusterID + ".csv";
+            FileUtility fileUtility = new FileUtility();
+            List<Patient> patientGroup1 = clusterIDToPatients.get(clusterID).get(0);
+            List<Patient> patientGroup2 = clusterIDToPatients.get(clusterID).get(1);
+            List<Patient> patientGroup3 = clusterIDToPatients.get(clusterID).get(2);
+            List<Patient> patientGroup4 = clusterIDToPatients.get(clusterID).get(3);
+            int numLines = Math.max(
+                    Math.max(patientGroup1.size(),
+                            patientGroup2.size()),
+                    patientGroup3.size());
+            try {
+                fileUtility.setOutput(outFilePath);
+                fileUtility.printLine("1,2,3,4");
+                for (int i = 0; i < numLines; i++) {
+                    fileUtility.printLine(String.format("%s,%s,%s,%s",
+                            patientGroup1.size() > i
+                                    ? patientGroup1.get(i).getTcgaBarcode()
+                                    : null,
+                            patientGroup2.size() > i
+                                    ? patientGroup2.get(i).getTcgaBarcode()
+                                    : null,
+                            patientGroup3.size() > i
+                                    ? patientGroup3.get(i).getTcgaBarcode()
+                                    : null,
+                            patientGroup4.size() > i
+                                    ? patientGroup4.get(i).getTcgaBarcode()
+                                    : null));
+                }
+                fileUtility.close();
+            } catch (IOException ioe) {
+                System.out.println(String.format("Couldn't use %s, %s: %s",
+                        outFilePath,
+                        ioe.getMessage(),
+                        Arrays.toString(ioe.getStackTrace())));
+            }
+        }
+    }
+
+    public void writeToFile(String outputDir, String outputFilePrefix) {
+        String outFilePath = outputDir + outputFilePrefix + "rxnCooccurrence.csv";
         FileUtility fileUtility = new FileUtility();
 
         try {
-            fileUtility.setOutput(outFilePath5);
+            fileUtility.setOutput(outFilePath);
             fileUtility.printLine(
                     "Target Reaction," +
                             "#Co-occurring Upstream Reactions," +
                             "#Co-occurring Upstream Reaction (Mutated) FIs," +
+                            "#Samples With Mutated Target Reaction," +
                             "#Samples With 0 Mutated Upstream Reactions," +
                             "#Samples With 1 Mutated Upstream Reaction," +
                             "#Samples With 2 Mutated Upstream Reactions," +
@@ -287,6 +380,7 @@ public class CooccurrenceResult {
                             "Co-occurring Upstream Reaction Cluster ID," +
                             "Co-occurring Upstream Reactions," +
                             "Co-occurring Upstream (Mutated) FIs," +
+                            "Samples with Mutated Target Reaction," +
                             "Samples With 1 Mutated Upstream Reaction," +
                             "Samples With 2 Mutated Upstream Reactions," +
                             "Samples With 3+ Mutated Upstream Reactions," +
@@ -310,7 +404,7 @@ public class CooccurrenceResult {
             fileUtility.close();
         } catch (IOException ioe) {
             System.out.println(String.format("Couldn't use %s, %s: %s",
-                    outFilePath5,
+                    outFilePath,
                     ioe.getMessage(),
                     Arrays.toString(ioe.getStackTrace())));
         }
@@ -333,6 +427,7 @@ public class CooccurrenceResult {
                 "%s," + //Target Reaction
                         "%d," + //#Co-occurring Upstream Reactions
                         "%d," + //#Co-occurring Upstream Reaction FIs
+                        "%d," + //#Samples With Mutated Target Reaction
                         "%d," + //#Samples With 0 Mutated Upstream Reactions
                         "%d," + //#Samples With 1 Mutated Upstream Reaction
                         "%d," + //#Samples With 2 Mutated Upstream Reactions
@@ -348,6 +443,7 @@ public class CooccurrenceResult {
                         "%d," + //Co-occurring Upstream Reaction Cluster ID
                         "%s," + //Co-occurring Upstream Reactions (#Samples)
                         "%s," + //FIs (#Samples)
+                        "%s," + //Samples With Mutated Target Reaction
                         "%s," + //Samples With 1 Mutated Upstream Reaction
                         "%s," + //Samples With 2 Mutated Upstream Reactions
                         "%s," + //Samples With 3+ Mutated Upstream Reactions
@@ -365,6 +461,7 @@ public class CooccurrenceResult {
                 getTargetRxns().get(i),
                 getCooccurringUpstreamRxns().get(i).size(),
                 getCooccurringUpstreamRxnFIs().get(i).size(),
+                getSamplesWTargetRxnMutations().get(i).size(),
                 getNumSamplesW0MutatedUpstreamRxns().get(i),
                 getSamplesW1MutatedUpstreamRxn().get(i).size(),
                 getSamplesW2MutatedUpstreamRxns().get(i).size(),
@@ -377,7 +474,7 @@ public class CooccurrenceResult {
                 getIndirectMutations().get(i).size(),
                 getSuperDirectMutations().get(i).size(),
                 getDirectMutations().get(i).size(),
-                getCooccurringUpstreamRxns().get(i).hashCode(),
+                Math.abs(getCooccurringUpstreamRxns().get(i).hashCode()),
                 getCooccurringUpstreamRxns().get(i).size() > 1
                         ? org.gk.util.StringUtils.join("|",
                         new ArrayList<>(getCooccurringUpstreamRxns().get(i)))
@@ -388,6 +485,12 @@ public class CooccurrenceResult {
                         ? org.gk.util.StringUtils.join("|",
                         new ArrayList<>(getCooccurringUpstreamRxnFIs().get(i)))
                         : Collections.singletonList(getCooccurringUpstreamRxnFIs().get(i)).get(0).toString()
+                        .replace("[", "")
+                        .replace("]", ""),
+                getSamplesWTargetRxnMutations().get(i).size() > 1
+                        ? org.gk.util.StringUtils.join("|",
+                        new ArrayList<>(getSamplesWTargetRxnMutations().get(i)))
+                        : Collections.singletonList(getSamplesWTargetRxnMutations().get(i)).get(0).toString()
                         .replace("[", "")
                         .replace("]", ""),
                 getSamplesW1MutatedUpstreamRxn().get(i).size() > 1
@@ -459,5 +562,9 @@ public class CooccurrenceResult {
                 getpValues().get(i),
                 bhAdjustedP,
                 empiricalP));
+    }
+
+    public List<Set<Patient>> getSamplesWTargetRxnMutations() {
+        return samplesWTargetRxnMutations;
     }
 }
