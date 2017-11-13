@@ -962,6 +962,9 @@ public class MechismoAnalyzer {
 
         realResult.writeToFile(outputDir, outputFilePrefix);
         realResult.writePatientGroupingsToFile(outputDir, outputFilePrefix);
+        realResult.writePatientCluster0UnionDistancesToFile(outputDir,
+                outputFilePrefix,
+                reactomeMechismoDataMap);
 
         double curMemUsed = CalculateJavaMemFootprintGiB();
         maxMemUsed = curMemUsed > maxMemUsed ?

@@ -27,6 +27,8 @@ public class CooccurrenceResult {
     private List<Set<Gene>> directMutatedGenes;
     private Map<Double, Double> pValue2BHAdjustedPValueMap;
     private Map<Double, Double> pValue2EmpiricalPValueMap;
+    private Map<Integer, List<List<Patient>>> patientsWith123TMutations;
+    private Set<Reaction> patientCluster0Union;
 
     public CooccurrenceResult(
             List<Reaction> targetRxns,
@@ -63,6 +65,8 @@ public class CooccurrenceResult {
         this.directMutatedGenes = null;
         this.pValue2BHAdjustedPValueMap = null;
         this.pValue2EmpiricalPValueMap = null;
+        this.patientsWith123TMutations = null;
+        this.patientCluster0Union = null;
     }
 
     private void FillMutatedGeneSets() {
@@ -274,46 +278,128 @@ public class CooccurrenceResult {
         return samplesW2MutatedUpstreamRxns;
     }
 
-    public void writePatientGroupingsToFile(String outputDir, String outputFilePrefix) {
-        //TODO: use a 'cancertype' argument as file prefix
-        Set<Patient> affectedBy1Patients = new HashSet<>();
-        Set<Patient> affectedBy2Patients = new HashSet<>();
-        Set<Patient> affectedBy3Patients = new HashSet<>();
-        Set<Patient> affectedByTPatients = new HashSet<>();
-        Map<Integer, List<List<Patient>>> clusterIDToPatients = new HashMap<>();
-        for (int i = 0; i < getTargetRxns().size(); i++) {
-            if (getpValue2EmpiricalPValueMap().get(getpValues().get(i)) <= MAX_CLUSTER_EMPIRICAL_P_VALUE) {
-                affectedBy1Patients.addAll(getSamplesW1MutatedUpstreamRxn().get(i));
-                      affectedBy2Patients.addAll(getSamplesW2MutatedUpstreamRxns().get(i));
-                      affectedBy3Patients.addAll(getSamplesW3plusMutatedUpstreamRxns().get(i));
-                      affectedByTPatients.addAll(getSamplesWTargetRxnMutations().get(i));
-                Integer clusterID = Math.abs(getCooccurringUpstreamRxns().get(i).hashCode());
-                if (!clusterIDToPatients.containsKey(clusterID)) {
-                    List<List<Patient>> patientSetList = new ArrayList<>();
-                    patientSetList.add(new ArrayList<>(getSamplesW1MutatedUpstreamRxn().get(i)));
-                    patientSetList.add(new ArrayList<>(getSamplesW2MutatedUpstreamRxns().get(i)));
-                    patientSetList.add(new ArrayList<>(getSamplesW3plusMutatedUpstreamRxns().get(i)));
-                    patientSetList.add(new ArrayList<>(getSamplesWTargetRxnMutations().get(i)));
-                    clusterIDToPatients.put(clusterID, patientSetList);
+    private Integer getRxnDistanceToPatientCluster0Union(Patient patient,
+                                                         ReactomeMechismoDataMap reactomeMechismoDataMap){
+        if(this.patientCluster0Union == null){
+            getPatientCluster0Union(reactomeMechismoDataMap);
+        }
+        Set<Reaction> patientReactions = reactomeMechismoDataMap.getReactions(patient);
+
+        if(patientReactions != null) {
+            Set<Reaction> diff1 = new HashSet<>(patientReactions);
+            diff1.removeAll(this.patientCluster0Union);
+
+            Set<Reaction> diff2 = new HashSet<>(this.patientCluster0Union);
+            diff2.removeAll(patientReactions);
+
+            return diff1.size() + diff2.size();
+        }else{
+            return reactomeMechismoDataMap.getSupportedReactions().size();
+        }
+    }
+
+    private Set<Reaction> getPatientCluster0Union(ReactomeMechismoDataMap reactomeMechismoDataMap){
+        if(this.patientCluster0Union == null) {
+            if (this.patientsWith123TMutations == null) {
+                getPatientsWith123TMutations();
+            }
+            List<List<Patient>> group0 = this.getPatientsWith123TMutations().get(0);
+            Set<Reaction> patientCluster0Union = new HashSet<>();
+            for (List<Patient> patientsInGroup : group0) {
+                for (Patient patient : patientsInGroup) {
+                    patientCluster0Union.addAll(reactomeMechismoDataMap.getReactions(patient));
                 }
             }
+            this.patientCluster0Union = patientCluster0Union;
         }
-        affectedBy1Patients.removeAll(affectedBy2Patients);
-        affectedBy1Patients.removeAll(affectedBy3Patients);
-        affectedBy1Patients.removeAll(affectedByTPatients);
+        return this.patientCluster0Union;
+    }
 
-        affectedBy2Patients.removeAll(affectedBy3Patients);
-        affectedBy2Patients.removeAll(affectedByTPatients);
+    public void writePatientCluster0UnionDistancesToFile(String outputDir,
+                                                   String outputFilePrefix,
+                                                   ReactomeMechismoDataMap reactomeMechismoDataMap){
+        Map<Patient,Integer> patientToCluster0UnionDistance = new HashMap<>();
+        Set<Patient> patients = reactomeMechismoDataMap.getPatients();
+        Integer sumDistance = 0;
+        Integer numPatients = patients.size();
+        for(Patient patient : patients){
+            Integer distance = getRxnDistanceToPatientCluster0Union(patient,reactomeMechismoDataMap);
+            sumDistance += distance;
+            patientToCluster0UnionDistance.put(patient,
+                    distance);
+        }
+        Integer meanDistance = sumDistance / numPatients;
 
-        affectedBy3Patients.removeAll(affectedByTPatients);
+        String outFilePath = outputDir + outputFilePrefix + "cluster0UnionDistances.csv";
+        FileUtility fileUtility = new FileUtility();
+        try {
+            fileUtility.setOutput(outFilePath);
+            fileUtility.printLine("Patient,Distance");
+            for(Patient patient : patientToCluster0UnionDistance.keySet()) {
+                if(patientToCluster0UnionDistance.get(patient) < meanDistance) {
+                    fileUtility.printLine(String.format("%s,%d",
+                            patient,
+                            patientToCluster0UnionDistance.get(patient)
+                    ));
+                }
+            }
+            fileUtility.close();
+        } catch (IOException ioe) {
+            System.out.println(String.format("Couldn't use %s, %s: %s",
+                    outFilePath,
+                    ioe.getMessage(),
+                    Arrays.toString(ioe.getStackTrace())));
+        }
+    }
 
-        List<List<Patient>> patientSetList = new ArrayList<>();
-        patientSetList.add(new ArrayList<>(affectedBy1Patients));
-        patientSetList.add(new ArrayList<>(affectedBy2Patients));
-        patientSetList.add(new ArrayList<>(affectedBy3Patients));
-        patientSetList.add(new ArrayList<>(affectedByTPatients));
+    private Map<Integer, List<List<Patient>>> getPatientsWith123TMutations(){
+        if(this.patientsWith123TMutations == null) {
+            Set<Patient> affectedBy1Patients = new HashSet<>();
+            Set<Patient> affectedBy2Patients = new HashSet<>();
+            Set<Patient> affectedBy3Patients = new HashSet<>();
+            Set<Patient> affectedByTPatients = new HashSet<>();
+            Map<Integer, List<List<Patient>>> clusterIDToPatients = new HashMap<>();
+            for (int i = 0; i < getTargetRxns().size(); i++) {
+                if (getpValue2EmpiricalPValueMap().get(getpValues().get(i)) <= MAX_CLUSTER_EMPIRICAL_P_VALUE) {
+                    affectedBy1Patients.addAll(getSamplesW1MutatedUpstreamRxn().get(i));
+                    affectedBy2Patients.addAll(getSamplesW2MutatedUpstreamRxns().get(i));
+                    affectedBy3Patients.addAll(getSamplesW3plusMutatedUpstreamRxns().get(i));
+                    affectedByTPatients.addAll(getSamplesWTargetRxnMutations().get(i));
+                    Integer clusterID = Math.abs(getCooccurringUpstreamRxns().get(i).hashCode());
+                    if (!clusterIDToPatients.containsKey(clusterID)) {
+                        List<List<Patient>> patientSetList = new ArrayList<>();
+                        patientSetList.add(new ArrayList<>(getSamplesW1MutatedUpstreamRxn().get(i)));
+                        patientSetList.add(new ArrayList<>(getSamplesW2MutatedUpstreamRxns().get(i)));
+                        patientSetList.add(new ArrayList<>(getSamplesW3plusMutatedUpstreamRxns().get(i)));
+                        patientSetList.add(new ArrayList<>(getSamplesWTargetRxnMutations().get(i)));
+                        clusterIDToPatients.put(clusterID, patientSetList);
+                    }
+                }
+            }
+            affectedBy1Patients.removeAll(affectedBy2Patients);
+            affectedBy1Patients.removeAll(affectedBy3Patients);
+            affectedBy1Patients.removeAll(affectedByTPatients);
 
-        clusterIDToPatients.put(0,patientSetList);
+            affectedBy2Patients.removeAll(affectedBy3Patients);
+            affectedBy2Patients.removeAll(affectedByTPatients);
+
+            affectedBy3Patients.removeAll(affectedByTPatients);
+
+            List<List<Patient>> patientSetList = new ArrayList<>();
+            patientSetList.add(new ArrayList<>(affectedBy1Patients));
+            patientSetList.add(new ArrayList<>(affectedBy2Patients));
+            patientSetList.add(new ArrayList<>(affectedBy3Patients));
+            patientSetList.add(new ArrayList<>(affectedByTPatients));
+
+            clusterIDToPatients.put(0, patientSetList);
+            this.patientsWith123TMutations = clusterIDToPatients;
+        }
+        return this.patientsWith123TMutations;
+    }
+
+    public void writePatientGroupingsToFile(String outputDir, String outputFilePrefix) {
+        //TODO: use a 'cancertype' argument as file prefix
+        Map<Integer, List<List<Patient>>> clusterIDToPatients = getPatientsWith123TMutations();
 
         for (Integer clusterID : clusterIDToPatients.keySet()) {
             String outFilePath = outputDir + outputFilePrefix + "group" + clusterID + ".csv";

@@ -25,15 +25,19 @@ create.survival.data <- function(clin,
     dplyr::mutate(duration = ifelse(CLI_vital_status == 1,
                                     CLI_days_to_death,
                                     CLI_days_to_last_followup)) %>%
-    dplyr::mutate(group = ifelse(tcga_participant_barcode %in% affected.samples$X1,
+    dplyr::mutate(group = ifelse(tcga_participant_barcode %in% affected.samples$Patient,
                                  1,
-                                 ifelse(tcga_participant_barcode %in% affected.samples$X2,
-                                        1,
-                                        ifelse(tcga_participant_barcode %in% affected.samples$X3,
-                                               1,
-                                               ifelse(tcga_participant_barcode %in% affected.samples$X4,
-                                                      2,
-                                                      0)))))
+                                 0))
+    
+    # dplyr::mutate(group = ifelse(tcga_participant_barcode %in% affected.samples$X1,
+    #                              1,
+    #                              ifelse(tcga_participant_barcode %in% affected.samples$X2,
+    #                                     1,
+    #                                     ifelse(tcga_participant_barcode %in% affected.samples$X3,
+    #                                            1,
+    #                                            ifelse(tcga_participant_barcode %in% affected.samples$X4,
+    #                                                   2,
+    #                                                   0)))))
   clin2
 }
 
@@ -75,11 +79,11 @@ run.survival.analysis <- function(clin,
         side=3)
   dev.off()
   
-  thisRow <- data.frame(File=cancer,
-                        logtest=cSum$logtest[3],
-                        waldtest=cSum$waldtest[3],
-                        sctest=cSum$sctest[3])
-  all_pvals <<- rbind(all_pvals,thisRow)
+  # thisRow <- data.frame(File=cancer,
+  #                       logtest=cSum$logtest[3],
+  #                       waldtest=cSum$waldtest[3],
+  #                       sctest=cSum$sctest[3])
+  # all_pvals <<- rbind(all_pvals,thisRow)
   
   print(surv.diff);
   print(summary(coxphresult));
@@ -87,51 +91,66 @@ run.survival.analysis <- function(clin,
 
 result.dir <- "/home/burkhart/Software/Ogmios/results/Mechismo/"
 data.dir <- "/home/burkhart/Software/Ogmios/datasets/FirehoseClinical/"
-clin.file <- paste(data.dir,"THCA-TP.samplefeatures.txt",sep="")
-cancer = "THCA"
+clin.file <- paste(data.dir,"pancancer.samplefeatures.txt",sep="")
+cancer = "pancancer"
+
+affected.samples <- read.csv(paste(result.dir,"cluster0UnionDistances.csv",sep=""),
+                              header=TRUE,
+                              sep=",",
+                              check.names=FALSE) %>%
+  dplyr::rowwise() %>% 
+  dplyr::mutate(Patient = ifelse(is.na(Patient),
+                                 NA,
+                                 stringr::str_extract(Patient,
+                                                      "TCGA-[0-9A-Z]{2}-[0-9A-Z]{4}")))
+
 clin <- read.csv(clin.file,
                  header = TRUE,
                  sep = "\t",
                  check.names = FALSE)
 
-filenames <- list.files(result.dir,pattern="THCAgroup.*\\.csv",full.names = TRUE)
-all_pvals <<- data.frame(File=character(),
-                         logtest=numeric(),
-                         waldtest=numeric(),
-                         sctest=numeric())
-for(f in filenames){
-  affected.samples <- read.csv(f,
-                               header=TRUE,
-                               sep=",",
-                               stringsAsFactors = FALSE,
-                               na.strings = "null") %>%
-    dplyr::rowwise() %>% 
-    dplyr::mutate(X1 = ifelse(is.na(X1),NA,stringr::str_extract(X1,"TCGA-[0-9A-Z]{2}-[0-9A-Z]{4}")),
-                  X2 = ifelse(is.na(X2),NA,stringr::str_extract(X2,"TCGA-[0-9A-Z]{2}-[0-9A-Z]{4}")),
-                  X3 = ifelse(is.na(X3),NA,stringr::str_extract(X3,"TCGA-[0-9A-Z]{2}-[0-9A-Z]{4}")),
-                  X4 = ifelse(is.na(X4),NA,stringr::str_extract(X4,"TCGA-[0-9A-Z]{2}-[0-9A-Z]{4}")))
-  
-  cancer2 <- paste(cancer,basename(f),sep=" ")
-  print(paste("Generating survival plot for",cancer2,sep=" "))
-  run.survival.analysis(clin,
-                        cancer2,
-                        affected.samples)
-}
+run.survival.analysis(clin,
+                      cancer,
+                      affected.samples)
 
-all_pvals <- cbind(all_pvals,qvalue::qvalue(all_pvals$sctest)$qvalue)
-
-colnames(all_pvals) <- c("Group",
-                         "CoxPH Log Test pvalue",
-                         "CoxPH Wald Test pvalue",
-                         "CoxPH Score Test pvalue",
-                         "qvalue")
-all_pvals %>%
-  write.table(paste(result.dir,
-                  cancer,
-                  "coxph_survival_significance.tsv",
-                  sep=""),
-            sep="\t",
-            row.names = FALSE)
+#filenames <- list.files(result.dir,pattern="COADgroup.*\\.csv",full.names = TRUE)
+#all_pvals <<- data.frame(File=character(),
+                         # logtest=numeric(),
+                         # waldtest=numeric(),
+                         # sctest=numeric())
+#for(f in filenames){
+#  affected.samples <- read.csv(f,
+#                               header=TRUE,
+#                               sep=",",
+#                               stringsAsFactors = FALSE,
+#                                na.strings = "null") %>%
+#     dplyr::rowwise() %>% 
+#     dplyr::mutate(X1 = ifelse(is.na(X1),NA,stringr::str_extract(X1,"TCGA-[0-9A-Z]{2}-[0-9A-Z]{4}")),
+#                   X2 = ifelse(is.na(X2),NA,stringr::str_extract(X2,"TCGA-[0-9A-Z]{2}-[0-9A-Z]{4}")),
+#                   X3 = ifelse(is.na(X3),NA,stringr::str_extract(X3,"TCGA-[0-9A-Z]{2}-[0-9A-Z]{4}")),
+#                   X4 = ifelse(is.na(X4),NA,stringr::str_extract(X4,"TCGA-[0-9A-Z]{2}-[0-9A-Z]{4}")))
+#   
+#   cancer2 <- paste(cancer,basename(f),sep=" ")
+#   print(paste("Generating survival plot for",cancer2,sep=" "))
+#   run.survival.analysis(clin,
+#                         cancer2,
+#                         affected.samples)
+# }
+# 
+# all_pvals <- cbind(all_pvals,qvalue::qvalue(all_pvals$sctest)$qvalue)
+# 
+# colnames(all_pvals) <- c("Group",
+#                          "CoxPH Log Test pvalue",
+#                          "CoxPH Wald Test pvalue",
+#                          "CoxPH Score Test pvalue",
+#                          "qvalue")
+# all_pvals %>%
+#   write.table(paste(result.dir,
+#                   cancer,
+#                   "coxph_survival_significance.tsv",
+#                   sep=""),
+#             sep="\t",
+#             row.names = FALSE)
 
 
 

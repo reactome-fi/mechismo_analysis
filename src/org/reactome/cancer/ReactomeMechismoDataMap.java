@@ -13,6 +13,7 @@ public class ReactomeMechismoDataMap {
     private Map<Patient, Set<FI>> patientsToFIs;
     private Map<FI, Set<Patient>> fisToPatients;
     private Map<Patient, Map<FI, Set<Mutation>>> patientToFIsToMutations;
+    private Map<Patient, Set<Reaction>> patientToReactions;
     private Map<Reaction, Set<FI>> reactionToFIs;
     private Map<Reaction, Set<Patient>> reactionToPatients;
     private CancerDriverReactomeAnalyzer cancerDriverReactomeAnalyzer;
@@ -167,19 +168,34 @@ public class ReactomeMechismoDataMap {
         return this.reactionToFIs.keySet();
     }
 
+    public Set<Reaction> getReactions(Patient patient){
+        return this.patientToReactions.get(patient);
+    }
+
     private void BuildReactionToPatients() {
         this.reactionToPatients = new HashMap<>();
+        this.patientToReactions = new HashMap<>();
         for (Reaction reaction : this.reactionToFIs.keySet()) {
             Set<FI> rxnFis = this.reactionToFIs.get(reaction);
             for (FI rxnFi : rxnFis) {
-                Set<Patient> rxnSamples;
+                Set<Patient> rxnPatients;
                 if (reactionToPatients.containsKey(reaction)) {
-                    rxnSamples = new HashSet<>(reactionToPatients.get(reaction));
+                    rxnPatients = new HashSet<>(reactionToPatients.get(reaction));
                 } else {
-                    rxnSamples = new HashSet<>();
+                    rxnPatients = new HashSet<>();
                 }
-                rxnSamples.addAll(fisToPatients.get(rxnFi));
-                reactionToPatients.put(reaction, rxnSamples);
+                rxnPatients.addAll(fisToPatients.get(rxnFi));
+                reactionToPatients.put(reaction, rxnPatients);
+                for(Patient patient : rxnPatients) {
+                    Set<Reaction> patientRxns;
+                    if (patientToReactions.containsKey(patient)){
+                        patientRxns = new HashSet<>(patientToReactions.get(patient));
+                    }else{
+                        patientRxns = new HashSet<>();
+                    }
+                    patientRxns.add(reaction);
+                    patientToReactions.put(patient,patientRxns);
+                }
             }
         }
     }
