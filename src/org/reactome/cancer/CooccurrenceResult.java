@@ -7,7 +7,7 @@ import java.io.IOException;
 import java.util.*;
 
 public class CooccurrenceResult {
-    private final Double MAX_CLUSTER_EMPIRICAL_P_VALUE = 0.01;
+    private final Double MAX_CLUSTER_EMPIRICAL_P_VALUE = 0.05;
     private List<Reaction> targetRxns;
     private List<Set<Reaction>> cooccurringUpstreamRxns;
     private List<Set<FI>> cooccurringUpstreamRxnFIs;
