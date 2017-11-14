@@ -279,13 +279,13 @@ public class CooccurrenceResult {
     }
 
     private Integer getRxnDistanceToPatientCluster0Union(Patient patient,
-                                                         ReactomeMechismoDataMap reactomeMechismoDataMap){
-        if(this.patientCluster0Union == null){
+                                                         ReactomeMechismoDataMap reactomeMechismoDataMap) {
+        if (this.patientCluster0Union == null) {
             getPatientCluster0Union(reactomeMechismoDataMap);
         }
         Set<Reaction> patientReactions = reactomeMechismoDataMap.getReactions(patient);
 
-        if(patientReactions != null) {
+        if (patientReactions != null) {
             Set<Reaction> diff1 = new HashSet<>(patientReactions);
             diff1.removeAll(this.patientCluster0Union);
 
@@ -293,13 +293,13 @@ public class CooccurrenceResult {
             diff2.removeAll(patientReactions);
 
             return diff1.size() + diff2.size();
-        }else{
+        } else {
             return reactomeMechismoDataMap.getSupportedReactions().size();
         }
     }
 
-    private Set<Reaction> getPatientCluster0Union(ReactomeMechismoDataMap reactomeMechismoDataMap){
-        if(this.patientCluster0Union == null) {
+    private Set<Reaction> getPatientCluster0Union(ReactomeMechismoDataMap reactomeMechismoDataMap) {
+        if (this.patientCluster0Union == null) {
             if (this.patientsWith123TMutations == null) {
                 getPatientsWith123TMutations();
             }
@@ -316,14 +316,14 @@ public class CooccurrenceResult {
     }
 
     public void writePatientCluster0UnionDistancesToFile(String outputDir,
-                                                   String outputFilePrefix,
-                                                   ReactomeMechismoDataMap reactomeMechismoDataMap){
-        Map<Patient,Integer> patientToCluster0UnionDistance = new HashMap<>();
+                                                         String outputFilePrefix,
+                                                         ReactomeMechismoDataMap reactomeMechismoDataMap) {
+        Map<Patient, Integer> patientToCluster0UnionDistance = new HashMap<>();
         Set<Patient> patients = reactomeMechismoDataMap.getPatients();
         Integer sumDistance = 0;
         Integer numPatients = patients.size();
-        for(Patient patient : patients){
-            Integer distance = getRxnDistanceToPatientCluster0Union(patient,reactomeMechismoDataMap);
+        for (Patient patient : patients) {
+            Integer distance = getRxnDistanceToPatientCluster0Union(patient, reactomeMechismoDataMap);
             sumDistance += distance;
             patientToCluster0UnionDistance.put(patient,
                     distance);
@@ -335,8 +335,8 @@ public class CooccurrenceResult {
         try {
             fileUtility.setOutput(outFilePath);
             fileUtility.printLine("Patient,Distance");
-            for(Patient patient : patientToCluster0UnionDistance.keySet()) {
-                if(patientToCluster0UnionDistance.get(patient) < meanDistance) {
+            for (Patient patient : patientToCluster0UnionDistance.keySet()) {
+                if (patientToCluster0UnionDistance.get(patient) < meanDistance) {
                     fileUtility.printLine(String.format("%s,%d",
                             patient,
                             patientToCluster0UnionDistance.get(patient)
@@ -352,8 +352,8 @@ public class CooccurrenceResult {
         }
     }
 
-    private Map<Integer, List<List<Patient>>> getPatientsWith123TMutations(){
-        if(this.patientsWith123TMutations == null) {
+    private Map<Integer, List<List<Patient>>> getPatientsWith123TMutations() {
+        if (this.patientsWith123TMutations == null) {
             Set<Patient> affectedBy1Patients = new HashSet<>();
             Set<Patient> affectedBy2Patients = new HashSet<>();
             Set<Patient> affectedBy3Patients = new HashSet<>();
