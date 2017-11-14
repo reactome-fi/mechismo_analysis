@@ -2,7 +2,9 @@ package org.reactome.cancer;
 
 import org.reactome.cancer.driver.CancerDriverReactomeAnalyzer;
 import org.reactome.r3.ReactomeAnalyzer;
+import org.reactome.r3.util.FileUtility;
 
+import java.io.IOException;
 import java.util.*;
 
 public class ReactomeMechismoDataMap {
@@ -34,24 +36,24 @@ public class ReactomeMechismoDataMap {
         this.patientToFIsToMutations = mechismoOutputLoader.ExtractSamples2FIs2Muts();
     }
 
-    private Set<Mutation> getReactionPatientMutations(Reaction reaction, Patient patient){
-       Set<Mutation> mutations = new HashSet<>();
-       if(this.reactionToFIs.keySet().contains(reaction)) {
-           Set<FI> reactionFIs = new HashSet<>(this.reactionToFIs.get(reaction));
-           reactionFIs.retainAll(this.patientsToFIs.get(patient));
-           for (FI fi : reactionFIs) {
-               if (this.patientToFIsToMutations.containsKey(patient)) {
-                   mutations.addAll(this.patientToFIsToMutations.get(patient).get(fi));
-               }
-           }
-       }
-       return mutations;
+    private Set<Mutation> getReactionPatientMutations(Reaction reaction, Patient patient) {
+        Set<Mutation> mutations = new HashSet<>();
+        if (this.reactionToFIs.keySet().contains(reaction)) {
+            Set<FI> reactionFIs = new HashSet<>(this.reactionToFIs.get(reaction));
+            reactionFIs.retainAll(this.patientsToFIs.get(patient));
+            for (FI fi : reactionFIs) {
+                if (this.patientToFIsToMutations.containsKey(patient)) {
+                    mutations.addAll(this.patientToFIsToMutations.get(patient).get(fi));
+                }
+            }
+        }
+        return mutations;
     }
 
-    public Set<Mutation> getReactionPatientsMutations(Reaction reaction, Set<Patient> patients){
+    public Set<Mutation> getReactionPatientsMutations(Reaction reaction, Set<Patient> patients) {
         Set<Mutation> mutations = new HashSet<>();
-        for(Patient patient : patients){
-            mutations.addAll(getReactionPatientMutations(reaction,patient));
+        for (Patient patient : patients) {
+            mutations.addAll(getReactionPatientMutations(reaction, patient));
         }
         return mutations;
     }
@@ -69,9 +71,9 @@ public class ReactomeMechismoDataMap {
     private void BuildReactions() throws Exception {
         this.reactions = new HashSet<>();
         this.reactionIDToReaction = new HashMap<>();
-        Map<Long,String> reactionIDToName = cancerDriverReactomeAnalyzer.loadReactionLongDBIDToName();
+        Map<Long, String> reactionIDToName = cancerDriverReactomeAnalyzer.loadReactionLongDBIDToName();
         for (Long reactionID : this.reactomeReactionGraphLoader.getReactionSet()) {
-            if(reactionIDToName.containsKey(reactionID)) {
+            if (reactionIDToName.containsKey(reactionID)) {
                 Reaction reaction = new Reaction(
                         reactionID,
                         reactionIDToName.get(reactionID));
@@ -125,7 +127,7 @@ public class ReactomeMechismoDataMap {
         this.reactionToFIs = new HashMap<>();
         Map<FI, Set<Reaction>> fisToReactions = new HashMap<>();
         ReactomeAnalyzer reactomeAnalyzer = new ReactomeAnalyzer();
-        for(Reaction reaction : this.reactions) {
+        for (Reaction reaction : this.reactions) {
             List<Long> reactionIDList = new ArrayList<>();
             reactionIDList.add(reaction.getReactionID());
             Set<String> reactionFIStrings = new HashSet<>();
@@ -168,7 +170,7 @@ public class ReactomeMechismoDataMap {
         return this.reactionToFIs.keySet();
     }
 
-    public Set<Reaction> getReactions(Patient patient){
+    public Set<Reaction> getReactions(Patient patient) {
         return this.patientToReactions.get(patient);
     }
 
@@ -186,17 +188,250 @@ public class ReactomeMechismoDataMap {
                 }
                 rxnPatients.addAll(fisToPatients.get(rxnFi));
                 reactionToPatients.put(reaction, rxnPatients);
-                for(Patient patient : rxnPatients) {
+                for (Patient patient : rxnPatients) {
                     Set<Reaction> patientRxns;
-                    if (patientToReactions.containsKey(patient)){
+                    if (patientToReactions.containsKey(patient)) {
                         patientRxns = new HashSet<>(patientToReactions.get(patient));
-                    }else{
+                    } else {
                         patientRxns = new HashSet<>();
                     }
                     patientRxns.add(reaction);
-                    patientToReactions.put(patient,patientRxns);
+                    patientToReactions.put(patient, patientRxns);
                 }
             }
+        }
+    }
+
+    private void FindIntersectionUnionClusters(Set<Set<String>> fiIntersectingSetUnionClusters,
+                                               Set<Set<String>> allFIs) {
+        Iterator<Set<String>> allFIsItr = allFIs.iterator();
+        while (allFIsItr.hasNext()) {
+            Set<String> fiSet = allFIsItr.next();
+            Set<String> union = new HashSet<>(fiSet);
+            Iterator<Set<String>> fiClusterItr = fiIntersectingSetUnionClusters.iterator();
+            while (fiClusterItr.hasNext()) {
+                Set<String> fiCluster = fiClusterItr.next();
+                Set<String> intersection = new HashSet<>(fiSet);
+                intersection.retainAll(fiCluster);
+                if (!intersection.isEmpty()) {
+                    union.addAll(fiCluster);
+                    fiClusterItr.remove(); //remove out-dated cluster
+                }
+            }
+            fiIntersectingSetUnionClusters.add(union);
+        }
+    }
+
+    private void CalculateClusterStats(Set<Set<String>> fiIntersectingSetUnionClusters) {
+        Iterator<Set<String>> fiClusterItr = fiIntersectingSetUnionClusters.iterator();
+        Double min = (double) fiClusterItr.next().size();
+        Double max = min;
+        Double sum = max;
+        while (fiClusterItr.hasNext()) {
+            Double sz = (double) fiClusterItr.next().size();
+            min = sz < min ? sz : min;
+            max = sz > max ? sz : max;
+            sum += sz;
+        }
+        Double mean = sum / (double) fiIntersectingSetUnionClusters.size();
+
+        System.out.println(String.format("Clusters min = %f, max = %f, mean = %f, sum = %f",
+                min,
+                max,
+                mean,
+                sum));
+    }
+
+    private void WriteClustersToFile(String outputDir,
+                                     String outputFilePrefix,
+                                     Set<Set<String>> fiIntersectingSetUnionClusters) {
+        //perform pathway enrichment analysis among FI clusters
+        FileUtility fileUtility0 = new FileUtility();
+        String outFilePath0 = outputDir + outputFilePrefix + "fiClusters.csv";
+        try {
+            fileUtility0.setOutput(outFilePath0);
+            Iterator<Set<String>> fiClusterItr0 = fiIntersectingSetUnionClusters.iterator();
+            while (fiClusterItr0.hasNext()) {
+                Set<String> fis0 = fiClusterItr0.next();
+                fileUtility0.printLine(
+                        fis0.size() > 1
+                                ? org.gk.util.StringUtils.join(" ",
+                                new ArrayList(fis0)).replace("\t", " ")
+                                : Arrays.asList(fis0).get(0).toString()
+                                .replace("[", "")
+                                .replace("]", "")
+                                .replace("\t", " "));
+            }
+            fileUtility0.close();
+        } catch (IOException ioe) {
+            System.out.println(String.format("Couldn't use %s, %s: %s",
+                    outFilePath0.toString(),
+                    ioe.getMessage(),
+                    Arrays.toString(ioe.getStackTrace())));
+        }
+    }
+
+    private void WriteReaction2FIsToFile(String outputDir,
+                                         String outputFilePrefix,
+                                         Map<Long, Set<String>> reaction2FiSet) {
+        //write reaction2FIs to file
+        FileUtility fileUtility1 = new FileUtility();
+        String outFilePath1 = outputDir + outputFilePrefix + "reactions2FIs.csv";
+        try {
+            fileUtility1.setOutput(outFilePath1);
+            fileUtility1.printLine("RxnId,Num FIs,Mapped FIs");
+            Iterator<Map.Entry<Long, Set<String>>> reaction2FiItr = reaction2FiSet.entrySet().iterator();
+            while (reaction2FiItr.hasNext()) {
+                Map.Entry<Long, Set<String>> pair = reaction2FiItr.next();
+                Long rxnId = pair.getKey();
+                Set<String> mappedFis = pair.getValue();
+                fileUtility1.printLine(String.format("%s,%d,%s",
+                        rxnId.toString(),
+                        mappedFis.size(),
+                        mappedFis.size() > 1
+                                ? org.gk.util.StringUtils.join(" ",
+                                new ArrayList(mappedFis)).replace("\t", " ")
+                                : Arrays.asList(mappedFis).get(0).toString()
+                                .replace("[", "")
+                                .replace("]", "")
+                                .replace("\t", " ")));
+            }
+            fileUtility1.close();
+        } catch (IOException ioe) {
+            System.out.println(String.format("Couldn't use %s, %s: %s",
+                    outFilePath1.toString(),
+                    ioe.getMessage(),
+                    Arrays.toString(ioe.getStackTrace())));
+        }
+    }
+
+    private void WriteSamples2FIsToFile(String outputDir,
+                                        String outputFilePrefix,
+                                        Map<String, Set<String>> samples2FIs) {
+        //write samples2FIs to file
+        FileUtility fileUtility2 = new FileUtility();
+        String outFilePath2 = outputDir + outputFilePrefix + "samples2FIs.csv";
+        try {
+            fileUtility2.setOutput(outFilePath2);
+            fileUtility2.printLine("Sample Barcode,Num FIs,Mapped FIs");
+            Iterator<Map.Entry<String, Set<String>>> sample2FiItr = samples2FIs.entrySet().iterator();
+            while (sample2FiItr.hasNext()) {
+                Map.Entry<String, Set<String>> pair = sample2FiItr.next();
+                String sampleBarcode = pair.getKey();
+                Set<String> mappedFis = pair.getValue();
+                fileUtility2.printLine(String.format("%s,%d,%s",
+                        sampleBarcode,
+                        mappedFis.size(),
+                        mappedFis.size() > 1
+                                ? org.gk.util.StringUtils.join(" ",
+                                new ArrayList(mappedFis)).replace("\t", " ")
+                                : Arrays.asList(mappedFis).get(0).toString()
+                                .replace("[", "")
+                                .replace("]", "")
+                                .replace("\t", " ")));
+            }
+            fileUtility2.close();
+        } catch (IOException ioe) {
+            System.out.println(String.format("Couldn't use %s, %s: %s",
+                    outFilePath2.toString(),
+                    ioe.getMessage(),
+                    Arrays.toString(ioe.getStackTrace())));
+        }
+    }
+
+    private void WriteFIs2SamplesToFile(String outputDir,
+                                        String outputFilePrefix,
+                                        Map<String, Set<String>> fis2Samples,
+                                        Map<String, Set<String>> samples2FIs) {
+        //write fis2Samples to file
+        FileUtility fileUtility3 = new FileUtility();
+        String outFilePath3 = outputDir + outputFilePrefix + "fis2Samples.csv";
+        try {
+            fileUtility3.setOutput(outFilePath3);
+            fileUtility3.printLine("FI,Num Samples,FI Frequency,Mapped Samples");
+            Iterator<Map.Entry<String, Set<String>>> fi2SampleItr = fis2Samples.entrySet().iterator();
+            while (fi2SampleItr.hasNext()) {
+                Map.Entry<String, Set<String>> pair = fi2SampleItr.next();
+                String fi = pair.getKey();
+                Set<String> mappedSamples = pair.getValue();
+                fileUtility3.printLine(String.format("%s,%d,%f,%s",
+                        fi,
+                        mappedSamples.size(),
+                        new Double(mappedSamples.size()) /
+                                new Double(samples2FIs.keySet().size()),
+                        mappedSamples.size() > 1
+                                ? org.gk.util.StringUtils.join(" ",
+                                new ArrayList(mappedSamples)).replace(
+                                "\t", " ")
+                                : Arrays.asList(mappedSamples).get(0).toString()
+                                .replace("[", "")
+                                .replace("]", "")
+                                .replace("\t", " ")));
+            }
+            fileUtility3.close();
+        } catch (IOException ioe) {
+            System.out.println(String.format("Couldn't use %s, %s: %s",
+                    outFilePath3.toString(),
+                    ioe.getMessage(),
+                    Arrays.toString(ioe.getStackTrace())));
+        }
+    }
+
+    private void WriteTargetReactionSummariesToFile(String outputDir,
+                                                    String outputFilePrefix,
+                                                    Set<TargetReactionCandidate> targetReactionSummaries) {
+        //write targetReactionSummaries to file
+        FileUtility fileUtility = new FileUtility();
+        String outFilePath = outputDir + outputFilePrefix + "dnUpReactions.csv";
+        try {
+            fileUtility.setOutput(outFilePath);
+            fileUtility.printLine(TargetReactionCandidate.getHeaderLine());
+            Iterator<TargetReactionCandidate> trsItr = targetReactionSummaries.iterator();
+            while (trsItr.hasNext()) {
+                TargetReactionCandidate targetReactionCandidate = trsItr.next();
+                fileUtility.printLine(targetReactionCandidate.toString());
+            }
+            fileUtility.close();
+        } catch (IOException ioe) {
+            System.out.println(String.format("Couldn't use %s, %s: %s",
+                    outFilePath.toString(),
+                    ioe.getMessage(),
+                    Arrays.toString(ioe.getStackTrace())));
+        }
+
+        System.out.println(String.format("Output written to %s",
+                outFilePath));
+    }
+
+    public void WriteRxn2SamplesToFile(String outputDir,
+                                       String outputFilePrefix) {
+        //write rxn2Samples to file
+        FileUtility fileUtility = new FileUtility();
+        String outFilePath = outputDir + outputFilePrefix + "rxn2Samples.csv";
+        try {
+            fileUtility.setOutput(outFilePath);
+            fileUtility.printLine("Rxn,Num Samples,Rxn Frequency,Mapped Samples");
+            for (Reaction reaction : getSupportedReactions()) {
+                Set<Patient> mappedSamples = getPatients(reaction);
+                fileUtility.printLine(String.format("%s,%d,%f,%s",
+                        reaction.toString(),
+                        mappedSamples.size(),
+                        (double) mappedSamples.size() /
+                                (double) getSupportedReactions().size(),
+                        mappedSamples.size() > 1
+                                ? org.gk.util.StringUtils.join(" ",
+                                new ArrayList<>(mappedSamples)).replace("\t", " ")
+                                : Collections.singletonList(mappedSamples).get(0).toString()
+                                .replace("[", "")
+                                .replace("]", "")
+                                .replace("\t", " ")));
+            }
+            fileUtility.close();
+        } catch (IOException ioe) {
+            System.out.println(String.format("Couldn't use %s, %s: %s",
+                    outFilePath,
+                    ioe.getMessage(),
+                    Arrays.toString(ioe.getStackTrace())));
         }
     }
 }
