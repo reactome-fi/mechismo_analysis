@@ -662,7 +662,7 @@ public class MechismoAnalyzer {
 
         realResult.writeToFile(outputDir, outputFilePrefix);
         realResult.writePatientGroupingsToFile(outputDir, outputFilePrefix);
-        realResult.writePatientCluster0UnionDistancesToFile(outputDir,
+        realResult.writePatientDistancesToFile(outputDir,
                 outputFilePrefix,
                 reactomeMechismoDataMap);
 

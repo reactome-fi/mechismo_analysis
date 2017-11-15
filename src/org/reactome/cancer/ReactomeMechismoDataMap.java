@@ -1,5 +1,6 @@
 package org.reactome.cancer;
 
+import org.gk.util.StringUtils;
 import org.reactome.cancer.driver.CancerDriverReactomeAnalyzer;
 import org.reactome.r3.ReactomeAnalyzer;
 import org.reactome.r3.util.FileUtility;
@@ -250,14 +251,12 @@ public class ReactomeMechismoDataMap {
         String outFilePath0 = outputDir + outputFilePrefix + "fiClusters.csv";
         try {
             fileUtility0.setOutput(outFilePath0);
-            Iterator<Set<String>> fiClusterItr0 = fiIntersectingSetUnionClusters.iterator();
-            while (fiClusterItr0.hasNext()) {
-                Set<String> fis0 = fiClusterItr0.next();
+            for (Set<String> fis0 : fiIntersectingSetUnionClusters) {
                 fileUtility0.printLine(
                         fis0.size() > 1
-                                ? org.gk.util.StringUtils.join(" ",
+                                ? StringUtils.join(" ",
                                 new ArrayList(fis0)).replace("\t", " ")
-                                : Arrays.asList(fis0).get(0).toString()
+                                : Collections.singletonList(fis0).get(0).toString()
                                 .replace("[", "")
                                 .replace("]", "")
                                 .replace("\t", " "));
@@ -265,7 +264,7 @@ public class ReactomeMechismoDataMap {
             fileUtility0.close();
         } catch (IOException ioe) {
             System.out.println(String.format("Couldn't use %s, %s: %s",
-                    outFilePath0.toString(),
+                    outFilePath0,
                     ioe.getMessage(),
                     Arrays.toString(ioe.getStackTrace())));
         }
@@ -280,18 +279,16 @@ public class ReactomeMechismoDataMap {
         try {
             fileUtility1.setOutput(outFilePath1);
             fileUtility1.printLine("RxnId,Num FIs,Mapped FIs");
-            Iterator<Map.Entry<Long, Set<String>>> reaction2FiItr = reaction2FiSet.entrySet().iterator();
-            while (reaction2FiItr.hasNext()) {
-                Map.Entry<Long, Set<String>> pair = reaction2FiItr.next();
+            for (Map.Entry<Long, Set<String>> pair : reaction2FiSet.entrySet()) {
                 Long rxnId = pair.getKey();
                 Set<String> mappedFis = pair.getValue();
                 fileUtility1.printLine(String.format("%s,%d,%s",
                         rxnId.toString(),
                         mappedFis.size(),
                         mappedFis.size() > 1
-                                ? org.gk.util.StringUtils.join(" ",
+                                ? StringUtils.join(" ",
                                 new ArrayList(mappedFis)).replace("\t", " ")
-                                : Arrays.asList(mappedFis).get(0).toString()
+                                : Collections.singletonList(mappedFis).get(0).toString()
                                 .replace("[", "")
                                 .replace("]", "")
                                 .replace("\t", " ")));
@@ -299,7 +296,7 @@ public class ReactomeMechismoDataMap {
             fileUtility1.close();
         } catch (IOException ioe) {
             System.out.println(String.format("Couldn't use %s, %s: %s",
-                    outFilePath1.toString(),
+                    outFilePath1,
                     ioe.getMessage(),
                     Arrays.toString(ioe.getStackTrace())));
         }
@@ -314,18 +311,16 @@ public class ReactomeMechismoDataMap {
         try {
             fileUtility2.setOutput(outFilePath2);
             fileUtility2.printLine("Sample Barcode,Num FIs,Mapped FIs");
-            Iterator<Map.Entry<String, Set<String>>> sample2FiItr = samples2FIs.entrySet().iterator();
-            while (sample2FiItr.hasNext()) {
-                Map.Entry<String, Set<String>> pair = sample2FiItr.next();
+            for (Map.Entry<String, Set<String>> pair : samples2FIs.entrySet()) {
                 String sampleBarcode = pair.getKey();
                 Set<String> mappedFis = pair.getValue();
                 fileUtility2.printLine(String.format("%s,%d,%s",
                         sampleBarcode,
                         mappedFis.size(),
                         mappedFis.size() > 1
-                                ? org.gk.util.StringUtils.join(" ",
+                                ? StringUtils.join(" ",
                                 new ArrayList(mappedFis)).replace("\t", " ")
-                                : Arrays.asList(mappedFis).get(0).toString()
+                                : Collections.singletonList(mappedFis).get(0).toString()
                                 .replace("[", "")
                                 .replace("]", "")
                                 .replace("\t", " ")));
@@ -333,7 +328,7 @@ public class ReactomeMechismoDataMap {
             fileUtility2.close();
         } catch (IOException ioe) {
             System.out.println(String.format("Couldn't use %s, %s: %s",
-                    outFilePath2.toString(),
+                    outFilePath2,
                     ioe.getMessage(),
                     Arrays.toString(ioe.getStackTrace())));
         }
@@ -349,18 +344,16 @@ public class ReactomeMechismoDataMap {
         try {
             fileUtility3.setOutput(outFilePath3);
             fileUtility3.printLine("FI,Num Samples,FI Frequency,Mapped Samples");
-            Iterator<Map.Entry<String, Set<String>>> fi2SampleItr = fis2Samples.entrySet().iterator();
-            while (fi2SampleItr.hasNext()) {
-                Map.Entry<String, Set<String>> pair = fi2SampleItr.next();
+            for (Map.Entry<String, Set<String>> pair : fis2Samples.entrySet()) {
                 String fi = pair.getKey();
                 Set<String> mappedSamples = pair.getValue();
                 fileUtility3.printLine(String.format("%s,%d,%f,%s",
                         fi,
                         mappedSamples.size(),
-                        new Double(mappedSamples.size()) /
-                                new Double(samples2FIs.keySet().size()),
+                        (double) mappedSamples.size() /
+                                (double) samples2FIs.keySet().size(),
                         mappedSamples.size() > 1
-                                ? org.gk.util.StringUtils.join(" ",
+                                ? StringUtils.join(" ",
                                 new ArrayList(mappedSamples)).replace(
                                 "\t", " ")
                                 : Arrays.asList(mappedSamples).get(0).toString()
@@ -371,7 +364,7 @@ public class ReactomeMechismoDataMap {
             fileUtility3.close();
         } catch (IOException ioe) {
             System.out.println(String.format("Couldn't use %s, %s: %s",
-                    outFilePath3.toString(),
+                    outFilePath3,
                     ioe.getMessage(),
                     Arrays.toString(ioe.getStackTrace())));
         }
@@ -386,15 +379,13 @@ public class ReactomeMechismoDataMap {
         try {
             fileUtility.setOutput(outFilePath);
             fileUtility.printLine(TargetReactionCandidate.getHeaderLine());
-            Iterator<TargetReactionCandidate> trsItr = targetReactionSummaries.iterator();
-            while (trsItr.hasNext()) {
-                TargetReactionCandidate targetReactionCandidate = trsItr.next();
+            for (TargetReactionCandidate targetReactionCandidate : targetReactionSummaries) {
                 fileUtility.printLine(targetReactionCandidate.toString());
             }
             fileUtility.close();
         } catch (IOException ioe) {
             System.out.println(String.format("Couldn't use %s, %s: %s",
-                    outFilePath.toString(),
+                    outFilePath,
                     ioe.getMessage(),
                     Arrays.toString(ioe.getStackTrace())));
         }

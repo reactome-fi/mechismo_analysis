@@ -976,9 +976,7 @@ public class CancerDriverReactomeAnalyzer {
     private Map<String, String> loadReactionDBIDToName() throws Exception {
         Map<Long, String> longDbIdToName = loadReactionLongDBIDToName();
         Map<String, String> dbIdToName = new HashMap<>();
-        Iterator<Long> longDbIdToNameItr = longDbIdToName.keySet().iterator();
-        while (longDbIdToNameItr.hasNext()) {
-            Long dbId = longDbIdToNameItr.next();
+        for (Long dbId : longDbIdToName.keySet()) {
             dbIdToName.put(dbId.toString(), longDbIdToName.get(dbId));
         }
         if (longDbIdToName.size() != dbIdToName.size()) {

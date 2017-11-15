@@ -28,7 +28,7 @@ public class CooccurrenceResult {
     private Map<Double, Double> pValue2BHAdjustedPValueMap;
     private Map<Double, Double> pValue2EmpiricalPValueMap;
     private Map<Integer, List<List<Patient>>> patientsWith123TMutations;
-    private Set<Reaction> patientCluster0Union;
+    private Map<Integer, Set<Patient>> hashCodeToAgPatients;
 
     public CooccurrenceResult(
             List<Reaction> targetRxns,
@@ -59,6 +59,7 @@ public class CooccurrenceResult {
         this.directMutations = directMutations;
         this.pValues = pValues;
 
+        this.hashCodeToAgPatients = null;
         this.superIndirectMutatedGenes = null;
         this.indirectMutatedGenes = null;
         this.superDirectMutatedGenes = null;
@@ -66,7 +67,6 @@ public class CooccurrenceResult {
         this.pValue2BHAdjustedPValueMap = null;
         this.pValue2EmpiricalPValueMap = null;
         this.patientsWith123TMutations = null;
-        this.patientCluster0Union = null;
     }
 
     private void FillMutatedGeneSets() {
@@ -278,70 +278,151 @@ public class CooccurrenceResult {
         return samplesW2MutatedUpstreamRxns;
     }
 
-    private Integer getRxnDistanceToPatientCluster0Union(Patient patient,
-                                                         ReactomeMechismoDataMap reactomeMechismoDataMap) {
-        if (this.patientCluster0Union == null) {
-            getPatientCluster0Union(reactomeMechismoDataMap);
+    private Integer calculateReactionDistanceBetweenPatients(Patient patient1,
+                                                             Patient patient2,
+                                                             ReactomeMechismoDataMap reactomeMechismoDataMap) {
+
+        Set<Reaction> patient1Rxns = reactomeMechismoDataMap.getReactions(patient1);
+        Set<Reaction> patient2Rxns = reactomeMechismoDataMap.getReactions(patient2);
+
+        if(patient1Rxns != null && patient2Rxns != null) {
+            Set<Reaction> patient1RxnsCpy = new HashSet<>(patient1Rxns);
+            Set<Reaction> patient2RxnsCpy = new HashSet<>(patient2Rxns);
+            patient1RxnsCpy.removeAll(patient2Rxns);
+            Integer patient1OnlyRxns = patient1RxnsCpy.size();
+            patient2RxnsCpy.removeAll(patient1Rxns);
+            Integer patient2OnlyRxns = patient2RxnsCpy.size();
+            return patient1OnlyRxns + patient2OnlyRxns;
         }
-        Set<Reaction> patientReactions = reactomeMechismoDataMap.getReactions(patient);
-
-        if (patientReactions != null) {
-            Set<Reaction> diff1 = new HashSet<>(patientReactions);
-            diff1.removeAll(this.patientCluster0Union);
-
-            Set<Reaction> diff2 = new HashSet<>(this.patientCluster0Union);
-            diff2.removeAll(patientReactions);
-
-            return diff1.size() + diff2.size();
-        } else {
-            return reactomeMechismoDataMap.getSupportedReactions().size();
-        }
+        return reactomeMechismoDataMap.getSupportedReactions().size();
     }
 
-    private Set<Reaction> getPatientCluster0Union(ReactomeMechismoDataMap reactomeMechismoDataMap) {
-        if (this.patientCluster0Union == null) {
-            if (this.patientsWith123TMutations == null) {
-                getPatientsWith123TMutations();
-            }
-            List<List<Patient>> group0 = this.getPatientsWith123TMutations().get(0);
-            Set<Reaction> patientCluster0Union = new HashSet<>();
-            for (List<Patient> patientsInGroup : group0) {
-                for (Patient patient : patientsInGroup) {
-                    patientCluster0Union.addAll(reactomeMechismoDataMap.getReactions(patient));
-                }
-            }
-            this.patientCluster0Union = patientCluster0Union;
+    private Double calculateMeanReactionDistanceToReferencePatients(Patient queryPatient,
+                                                                    Set<Patient> referencePatients,
+                                                                    ReactomeMechismoDataMap reactomeMechismoDataMap) {
+        Integer totalDistance = 0;
+        for (Patient referencePatient : referencePatients) {
+            totalDistance += calculateReactionDistanceBetweenPatients(queryPatient, referencePatient, reactomeMechismoDataMap);
         }
-        return this.patientCluster0Union;
+        return (double) totalDistance / (double) referencePatients.size();
+
     }
 
-    public void writePatientCluster0UnionDistancesToFile(String outputDir,
-                                                         String outputFilePrefix,
-                                                         ReactomeMechismoDataMap reactomeMechismoDataMap) {
-        Map<Patient, Integer> patientToCluster0UnionDistance = new HashMap<>();
-        Set<Patient> patients = reactomeMechismoDataMap.getPatients();
-        Integer sumDistance = 0;
-        Integer numPatients = patients.size();
-        for (Patient patient : patients) {
-            Integer distance = getRxnDistanceToPatientCluster0Union(patient, reactomeMechismoDataMap);
-            sumDistance += distance;
-            patientToCluster0UnionDistance.put(patient,
-                    distance);
-        }
-        Integer meanDistance = sumDistance / numPatients;
+    private Double getMeanDistanceToTClusteredPatients(Patient queryPatient,
+                                                       ReactomeMechismoDataMap reactomeMechismoDataMap) {
+        return calculateMeanReactionDistanceToReferencePatients(queryPatient,
+                aggregateAllPatients(getSamplesWTargetRxnMutations()),
+                reactomeMechismoDataMap);
+    }
 
-        String outFilePath = outputDir + outputFilePrefix + "cluster0UnionDistances.csv";
+    private Double getMeanDistanceTo1ClusteredPatients(Patient queryPatient,
+                                                       ReactomeMechismoDataMap reactomeMechismoDataMap) {
+        return calculateMeanReactionDistanceToReferencePatients(queryPatient,
+                aggregateAllPatients(getSamplesW1MutatedUpstreamRxn()),
+                reactomeMechismoDataMap);
+    }
+
+    private Double getMeanDistanceTo2ClusteredPatients(Patient queryPatient,
+                                                       ReactomeMechismoDataMap reactomeMechismoDataMap) {
+        return calculateMeanReactionDistanceToReferencePatients(queryPatient,
+                aggregateAllPatients(getSamplesW2MutatedUpstreamRxns()),
+                reactomeMechismoDataMap);
+    }
+
+    private Double getMeanDistanceTo3ClusteredPatients(Patient queryPatient,
+                                                       ReactomeMechismoDataMap reactomeMechismoDataMap) {
+        return calculateMeanReactionDistanceToReferencePatients(queryPatient,
+                aggregateAllPatients(getSamplesW3plusMutatedUpstreamRxns()),
+                reactomeMechismoDataMap);
+    }
+
+    private Set<Patient> aggregateAllPatients(List<Set<Patient>> listOfSets) {
+        if(this.hashCodeToAgPatients == null){
+            this.hashCodeToAgPatients = new HashMap<>();
+        }
+        if (!this.hashCodeToAgPatients.containsKey(listOfSets.hashCode())) {
+            Set<Patient> ag = new HashSet<>();
+            for (int i = 0; i < getTargetRxns().size(); i++) {
+                ag.addAll(listOfSets.get(i));
+            }
+            this.hashCodeToAgPatients.put(listOfSets.hashCode(), ag);
+        }
+        return this.hashCodeToAgPatients.get(listOfSets.hashCode());
+    }
+
+    private Double getMeanDistanceToAllClusteredPatients(Patient queryPatient,
+                                                         ReactomeMechismoDataMap reactomeMechismoDataMap) {
+
+        Set<Patient> ag1 = aggregateAllPatients(getSamplesW1MutatedUpstreamRxn());
+        Set<Patient> ag2 = aggregateAllPatients(getSamplesW2MutatedUpstreamRxns());
+        Set<Patient> ag3 = aggregateAllPatients(getSamplesW3plusMutatedUpstreamRxns());
+        Set<Patient> agT = aggregateAllPatients(getSamplesWTargetRxnMutations());
+
+        Double weightedDistance = 0.0d;
+
+        Integer totalSize = ag1.size() +
+                ag2.size() +
+                ag3.size() +
+                agT.size();
+
+        weightedDistance += calculateMeanReactionDistanceToReferencePatients(
+                queryPatient,
+                ag1,
+                reactomeMechismoDataMap) * (double) ag1.size();
+        weightedDistance += calculateMeanReactionDistanceToReferencePatients(
+                queryPatient,
+                ag2,
+                reactomeMechismoDataMap) * (double) ag2.size();
+        weightedDistance += calculateMeanReactionDistanceToReferencePatients(
+                queryPatient,
+                ag3,
+                reactomeMechismoDataMap) * (double) ag3.size();
+        weightedDistance += calculateMeanReactionDistanceToReferencePatients(
+                queryPatient,
+                agT,
+                reactomeMechismoDataMap) * (double) agT.size();
+
+        return weightedDistance / (double) totalSize;
+    }
+
+    public void writePatientDistancesToFile(String outputDir,
+                                            String outputFilePrefix,
+                                            ReactomeMechismoDataMap reactomeMechismoDataMap) {
+        Map<Patient,List<Double>> patientToDistanceList = new HashMap<>();
+
+        Integer patientCounter = 1;
+        for(Patient patient : reactomeMechismoDataMap.getPatients()){
+            List<Double> distanceList = new ArrayList<>();
+            distanceList.add(getMeanDistanceTo1ClusteredPatients(patient,reactomeMechismoDataMap));
+            distanceList.add(getMeanDistanceTo2ClusteredPatients(patient,reactomeMechismoDataMap));
+            distanceList.add(getMeanDistanceTo3ClusteredPatients(patient,reactomeMechismoDataMap));
+            distanceList.add(getMeanDistanceToTClusteredPatients(patient,reactomeMechismoDataMap));
+            distanceList.add(getMeanDistanceToAllClusteredPatients(patient,reactomeMechismoDataMap));
+            patientToDistanceList.put(patient,distanceList);
+
+            patientCounter++;
+            if(patientCounter % 500 == 0){
+                System.out.println(String.format("Calculated %d of %d patient distances...",
+                        patientCounter,
+                        reactomeMechismoDataMap.getPatients().size()));
+            }
+        }
+
+        String outFilePath = outputDir + outputFilePrefix + "patientDistances.csv";
         FileUtility fileUtility = new FileUtility();
         try {
             fileUtility.setOutput(outFilePath);
-            fileUtility.printLine("Patient,Distance");
-            for (Patient patient : patientToCluster0UnionDistance.keySet()) {
-                if (patientToCluster0UnionDistance.get(patient) < meanDistance) {
-                    fileUtility.printLine(String.format("%s,%d",
-                            patient,
-                            patientToCluster0UnionDistance.get(patient)
+            fileUtility.printLine("Patient,Cancer Type,Distance to 1,Distance to 2,Distance to 3,Distance to T,Distance to All");
+            for (Patient patient : patientToDistanceList.keySet()) {
+                    fileUtility.printLine(String.format("%s,%s,%.100e,%.100e,%.100e,%.100e,%.100e",
+                            patient.getTcgaBarcode(),
+                            patient.getCancerType(),
+                            patientToDistanceList.get(patient).get(0),
+                            patientToDistanceList.get(patient).get(1),
+                            patientToDistanceList.get(patient).get(2),
+                            patientToDistanceList.get(patient).get(3),
+                            patientToDistanceList.get(patient).get(4)
                     ));
-                }
             }
             fileUtility.close();
         } catch (IOException ioe) {

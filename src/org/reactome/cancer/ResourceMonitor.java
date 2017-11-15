@@ -17,8 +17,8 @@ public class ResourceMonitor {
         Long endMethodTime = System.currentTimeMillis();
         System.out.println(String.format("Completed after %.2f minutes\n" +
                         "Max memory footprint: %.2f GiB",
-                (endMethodTime - startMethodTime) / 60000.0,
-                maxMemUsed));
+                (endMethodTime - this.startMethodTime) / 60000.0,
+                this.maxMemUsed));
     }
 
     public void StartLoopTimer() {
@@ -31,16 +31,16 @@ public class ResourceMonitor {
                         "Total running time: %.2f minutes\n" +
                         "Max memory footprint: %.2f GiB",
                 iterationName,
-                (endLoopTime - startLoopTime) / 60000.0,
-                (endLoopTime - startMethodTime) / 60000.0,
-                maxMemUsed));
+                (endLoopTime - this.startLoopTime) / 60000.0,
+                (endLoopTime - this.startMethodTime) / 60000.0,
+                this.maxMemUsed));
     }
 
     public void CalculateMemUsed() {
         double curMemUsed = CalculateJavaMemFootprintGiB();
-        maxMemUsed = curMemUsed > maxMemUsed ?
+        this.maxMemUsed = curMemUsed > this.maxMemUsed ?
                 curMemUsed :
-                maxMemUsed;
+                this.maxMemUsed;
     }
 
     private double CalculateJavaMemFootprint() {

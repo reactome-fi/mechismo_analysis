@@ -15,7 +15,6 @@ public class ReactionGraphAnalyzer {
     private Integer depth;
     private FisherExact fisherExact;
     private ReactomeMechismoDataMap reactomeMechismoDataMap;
-    private Set<TargetReactionCandidate> targetReactionCandidates;
     private boolean ignoreDependentUpstreamReactions;
     private boolean ignoreIndependentUpstreamReactions;
     private boolean excludeMultipleImmediateUpstreamReactions;
@@ -27,7 +26,6 @@ public class ReactionGraphAnalyzer {
                                  boolean excludeMultipleImmediateUpstreamReactions) {
         this.depth = depth;
         this.fisherExact = new FisherExact(reactomeMechismoDataMap.getNumPatients());
-        this.targetReactionCandidates = new HashSet<>();
         this.reactomeMechismoDataMap = reactomeMechismoDataMap;
         this.ignoreDependentUpstreamReactions = ignoreDependentUpstreamReactions;
         this.ignoreIndependentUpstreamReactions = ignoreIndependentUpstreamReactions;
@@ -37,20 +35,22 @@ public class ReactionGraphAnalyzer {
     public CooccurrenceResult CalculateCooccurrencePValues(
             DirectedGraph<Long, DefaultEdge> reactionGraph) throws MathException {
 
-        SearchRxnNetworkForTargetReactionCandidates(
+        Set<TargetReactionCandidate> targetReactionCandidates = SearchRxnNetworkForTargetReactionCandidates(
                 reactionGraph);
 
         System.out.println(String.format("Found %d supported Dn/Up reactions",
                 targetReactionCandidates.size()));
 
         return CalculateCooccurrence(
+                targetReactionCandidates,
                 reactionGraph);
     }
 
-    private void SearchRxnNetworkForTargetReactionCandidates(
+    private Set<TargetReactionCandidate> SearchRxnNetworkForTargetReactionCandidates(
             DirectedGraph<Long, DefaultEdge> reactionGraph) {
         Set<DefaultEdge> outgoingEdges = new HashSet<>();
-        Set<Reaction> targetReactionCandidateSet = new HashSet<>();
+        Set<Reaction> downstreamReactions = new HashSet<>();
+        Set<TargetReactionCandidate> targetReactionCandidates = new HashSet<>();
 
         for (Reaction reaction : reactomeMechismoDataMap.getSupportedReactions()) {
             //http://jgrapht.org/javadoc/org/jgrapht/graph/DefaultDirectedGraph.html
@@ -58,23 +58,22 @@ public class ReactionGraphAnalyzer {
             outgoingEdges.addAll(reactionGraph.outgoingEdgesOf(reaction.getReactionID()));
         }
         for (DefaultEdge outgoingEdge : outgoingEdges) {
-            targetReactionCandidateSet.add(
+            downstreamReactions.add(
                     reactomeMechismoDataMap.getReaction(
                             reactionGraph.getEdgeTarget(outgoingEdge)));
         }
-        for (Reaction targetReactionCandidate : targetReactionCandidateSet) {
-            SearchUpstreamReactions(
+        for (Reaction downstreamReaction : downstreamReactions) {
+            targetReactionCandidates.add(CreateTargetReactionCandidate(
                     reactionGraph,
-                    reactionGraph.incomingEdgesOf(targetReactionCandidate.getReactionID()),
-                    targetReactionCandidate);
+                    downstreamReaction));
         }
+        return targetReactionCandidates;
     }
 
-    private void SearchUpstreamReactions(
+    private TargetReactionCandidate CreateTargetReactionCandidate(
             DirectedGraph<Long, DefaultEdge> reactionGraph,
-            Set<DefaultEdge> incomingEdges,
-            Reaction targetReactionCandidate) {
-        Set<DefaultEdge> incomingEdgesCpy = new HashSet<>(incomingEdges);
+            Reaction downstreamReaction) {
+        Set<DefaultEdge> incomingEdgesCpy = new HashSet<>(reactionGraph.incomingEdgesOf(downstreamReaction.getReactionID()));
         Set<Reaction> upstreamReactions = new HashSet<>();
         Set<Reaction> allUpstreamReactions = new HashSet<>();
         List<Set<Reaction>> upstreamReactionsByDepth = new ArrayList<>();
@@ -97,7 +96,7 @@ public class ReactionGraphAnalyzer {
         upstreamReactions.clear();
         upstreamReactionsByDepth.clear();
 
-        allUpstreamReactions.remove(targetReactionCandidate);
+        allUpstreamReactions.remove(downstreamReaction);
 
         //find intersection of upstream reactions and supported reactions
         Set<Reaction> supportedUpstreamReactions = new HashSet<>(allUpstreamReactions);
@@ -106,7 +105,7 @@ public class ReactionGraphAnalyzer {
         //remove upstream reactions directly activated by target
         supportedUpstreamReactions.removeIf(
                 upstreamReaction -> !reactionGraph.getAllEdges(
-                        targetReactionCandidate.getReactionID(),
+                        downstreamReaction.getReactionID(),
                         upstreamReaction.getReactionID()).isEmpty());
 
         Set<FI> supportedFIs = new HashSet<>();
@@ -114,13 +113,14 @@ public class ReactionGraphAnalyzer {
             supportedFIs.addAll(reactomeMechismoDataMap.getFIs(supportedUpstreamReaction));
         }
 
-        targetReactionCandidates.add(new TargetReactionCandidate(
-                targetReactionCandidate,
+        return new TargetReactionCandidate(
+                downstreamReaction,
                 supportedUpstreamReactions,
-                supportedFIs));
+                supportedFIs);
     }
 
     private CooccurrenceResult CalculateCooccurrence(
+            Set<TargetReactionCandidate> targetReactionCandidates,
             DirectedGraph<Long, DefaultEdge> reactionGraph) throws MathException {
 
         List<Reaction> allTargetRxns = new ArrayList<>();
