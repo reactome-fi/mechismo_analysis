@@ -640,7 +640,7 @@ public class MechismoAnalyzer {
                     rewiredReactionGraph.edgeSet().size(),
                     connectivityInspector.connectedSets().size()));
 
-            CooccurrenceResult rewiredNetworkResult = reactionGraphAnalyzer.CalculateCooccurrencePValues(rewiredReactionGraph);
+            CooccurrenceResult rewiredNetworkResult = reactionGraphAnalyzer.SearchRxnNetworkAndCalculateCooccurrencePValues(rewiredReactionGraph);
 
             rewiredNetworkResult.CalculateBHAdjustedPValues();
             rewiredNetworkResult.writeToFile(outputDir, i + 1 + "");
@@ -653,7 +653,7 @@ public class MechismoAnalyzer {
             resourceMonitor.EndLoopTimer(i + 1 + "");//start with iteration '1'
         }
 
-        CooccurrenceResult realResult = reactionGraphAnalyzer.CalculateCooccurrencePValues(reactionGraph);
+        CooccurrenceResult realResult = reactionGraphAnalyzer.SearchRxnNetworkAndCalculateCooccurrencePValues(reactionGraph);
 
         realResult.CalculateBHAdjustedPValues();
         realResult.CalculateEmpiricalPValues(rewiredNetworkResults);

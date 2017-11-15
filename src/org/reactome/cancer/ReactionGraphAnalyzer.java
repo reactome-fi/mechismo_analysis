@@ -32,7 +32,7 @@ public class ReactionGraphAnalyzer {
         this.excludeMultipleImmediateUpstreamReactions = excludeMultipleImmediateUpstreamReactions;
     }
 
-    public CooccurrenceResult CalculateCooccurrencePValues(
+    public CooccurrenceResult SearchRxnNetworkAndCalculateCooccurrencePValues(
             DirectedGraph<Long, DefaultEdge> reactionGraph) throws MathException {
 
         Set<TargetReactionCandidate> targetReactionCandidates = SearchRxnNetworkForTargetReactionCandidates(
@@ -41,7 +41,7 @@ public class ReactionGraphAnalyzer {
         System.out.println(String.format("Found %d supported Dn/Up reactions",
                 targetReactionCandidates.size()));
 
-        return CalculateCooccurrence(
+        return CalculateCooccurrencePValues(
                 targetReactionCandidates,
                 reactionGraph);
     }
@@ -119,7 +119,7 @@ public class ReactionGraphAnalyzer {
                 supportedFIs);
     }
 
-    private CooccurrenceResult CalculateCooccurrence(
+    private CooccurrenceResult CalculateCooccurrencePValues(
             Set<TargetReactionCandidate> targetReactionCandidates,
             DirectedGraph<Long, DefaultEdge> reactionGraph) throws MathException {
 
@@ -154,6 +154,7 @@ public class ReactionGraphAnalyzer {
             Set<Mutation> targetSuperDirectMutations = new HashSet<>();
             Set<Mutation> targetDirectMutations = new HashSet<>();
             List<Double> targetUpstreamReactionPValues = new ArrayList<>();
+            List<List<Double>> targetUpstreamReactionABCDs = new ArrayList<>();
 
             if (!targetUpstreamReactionPairs.isEmpty()) {
                 boolean targetReactionDetected = false;
@@ -291,6 +292,12 @@ public class ReactionGraphAnalyzer {
                                                 B.size(),
                                                 C.size(),
                                                 D.size())));
+                        List<Double> abcds = new ArrayList<>();
+                        abcds.add((double) A.size());
+                        abcds.add((double) B.size());
+                        abcds.add((double) C.size());
+                        abcds.add((double) D.size());
+                        targetUpstreamReactionABCDs.add(abcds);
                     }
                 }
 
@@ -326,6 +333,16 @@ public class ReactionGraphAnalyzer {
 
                     targetSuperIndirectMutations.removeAll(targetSuperDirectMutations);
 
+                    Double combinedPValue;
+                    if(targetUpstreamReactionABCDs.size() > 1){
+                        combinedPValue = MathUtilities.calculatePValuesWithEmpiricalBrownsMethod(
+                                targetUpstreamReactionABCDs,
+                                targetUpstreamReactionPValues);
+                    }else{
+                        combinedPValue = MathUtilities.combinePValuesWithFisherMethod(
+                                targetUpstreamReactionPValues);
+                    }
+
                     allTargetRxns.add(targetRxn);
                     allCooccurringUpstreamRxns.add(targetCooccurringUpstreamRxns);
                     allCooccurringUpstreamReactionFIs.add(targetCooccurringUpstreamReactionFIs);
@@ -338,10 +355,7 @@ public class ReactionGraphAnalyzer {
                     allIndirectMutations.add(targetIndirectMutations);
                     allSuperDirectMutations.add(targetSuperDirectMutations);
                     allDirectMutations.add(targetDirectMutations);
-                    allPValues.add(
-                            MathUtilities.boundDouble01(
-                                    MathUtilities.combinePValuesWithFisherMethod(
-                                            targetUpstreamReactionPValues)));
+                    allPValues.add(MathUtilities.boundDouble01(combinedPValue));
                 }
             }
 

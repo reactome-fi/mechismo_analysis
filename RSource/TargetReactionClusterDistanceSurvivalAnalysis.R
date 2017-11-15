@@ -7,21 +7,22 @@ library(stringr)
 library(qvalue)
 
 P_VAL_THRESH <- 0.05
+M_MULT <- 1 #increase this to grab more nearby? patients
 
 # Use this function to create a data frame for survival analysis
 create.survival.data <- function(cancer.dist.df,
                                  cancer.clin.df) {
   
   lt.median.1 <- cancer.dist.df %>%
-    dplyr::filter(`Distance to 1` < median(cancer.dist.df$`Distance to 1`))
+    dplyr::filter(`Distance to 1` < M_MULT * median(cancer.dist.df$`Distance to 1`))
   lt.median.2 <- cancer.dist.df %>%
-    dplyr::filter(`Distance to 2` < median(cancer.dist.df$`Distance to 2`))
+    dplyr::filter(`Distance to 2` < M_MULT * median(cancer.dist.df$`Distance to 2`))
   lt.median.3 <- cancer.dist.df %>%
-  dplyr::filter(`Distance to 3` < median(cancer.dist.df$`Distance to 3`))
+  dplyr::filter(`Distance to 3` < M_MULT * median(cancer.dist.df$`Distance to 3`))
   lt.median.T <- cancer.dist.df %>%
-    dplyr::filter(`Distance to T` < median(cancer.dist.df$`Distance to T`))
+    dplyr::filter(`Distance to T` < M_MULT * median(cancer.dist.df$`Distance to T`))
   lt.median.All <- cancer.dist.df %>%
-    dplyr::filter(`Distance to All` < median(cancer.dist.df$`Distance to All`))
+    dplyr::filter(`Distance to All` < M_MULT * median(cancer.dist.df$`Distance to All`))
   
   cancer.clin.df %>%
     dplyr::rowwise() %>%

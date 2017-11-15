@@ -4,18 +4,9 @@
  */
 package org.reactome.r3.util;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import org.apache.commons.math.MathException;
-import org.apache.commons.math.distribution.ChiSquaredDistribution;
-import org.apache.commons.math.distribution.ChiSquaredDistributionImpl;
 import org.apache.commons.math.distribution.HypergeometricDistribution;
 import org.apache.commons.math.distribution.HypergeometricDistributionImpl;
 import org.apache.commons.math.linear.Array2DRowRealMatrix;
@@ -24,7 +15,13 @@ import org.apache.commons.math.random.RandomDataImpl;
 import org.apache.commons.math.stat.correlation.PearsonsCorrelation;
 import org.apache.commons.math.stat.correlation.SpearmansCorrelation;
 import org.apache.commons.math.stat.inference.TestUtils;
+import org.apache.commons.math3.linear.RealMatrix;
+import org.apache.commons.math3.random.EmpiricalDistribution;
 import org.apache.commons.math3.random.RandomDataGenerator;
+import org.apache.commons.math3.stat.correlation.Covariance;
+import org.apache.commons.math3.stat.descriptive.SummaryStatistics;
+import org.apache.commons.math3.distribution.ChiSquaredDistribution;
+import org.jgap.gp.function.Exp;
 import org.junit.Test;
 
 import cern.jet.random.Binomial;
@@ -516,6 +513,78 @@ public class MathUtilities {
                 : val);
     }
 
+    //from https://github.com/IlyaLab/CombiningDependentPvaluesUsingEBM/blob/master/Python/EmpiricalBrownsMethod.py
+    /*
+    Input: An m x n data matrix with each of m rows representing a variable and each of n columns representing a sample. Should be of type numpy.array
+           A vector of m P-values to combine. May be a list or of type numpy.array.
+    Output: A combined P-value using the Empirical Brown's Method (EBM).
+            If extra_info == True: also returns the p-value from Fisher's method, the scale factor c, and the new degrees of freedom from Brown's Method
+     */
+    public static Double calculatePValuesWithEmpiricalBrownsMethod(List<List<Double>> matrix, List<Double> pvalues){
+        RealMatrix covarianceMatrix = calculateCovariances(matrix);
+        return combinePValuesWithEBM(covarianceMatrix,pvalues);
+    }
+
+    private static Double combinePValuesWithEBM(RealMatrix covarianceMatrix,List<Double> pvalues){
+        Integer m = covarianceMatrix.getRowDimension();
+        Integer n = covarianceMatrix.getColumnDimension();
+        Double df_fisher = 2.0d*m;
+        Double Expected = 2.0d*m;
+        Double cov_sum = 0.0d;
+        for(int i = 0; i < m; i++){
+            for(int j = 0; j < n; j++){
+                cov_sum += covarianceMatrix.getEntry(i,j);
+            }
+        }
+        Double Var = 4.0d*m+2.0d*cov_sum;
+        Double c = Var/(2.0d*Expected);
+        Double df_brown = 2.0d*Math.pow(Expected,2.0d)/Var;
+        if(df_brown > df_fisher){
+            df_brown = df_fisher;
+            c = 1.0d;
+        }
+        Double sum_nlog_pvalues = 0.0;
+        for(Double pvalue : pvalues){
+            sum_nlog_pvalues-=Math.log(pvalue);
+        }
+        Double x = 2.0d*sum_nlog_pvalues;
+        ChiSquaredDistribution chiSquaredDistributionBrown = new ChiSquaredDistribution(df_brown);
+        return 1.0d - chiSquaredDistributionBrown.cumulativeProbability(1.0d*x/c);
+    }
+
+    private static double[][] transformMatrix(List<List<Double>> matrix){
+        double[][] transformedMatrix = new double[matrix.size()][matrix.get(0).size()];
+        for(int i = 0; i < matrix.size(); i++){
+            List<Double> vector = matrix.get(i);
+            double[] transformedVector = new double[vector.size()];
+            double[] sVector = new double[vector.size()];
+            SummaryStatistics vectorSummary = new SummaryStatistics();
+            for(Double element : vector){
+                vectorSummary.addValue(element);
+            }
+            Double mean = vectorSummary.getMean();
+            Double std = vectorSummary.getStandardDeviation();
+            for(int j = 0; j < vector.size(); j++){
+                Double element = vector.get(j);
+               sVector[j] = (element - mean)/std;
+            }
+            EmpiricalDistribution empiricalDistribution = new EmpiricalDistribution();
+            empiricalDistribution.load(sVector);
+            for(int k = 0; k< vector.size(); k++){
+                Double element = vector.get(k);
+                transformedVector[k] = -2*Math.log(empiricalDistribution.cumulativeProbability(element)); //TODO: is this right? multiply by cumulative probability?
+            }
+            transformedMatrix[i] = transformedVector;
+        }
+        return transformedMatrix;
+    }
+
+    private static RealMatrix calculateCovariances(List<List<Double>> matrix){
+        double[][] transformedMatrix = transformMatrix(matrix);
+        Covariance covarianceMatrix = new Covariance(transformedMatrix);
+        return covarianceMatrix.getCovarianceMatrix();
+    }
+
     /**
      * This method is used to combine a collection of pvalues using Fisher's method.
      * (see http://en.wikipedia.org/wiki/Fisher's_method).
@@ -534,7 +603,7 @@ public class MathUtilities {
             total += Math.log(pvalue);
         }
         total *= -2.0d;
-        ChiSquaredDistribution distribution = new ChiSquaredDistributionImpl(2 * pvalues.size());
+        ChiSquaredDistribution distribution = new ChiSquaredDistribution(2 * pvalues.size());
         return 1.0d - distribution.cumulativeProbability(total);
     }
     
@@ -550,7 +619,7 @@ public class MathUtilities {
         double yatesCorrection = Math.min(0.50d,  diff);
         double chisqr = (diff - yatesCorrection) * (diff - yatesCorrection) / (sampleSize * proportation * (1.0d - proportation));
         // Calculate chisq pvalues
-        ChiSquaredDistribution distribution = new ChiSquaredDistributionImpl(1);
+        ChiSquaredDistribution distribution = new ChiSquaredDistribution(1);
         return 1.0d - distribution.cumulativeProbability(chisqr);
     }
     
