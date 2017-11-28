@@ -644,7 +644,7 @@ public class MechismoAnalyzer {
             CooccurrenceResult rewiredNetworkResult = reactionGraphAnalyzer.SearchRxnNetworkAndCalculateCooccurrencePValues(rewiredReactionGraph);
 
             rewiredNetworkResult.CalculateBHAdjustedPValues();
-            rewiredNetworkResult.writeToFile(outputDir, "RandomRewiring_" + i + 1 + "_");
+            rewiredNetworkResult.writeToFile(outputDir, "RandomRewiring_" + (i + 1) + "_");
 
             resourceMonitor.CalculateMemUsed();
 

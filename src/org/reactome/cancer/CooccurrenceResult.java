@@ -5,7 +5,6 @@ import org.reactome.r3.util.MathUtilities;
 
 import java.io.IOException;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicReference;
 
 public class CooccurrenceResult {
     private final Double MAX_CLUSTER_EMPIRICAL_P_VALUE = 0.01;
@@ -275,31 +274,48 @@ public class CooccurrenceResult {
         Set<Patient> ag3 = aggregateAllPatients(samplesW3plusMutatedUpstreamRxns);
         Set<Patient> agT = aggregateAllPatients(samplesWTargetRxnMutations);
 
-        Double weightedDistance = 0.0d;
-
         Integer totalSize = ag1.size() +
                 ag2.size() +
                 ag3.size() +
                 agT.size();
 
-        weightedDistance += calculateMeanReactionDistanceToReferencePatients(
+        Double ag1d = calculateMeanReactionDistanceToReferencePatients(
                 queryPatient,
                 ag1,
                 reactomeMechismoDataMap) * (double) ag1.size();
-        weightedDistance += calculateMeanReactionDistanceToReferencePatients(
+        Double ag2d = calculateMeanReactionDistanceToReferencePatients(
                 queryPatient,
                 ag2,
                 reactomeMechismoDataMap) * (double) ag2.size();
-        weightedDistance += calculateMeanReactionDistanceToReferencePatients(
+        Double ag3d = calculateMeanReactionDistanceToReferencePatients(
                 queryPatient,
                 ag3,
                 reactomeMechismoDataMap) * (double) ag3.size();
-        weightedDistance += calculateMeanReactionDistanceToReferencePatients(
+        Double agTd = calculateMeanReactionDistanceToReferencePatients(
                 queryPatient,
                 agT,
                 reactomeMechismoDataMap) * (double) agT.size();
 
-        return weightedDistance / (double) totalSize;
+        ag1d = ag1d.isNaN()
+                ? 0.0d
+                : ag1d;
+        ag2d = ag2d.isNaN()
+                ? 0.0d
+                : ag2d;
+        ag3d = ag3d.isNaN()
+                ? 0.0d
+                : ag3d;
+        agTd = agTd.isNaN()
+                ? 0.0d
+                : agTd;
+
+        Double ret = (ag1d + ag2d + ag3d + agTd) / (double) totalSize;
+
+        if(ret.isNaN()){
+            int debug = 1;
+        }
+
+        return ret;
     }
 
     private Double getMeanDistanceToTargetReactionGroupAllClusteredPatients(Patient queryPatient,
@@ -311,31 +327,48 @@ public class CooccurrenceResult {
         Collection<Patient> ag3 = referencePatients.get(2);
         Collection<Patient> agT = referencePatients.get(3);
 
-        AtomicReference<Double> weightedDistance = new AtomicReference<>(0.0d);
-
         Integer totalSize = ag1.size() +
                 ag2.size() +
                 ag3.size() +
                 agT.size();
 
-        weightedDistance.updateAndGet(v -> v + calculateMeanReactionDistanceToReferencePatients(
+        Double ag1d = calculateMeanReactionDistanceToReferencePatients(
                 queryPatient,
                 ag1,
-                reactomeMechismoDataMap) * (double) ag1.size());
-        weightedDistance.updateAndGet(v -> v + calculateMeanReactionDistanceToReferencePatients(
+                reactomeMechismoDataMap) * (double) ag1.size();
+        Double ag2d = calculateMeanReactionDistanceToReferencePatients(
                 queryPatient,
                 ag2,
-                reactomeMechismoDataMap) * (double) ag2.size());
-        weightedDistance.updateAndGet(v -> v + calculateMeanReactionDistanceToReferencePatients(
+                reactomeMechismoDataMap) * (double) ag2.size();
+        Double ag3d = calculateMeanReactionDistanceToReferencePatients(
                 queryPatient,
                 ag3,
-                reactomeMechismoDataMap) * (double) ag3.size());
-        weightedDistance.updateAndGet(v -> v + calculateMeanReactionDistanceToReferencePatients(
+                reactomeMechismoDataMap) * (double) ag3.size();
+        Double agTd = calculateMeanReactionDistanceToReferencePatients(
                 queryPatient,
                 agT,
-                reactomeMechismoDataMap) * (double) agT.size());
+                reactomeMechismoDataMap) * (double) agT.size();
 
-        return weightedDistance.get() / (double) totalSize;
+        ag1d = ag1d.isNaN()
+                ? 0.0d
+                : ag1d;
+        ag2d = ag2d.isNaN()
+                ? 0.0d
+                : ag2d;
+        ag3d = ag3d.isNaN()
+                ? 0.0d
+                : ag3d;
+        agTd = agTd.isNaN()
+                ? 0.0d
+                : agTd;
+
+        Double ret = (ag1d + ag2d + ag3d + agTd) / (double) totalSize;
+
+        if(ret.isNaN()){
+            int debug = 1;
+        }
+
+        return ret;
     }
 
     public void writePatientDistancesToFile(String outputDir,
@@ -344,6 +377,8 @@ public class CooccurrenceResult {
         Map<Patient, List<Double>> patientToDistanceList = new HashMap<>();
         Map<Patient, List<Double>> patientToMembershipList = new HashMap<>();
         Map<Integer, List<List<Patient>>> targetReactionGroupClusters = getPatientsWith123TMutations();
+        List<Integer> orderedClusterIDs = new ArrayList<>(targetReactionGroupClusters.keySet());
+        Collections.sort(orderedClusterIDs);
 
         Integer patientCounter = 1;
         for (Patient patient : reactomeMechismoDataMap.getPatients()) {
@@ -382,7 +417,7 @@ public class CooccurrenceResult {
                     : 0.0d);
 
             //each Target Reaction Group
-            for (Integer clusterID : targetReactionGroupClusters.keySet()) {
+            for (Integer clusterID : orderedClusterIDs) {
                 //TARGET REACTION GROUP DISTANCES
                 distanceList.add(calculateMeanReactionDistanceToReferencePatients(patient,
                         targetReactionGroupClusters.get(clusterID).get(0),
@@ -436,24 +471,31 @@ public class CooccurrenceResult {
                     "Distance to Samples with 2 Mutated Upstream Reactions (all TRGs)," +
                     "Distance to Samples with 3+ Mutated Upstream Reactions (all TRGs)," +
                     "Distance to Samples with Mutated Target Reaction (all TRGs)," +
-                    "Distance to Samples with 123T Mutated Reactions (all TRGs)," +
-                    "Has 1 Mutated Upstream Reaction (all TRGs)," +
-                    "Has 2 Mutated Upstream Reactions (all TRGs)," +
-                    "Has 3+ Mutated Upstream Reactions (all TRGs)," +
-                    "Has Mutated Target Reaction (all TRGs),");
+                    "Distance to Samples with 123T Mutated Reactions (all TRGs),");
 
-            for(Integer clusterID : targetReactionGroupClusters.keySet()){
+            for(Integer clusterID : orderedClusterIDs){
              headerLine.append(String.format("Distance to Samples with 1 Mutated Upstream Reaction (TRG %1$d)," +
                              "Distance to Samples with 2 Mutated Upstream Reactions (TRG %1$d)," +
                              "Distance to Samples with 3+ Mutated Upstream Reactions (TRG %1$d)," +
                              "Distance to Samples with Mutated Target Reaction (TRG %1$d)," +
-                             "Distance to Samples with 123T Mutated Reactions (TRG %1$d)," +
-                             "Has 1 Mutated Upstream Reaction (TRG %1$d)," +
-                             "Has 2 Mutated Upstream Reactions (TRG %1$d)," +
-                             "Has 3+ Mutated Upstream Reactions (TRG %1$d)," +
-                             "Has Mutated Target Reaction (TRG %1$d),",
+                             "Distance to Samples with 123T Mutated Reactions (TRG %1$d),",
                      clusterID));
             }
+
+            headerLine.append("Has 1 Mutated Upstream Reaction (all TRGs)," +
+                    "Has 2 Mutated Upstream Reactions (all TRGs)," +
+                    "Has 3+ Mutated Upstream Reactions (all TRGs)," +
+                    "Has Mutated Target Reaction (all TRGs),");
+
+            for(Integer clusterID : orderedClusterIDs){
+
+                headerLine.append(String.format("Has 1 Mutated Upstream Reaction (TRG %1$d)," +
+                        "Has 2 Mutated Upstream Reactions (TRG %1$d)," +
+                        "Has 3+ Mutated Upstream Reactions (TRG %1$d)," +
+                        "Has Mutated Target Reaction (TRG %1$d),",
+                        clusterID));
+            }
+
             headerLine = new StringBuilder(headerLine.substring(0, headerLine.length() - 1));//remove trailing ','
 
             fileUtility.printLine(headerLine.toString());
