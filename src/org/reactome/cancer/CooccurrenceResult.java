@@ -5,9 +5,10 @@ import org.reactome.r3.util.MathUtilities;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class CooccurrenceResult {
-    private final Double MAX_CLUSTER_EMPIRICAL_P_VALUE = 0.05;
+    private final Double MAX_CLUSTER_EMPIRICAL_P_VALUE = 0.01;
     private List<Reaction> targetRxns;
     private List<Set<Reaction>> cooccurringUpstreamRxns;
     private List<Set<FI>> cooccurringUpstreamRxnFIs;
@@ -222,62 +223,6 @@ public class CooccurrenceResult {
         System.gc();
     }
 
-    private List<Double> getpValues() {
-        return pValues;
-    }
-
-    private List<Set<FI>> getCooccurringUpstreamRxnFIs() {
-        return cooccurringUpstreamRxnFIs;
-    }
-
-    private List<Reaction> getTargetRxns() {
-        return targetRxns;
-    }
-
-    private List<Set<Reaction>> getCooccurringUpstreamRxns() {
-        return cooccurringUpstreamRxns;
-    }
-
-    private Map<Double, Double> getpValue2BHAdjustedPValueMap() {
-        return pValue2BHAdjustedPValueMap;
-    }
-
-    private Map<Double, Double> getpValue2EmpiricalPValueMap() {
-        return pValue2EmpiricalPValueMap;
-    }
-
-    private List<Integer> getNumSamplesW0MutatedUpstreamRxns() {
-        return numSamplesW0MutatedUpstreamRxns;
-    }
-
-    private List<Set<Patient>> getSamplesW1MutatedUpstreamRxn() {
-        return samplesW1MutatedUpstreamRxn;
-    }
-
-    private List<Set<Patient>> getSamplesW3plusMutatedUpstreamRxns() {
-        return samplesW3plusMutatedUpstreamRxns;
-    }
-
-    private List<Set<Mutation>> getSuperIndirectMutations() {
-        return superIndirectMutations;
-    }
-
-    private List<Set<Mutation>> getIndirectMutations() {
-        return indirectMutations;
-    }
-
-    private List<Set<Mutation>> getSuperDirectMutations() {
-        return superDirectMutations;
-    }
-
-    private List<Set<Mutation>> getDirectMutations() {
-        return directMutations;
-    }
-
-    private List<Set<Patient>> getSamplesW2MutatedUpstreamRxns() {
-        return samplesW2MutatedUpstreamRxns;
-    }
-
     private Integer calculateReactionDistanceBetweenPatients(Patient patient1,
                                                              Patient patient2,
                                                              ReactomeMechismoDataMap reactomeMechismoDataMap) {
@@ -285,7 +230,7 @@ public class CooccurrenceResult {
         Set<Reaction> patient1Rxns = reactomeMechismoDataMap.getReactions(patient1);
         Set<Reaction> patient2Rxns = reactomeMechismoDataMap.getReactions(patient2);
 
-        if(patient1Rxns != null && patient2Rxns != null) {
+        if (patient1Rxns != null && patient2Rxns != null) {
             Set<Reaction> patient1RxnsCpy = new HashSet<>(patient1Rxns);
             Set<Reaction> patient2RxnsCpy = new HashSet<>(patient2Rxns);
             patient1RxnsCpy.removeAll(patient2Rxns);
@@ -298,7 +243,7 @@ public class CooccurrenceResult {
     }
 
     private Double calculateMeanReactionDistanceToReferencePatients(Patient queryPatient,
-                                                                    Set<Patient> referencePatients,
+                                                                    Collection<Patient> referencePatients,
                                                                     ReactomeMechismoDataMap reactomeMechismoDataMap) {
         Integer totalDistance = 0;
         for (Patient referencePatient : referencePatients) {
@@ -308,41 +253,13 @@ public class CooccurrenceResult {
 
     }
 
-    private Double getMeanDistanceToTClusteredPatients(Patient queryPatient,
-                                                       ReactomeMechismoDataMap reactomeMechismoDataMap) {
-        return calculateMeanReactionDistanceToReferencePatients(queryPatient,
-                aggregateAllPatients(getSamplesWTargetRxnMutations()),
-                reactomeMechismoDataMap);
-    }
-
-    private Double getMeanDistanceTo1ClusteredPatients(Patient queryPatient,
-                                                       ReactomeMechismoDataMap reactomeMechismoDataMap) {
-        return calculateMeanReactionDistanceToReferencePatients(queryPatient,
-                aggregateAllPatients(getSamplesW1MutatedUpstreamRxn()),
-                reactomeMechismoDataMap);
-    }
-
-    private Double getMeanDistanceTo2ClusteredPatients(Patient queryPatient,
-                                                       ReactomeMechismoDataMap reactomeMechismoDataMap) {
-        return calculateMeanReactionDistanceToReferencePatients(queryPatient,
-                aggregateAllPatients(getSamplesW2MutatedUpstreamRxns()),
-                reactomeMechismoDataMap);
-    }
-
-    private Double getMeanDistanceTo3ClusteredPatients(Patient queryPatient,
-                                                       ReactomeMechismoDataMap reactomeMechismoDataMap) {
-        return calculateMeanReactionDistanceToReferencePatients(queryPatient,
-                aggregateAllPatients(getSamplesW3plusMutatedUpstreamRxns()),
-                reactomeMechismoDataMap);
-    }
-
     private Set<Patient> aggregateAllPatients(List<Set<Patient>> listOfSets) {
-        if(this.hashCodeToAgPatients == null){
+        if (this.hashCodeToAgPatients == null) {
             this.hashCodeToAgPatients = new HashMap<>();
         }
         if (!this.hashCodeToAgPatients.containsKey(listOfSets.hashCode())) {
             Set<Patient> ag = new HashSet<>();
-            for (int i = 0; i < getTargetRxns().size(); i++) {
+            for (int i = 0; i < targetRxns.size(); i++) {
                 ag.addAll(listOfSets.get(i));
             }
             this.hashCodeToAgPatients.put(listOfSets.hashCode(), ag);
@@ -353,10 +270,10 @@ public class CooccurrenceResult {
     private Double getMeanDistanceToAllClusteredPatients(Patient queryPatient,
                                                          ReactomeMechismoDataMap reactomeMechismoDataMap) {
 
-        Set<Patient> ag1 = aggregateAllPatients(getSamplesW1MutatedUpstreamRxn());
-        Set<Patient> ag2 = aggregateAllPatients(getSamplesW2MutatedUpstreamRxns());
-        Set<Patient> ag3 = aggregateAllPatients(getSamplesW3plusMutatedUpstreamRxns());
-        Set<Patient> agT = aggregateAllPatients(getSamplesWTargetRxnMutations());
+        Set<Patient> ag1 = aggregateAllPatients(samplesW1MutatedUpstreamRxn);
+        Set<Patient> ag2 = aggregateAllPatients(samplesW2MutatedUpstreamRxns);
+        Set<Patient> ag3 = aggregateAllPatients(samplesW3plusMutatedUpstreamRxns);
+        Set<Patient> agT = aggregateAllPatients(samplesWTargetRxnMutations);
 
         Double weightedDistance = 0.0d;
 
@@ -385,44 +302,178 @@ public class CooccurrenceResult {
         return weightedDistance / (double) totalSize;
     }
 
+    private Double getMeanDistanceToTargetReactionGroupAllClusteredPatients(Patient queryPatient,
+                                                                            ReactomeMechismoDataMap reactomeMechismoDataMap,
+                                                                            List<List<Patient>> referencePatients) {
+
+        Collection<Patient> ag1 = referencePatients.get(0);
+        Collection<Patient> ag2 = referencePatients.get(1);
+        Collection<Patient> ag3 = referencePatients.get(2);
+        Collection<Patient> agT = referencePatients.get(3);
+
+        AtomicReference<Double> weightedDistance = new AtomicReference<>(0.0d);
+
+        Integer totalSize = ag1.size() +
+                ag2.size() +
+                ag3.size() +
+                agT.size();
+
+        weightedDistance.updateAndGet(v -> v + calculateMeanReactionDistanceToReferencePatients(
+                queryPatient,
+                ag1,
+                reactomeMechismoDataMap) * (double) ag1.size());
+        weightedDistance.updateAndGet(v -> v + calculateMeanReactionDistanceToReferencePatients(
+                queryPatient,
+                ag2,
+                reactomeMechismoDataMap) * (double) ag2.size());
+        weightedDistance.updateAndGet(v -> v + calculateMeanReactionDistanceToReferencePatients(
+                queryPatient,
+                ag3,
+                reactomeMechismoDataMap) * (double) ag3.size());
+        weightedDistance.updateAndGet(v -> v + calculateMeanReactionDistanceToReferencePatients(
+                queryPatient,
+                agT,
+                reactomeMechismoDataMap) * (double) agT.size());
+
+        return weightedDistance.get() / (double) totalSize;
+    }
+
     public void writePatientDistancesToFile(String outputDir,
                                             String outputFilePrefix,
                                             ReactomeMechismoDataMap reactomeMechismoDataMap) {
-        Map<Patient,List<Double>> patientToDistanceList = new HashMap<>();
+        Map<Patient, List<Double>> patientToDistanceList = new HashMap<>();
+        Map<Patient, List<Double>> patientToMembershipList = new HashMap<>();
+        Map<Integer, List<List<Patient>>> targetReactionGroupClusters = getPatientsWith123TMutations();
 
         Integer patientCounter = 1;
-        for(Patient patient : reactomeMechismoDataMap.getPatients()){
+        for (Patient patient : reactomeMechismoDataMap.getPatients()) {
             List<Double> distanceList = new ArrayList<>();
-            distanceList.add(getMeanDistanceTo1ClusteredPatients(patient,reactomeMechismoDataMap));
-            distanceList.add(getMeanDistanceTo2ClusteredPatients(patient,reactomeMechismoDataMap));
-            distanceList.add(getMeanDistanceTo3ClusteredPatients(patient,reactomeMechismoDataMap));
-            distanceList.add(getMeanDistanceToTClusteredPatients(patient,reactomeMechismoDataMap));
-            distanceList.add(getMeanDistanceToAllClusteredPatients(patient,reactomeMechismoDataMap));
-            patientToDistanceList.put(patient,distanceList);
+            List<Double> membershipList = new ArrayList<>();
+
+            //all Target Reaction Groups
+
+            //TARGET REACTION GROUP DISTANCES
+            distanceList.add(calculateMeanReactionDistanceToReferencePatients(patient,
+                    aggregateAllPatients(samplesW1MutatedUpstreamRxn),
+                    reactomeMechismoDataMap));
+            distanceList.add(calculateMeanReactionDistanceToReferencePatients(patient,
+                    aggregateAllPatients(samplesW2MutatedUpstreamRxns),
+                    reactomeMechismoDataMap));
+            distanceList.add(calculateMeanReactionDistanceToReferencePatients(patient,
+                    aggregateAllPatients(samplesW3plusMutatedUpstreamRxns),
+                    reactomeMechismoDataMap));
+            distanceList.add(calculateMeanReactionDistanceToReferencePatients(patient,
+                    aggregateAllPatients(samplesWTargetRxnMutations),
+                    reactomeMechismoDataMap));
+            distanceList.add(getMeanDistanceToAllClusteredPatients(patient, reactomeMechismoDataMap));
+
+            //TARGET REACTION GROUP MEMBERSHIP
+            membershipList.add(aggregateAllPatients(samplesW1MutatedUpstreamRxn).contains(patient)
+                    ? 1.0d
+                    : 0.0d);
+            membershipList.add(aggregateAllPatients(samplesW2MutatedUpstreamRxns).contains(patient)
+                    ? 1.0d
+                    : 0.0d);
+            membershipList.add(aggregateAllPatients(samplesW3plusMutatedUpstreamRxns).contains(patient)
+                    ? 1.0d
+                    : 0.0d);
+            membershipList.add(aggregateAllPatients(samplesWTargetRxnMutations).contains(patient)
+                    ? 1.0d
+                    : 0.0d);
+
+            //each Target Reaction Group
+            for (Integer clusterID : targetReactionGroupClusters.keySet()) {
+                //TARGET REACTION GROUP DISTANCES
+                distanceList.add(calculateMeanReactionDistanceToReferencePatients(patient,
+                        targetReactionGroupClusters.get(clusterID).get(0),
+                        reactomeMechismoDataMap));
+                distanceList.add(calculateMeanReactionDistanceToReferencePatients(patient,
+                        targetReactionGroupClusters.get(clusterID).get(1),
+                        reactomeMechismoDataMap));
+                distanceList.add(calculateMeanReactionDistanceToReferencePatients(patient,
+                        targetReactionGroupClusters.get(clusterID).get(2),
+                        reactomeMechismoDataMap));
+                distanceList.add(calculateMeanReactionDistanceToReferencePatients(patient,
+                        targetReactionGroupClusters.get(clusterID).get(3),
+                        reactomeMechismoDataMap));
+                distanceList.add(getMeanDistanceToTargetReactionGroupAllClusteredPatients(patient,
+                        reactomeMechismoDataMap,
+                        targetReactionGroupClusters.get(clusterID)));
+
+                //TARGET REACTION GROUP MEMBERSHIP
+                membershipList.add(targetReactionGroupClusters.get(clusterID).get(0).contains(patient)
+                        ? 1.0d
+                        : 0.0d);
+                membershipList.add(targetReactionGroupClusters.get(clusterID).get(1).contains(patient)
+                        ? 1.0d
+                        : 0.0d);
+                membershipList.add(targetReactionGroupClusters.get(clusterID).get(2).contains(patient)
+                        ? 1.0d
+                        : 0.0d);
+                membershipList.add(targetReactionGroupClusters.get(clusterID).get(3).contains(patient)
+                        ? 1.0d
+                        : 0.0d);
+            }
+
+            patientToDistanceList.put(patient, distanceList);
+            patientToMembershipList.put(patient, membershipList);
+
 
             patientCounter++;
-            if(patientCounter % 500 == 0){
+            if (patientCounter % 500 == 0) {
                 System.out.println(String.format("Calculated %d of %d patient distances...",
                         patientCounter,
                         reactomeMechismoDataMap.getPatients().size()));
             }
         }
 
-        String outFilePath = outputDir + outputFilePrefix + "patientDistances.csv";
+        String outFilePath = outputDir + outputFilePrefix + "TargetReactionGroupPatientDistances.csv";
         FileUtility fileUtility = new FileUtility();
         try {
             fileUtility.setOutput(outFilePath);
-            fileUtility.printLine("Patient,Cancer Type,Distance to 1,Distance to 2,Distance to 3,Distance to T,Distance to All");
+            StringBuilder headerLine = new StringBuilder("Patient Barcode,Cancer Type,");
+            headerLine.append("Distance to Samples with 1 Mutated Upstream Reaction (all TRGs)," +
+                    "Distance to Samples with 2 Mutated Upstream Reactions (all TRGs)," +
+                    "Distance to Samples with 3+ Mutated Upstream Reactions (all TRGs)," +
+                    "Distance to Samples with Mutated Target Reaction (all TRGs)," +
+                    "Distance to Samples with 123T Mutated Reactions (all TRGs)," +
+                    "Has 1 Mutated Upstream Reaction (all TRGs)," +
+                    "Has 2 Mutated Upstream Reactions (all TRGs)," +
+                    "Has 3+ Mutated Upstream Reactions (all TRGs)," +
+                    "Has Mutated Target Reaction (all TRGs),");
+
+            for(Integer clusterID : targetReactionGroupClusters.keySet()){
+             headerLine.append(String.format("Distance to Samples with 1 Mutated Upstream Reaction (TRG %1$d)," +
+                             "Distance to Samples with 2 Mutated Upstream Reactions (TRG %1$d)," +
+                             "Distance to Samples with 3+ Mutated Upstream Reactions (TRG %1$d)," +
+                             "Distance to Samples with Mutated Target Reaction (TRG %1$d)," +
+                             "Distance to Samples with 123T Mutated Reactions (TRG %1$d)," +
+                             "Has 1 Mutated Upstream Reaction (TRG %1$d)," +
+                             "Has 2 Mutated Upstream Reactions (TRG %1$d)," +
+                             "Has 3+ Mutated Upstream Reactions (TRG %1$d)," +
+                             "Has Mutated Target Reaction (TRG %1$d),",
+                     clusterID));
+            }
+            headerLine = new StringBuilder(headerLine.substring(0, headerLine.length() - 1));//remove trailing ','
+
+            fileUtility.printLine(headerLine.toString());
+
             for (Patient patient : patientToDistanceList.keySet()) {
-                    fileUtility.printLine(String.format("%s,%s,%.100e,%.100e,%.100e,%.100e,%.100e",
-                            patient.getTcgaBarcode(),
-                            patient.getCancerType(),
-                            patientToDistanceList.get(patient).get(0),
-                            patientToDistanceList.get(patient).get(1),
-                            patientToDistanceList.get(patient).get(2),
-                            patientToDistanceList.get(patient).get(3),
-                            patientToDistanceList.get(patient).get(4)
-                    ));
+                StringBuilder patientData = new StringBuilder();
+                for (int i = 0; i < patientToDistanceList.get(patient).size(); i++) {
+                    patientData.append(String.format("%.100e,",
+                            patientToDistanceList.get(patient).get(i)));
+                }
+                for (int i = 0; i < patientToMembershipList.get(patient).size(); i++) {
+                    patientData.append(String.format("%.100e,",
+                            patientToMembershipList.get(patient).get(i)));
+                }
+                patientData = new StringBuilder(patientData.substring(0, patientData.length() - 1));//remove trailing ','
+
+                fileUtility.printLine(String.format("%s,%s,%s",
+                        patient.getTcgaBarcode(),
+                        patient.getCancerType(),
+                        patientData.toString()));
             }
             fileUtility.close();
         } catch (IOException ioe) {
@@ -440,19 +491,19 @@ public class CooccurrenceResult {
             Set<Patient> affectedBy3Patients = new HashSet<>();
             Set<Patient> affectedByTPatients = new HashSet<>();
             Map<Integer, List<List<Patient>>> clusterIDToPatients = new HashMap<>();
-            for (int i = 0; i < getTargetRxns().size(); i++) {
-                if (getpValue2EmpiricalPValueMap().get(getpValues().get(i)) <= MAX_CLUSTER_EMPIRICAL_P_VALUE) {
-                    affectedBy1Patients.addAll(getSamplesW1MutatedUpstreamRxn().get(i));
-                    affectedBy2Patients.addAll(getSamplesW2MutatedUpstreamRxns().get(i));
-                    affectedBy3Patients.addAll(getSamplesW3plusMutatedUpstreamRxns().get(i));
-                    affectedByTPatients.addAll(getSamplesWTargetRxnMutations().get(i));
-                    Integer clusterID = Math.abs(getCooccurringUpstreamRxns().get(i).hashCode());
+            for (int i = 0; i < targetRxns.size(); i++) {
+                if (pValue2EmpiricalPValueMap.get(pValues.get(i)) <= MAX_CLUSTER_EMPIRICAL_P_VALUE) {
+                    affectedBy1Patients.addAll(samplesW1MutatedUpstreamRxn.get(i));
+                    affectedBy2Patients.addAll(samplesW2MutatedUpstreamRxns.get(i));
+                    affectedBy3Patients.addAll(samplesW3plusMutatedUpstreamRxns.get(i));
+                    affectedByTPatients.addAll(samplesWTargetRxnMutations.get(i));
+                    Integer clusterID = Math.abs(cooccurringUpstreamRxns.get(i).hashCode());
                     if (!clusterIDToPatients.containsKey(clusterID)) {
                         List<List<Patient>> patientSetList = new ArrayList<>();
-                        patientSetList.add(new ArrayList<>(getSamplesW1MutatedUpstreamRxn().get(i)));
-                        patientSetList.add(new ArrayList<>(getSamplesW2MutatedUpstreamRxns().get(i)));
-                        patientSetList.add(new ArrayList<>(getSamplesW3plusMutatedUpstreamRxns().get(i)));
-                        patientSetList.add(new ArrayList<>(getSamplesWTargetRxnMutations().get(i)));
+                        patientSetList.add(new ArrayList<>(samplesW1MutatedUpstreamRxn.get(i)));
+                        patientSetList.add(new ArrayList<>(samplesW2MutatedUpstreamRxns.get(i)));
+                        patientSetList.add(new ArrayList<>(samplesW3plusMutatedUpstreamRxns.get(i)));
+                        patientSetList.add(new ArrayList<>(samplesWTargetRxnMutations.get(i)));
                         clusterIDToPatients.put(clusterID, patientSetList);
                     }
                 }
@@ -479,11 +530,10 @@ public class CooccurrenceResult {
     }
 
     public void writePatientGroupingsToFile(String outputDir, String outputFilePrefix) {
-        //TODO: use a 'cancertype' argument as file prefix
         Map<Integer, List<List<Patient>>> clusterIDToPatients = getPatientsWith123TMutations();
 
         for (Integer clusterID : clusterIDToPatients.keySet()) {
-            String outFilePath = outputDir + outputFilePrefix + "group" + clusterID + ".csv";
+            String outFilePath = outputDir + outputFilePrefix + "TargetReactionGroup" + clusterID + ".csv";
             FileUtility fileUtility = new FileUtility();
             List<Patient> patientGroup1 = clusterIDToPatients.get(clusterID).get(0);
             List<Patient> patientGroup2 = clusterIDToPatients.get(clusterID).get(1);
@@ -495,7 +545,10 @@ public class CooccurrenceResult {
                     patientGroup3.size());
             try {
                 fileUtility.setOutput(outFilePath);
-                fileUtility.printLine("1,2,3,4");
+                fileUtility.printLine("1 Upstream Reaction Mutated," +
+                        "2 Upstream Reactions Mutated," +
+                        "3+ Upstream Reactions Mutated," +
+                        "Target Reaction Mutated");
                 for (int i = 0; i < numLines; i++) {
                     fileUtility.printLine(String.format("%s,%s,%s,%s",
                             patientGroup1.size() > i
@@ -563,7 +616,7 @@ public class CooccurrenceResult {
                             "BH Adjusted P-value," +
                             "Permutation-Based Empirical P-value");
 
-            for (int i = 0; i < getTargetRxns().size(); i++) {
+            for (int i = 0; i < targetRxns.size(); i++) {
                 WriteLineToFile(
                         fileUtility,
                         i);
@@ -580,13 +633,13 @@ public class CooccurrenceResult {
     private void WriteLineToFile(FileUtility fileUtility,
                                  int i) throws IOException {
 
-        Double bhAdjustedP = (getpValue2BHAdjustedPValueMap() == null)
+        Double bhAdjustedP = (pValue2BHAdjustedPValueMap == null)
                 ? 1.0d
-                : getpValue2BHAdjustedPValueMap().get(getpValues().get(i));
+                : pValue2BHAdjustedPValueMap.get(pValues.get(i));
 
-        Double empiricalP = (getpValue2EmpiricalPValueMap() == null)
+        Double empiricalP = (pValue2EmpiricalPValueMap == null)
                 ? 1.0d
-                : getpValue2EmpiricalPValueMap().get(getpValues().get(i));
+                : pValue2EmpiricalPValueMap.get(pValues.get(i));
 
         //TODO: add sample support to entity classes
 
@@ -625,57 +678,57 @@ public class CooccurrenceResult {
                         "%.100e," + //Fishers Method Combined P-value
                         "%.100e," + //BH Adjusted P-value
                         "%.100e", //Permutation-Based Empirical P-value
-                getTargetRxns().get(i),
-                getCooccurringUpstreamRxns().get(i).size(),
-                getCooccurringUpstreamRxnFIs().get(i).size(),
-                getSamplesWTargetRxnMutations().get(i).size(),
-                getNumSamplesW0MutatedUpstreamRxns().get(i),
-                getSamplesW1MutatedUpstreamRxn().get(i).size(),
-                getSamplesW2MutatedUpstreamRxns().get(i).size(),
-                getSamplesW3plusMutatedUpstreamRxns().get(i).size(),
+                targetRxns.get(i),
+                cooccurringUpstreamRxns.get(i).size(),
+                cooccurringUpstreamRxnFIs.get(i).size(),
+                samplesWTargetRxnMutations.get(i).size(),
+                numSamplesW0MutatedUpstreamRxns.get(i),
+                samplesW1MutatedUpstreamRxn.get(i).size(),
+                samplesW2MutatedUpstreamRxns.get(i).size(),
+                samplesW3plusMutatedUpstreamRxns.get(i).size(),
                 getSuperIndirectMutatedGenes().get(i).size(),
                 getIndirectMutatedGenes().get(i).size(),
                 getSuperDirectMutatedGenes().get(i).size(),
                 getDirectMutatedGenes().get(i).size(),
-                getSuperIndirectMutations().get(i).size(),
-                getIndirectMutations().get(i).size(),
-                getSuperDirectMutations().get(i).size(),
-                getDirectMutations().get(i).size(),
-                Math.abs(getCooccurringUpstreamRxns().get(i).hashCode()),
-                getCooccurringUpstreamRxns().get(i).size() > 1
+                superIndirectMutations.get(i).size(),
+                indirectMutations.get(i).size(),
+                superDirectMutations.get(i).size(),
+                directMutations.get(i).size(),
+                Math.abs(cooccurringUpstreamRxns.get(i).hashCode()),
+                cooccurringUpstreamRxns.get(i).size() > 1
                         ? org.gk.util.StringUtils.join("|",
-                        new ArrayList<>(getCooccurringUpstreamRxns().get(i)))
-                        : Collections.singletonList(getCooccurringUpstreamRxns().get(i)).get(0).toString()
+                        new ArrayList<>(cooccurringUpstreamRxns.get(i)))
+                        : Collections.singletonList(cooccurringUpstreamRxns.get(i)).get(0).toString()
                         .replace("[", "")
                         .replace("]", ""),
-                getCooccurringUpstreamRxnFIs().get(i).size() > 1
+                cooccurringUpstreamRxnFIs.get(i).size() > 1
                         ? org.gk.util.StringUtils.join("|",
-                        new ArrayList<>(getCooccurringUpstreamRxnFIs().get(i)))
-                        : Collections.singletonList(getCooccurringUpstreamRxnFIs().get(i)).get(0).toString()
+                        new ArrayList<>(cooccurringUpstreamRxnFIs.get(i)))
+                        : Collections.singletonList(cooccurringUpstreamRxnFIs.get(i)).get(0).toString()
                         .replace("[", "")
                         .replace("]", ""),
-                getSamplesWTargetRxnMutations().get(i).size() > 1
+                samplesWTargetRxnMutations.get(i).size() > 1
                         ? org.gk.util.StringUtils.join("|",
-                        new ArrayList<>(getSamplesWTargetRxnMutations().get(i)))
-                        : Collections.singletonList(getSamplesWTargetRxnMutations().get(i)).get(0).toString()
+                        new ArrayList<>(samplesWTargetRxnMutations.get(i)))
+                        : Collections.singletonList(samplesWTargetRxnMutations.get(i)).get(0).toString()
                         .replace("[", "")
                         .replace("]", ""),
-                getSamplesW1MutatedUpstreamRxn().get(i).size() > 1
+                samplesW1MutatedUpstreamRxn.get(i).size() > 1
                         ? org.gk.util.StringUtils.join("|",
-                        new ArrayList<>(getSamplesW1MutatedUpstreamRxn().get(i)))
-                        : Collections.singletonList(getSamplesW1MutatedUpstreamRxn().get(i)).get(0).toString()
+                        new ArrayList<>(samplesW1MutatedUpstreamRxn.get(i)))
+                        : Collections.singletonList(samplesW1MutatedUpstreamRxn.get(i)).get(0).toString()
                         .replace("[", "")
                         .replace("]", ""),
-                getSamplesW2MutatedUpstreamRxns().get(i).size() > 1
+                samplesW2MutatedUpstreamRxns.get(i).size() > 1
                         ? org.gk.util.StringUtils.join("|",
-                        new ArrayList<>(getSamplesW2MutatedUpstreamRxns().get(i)))
-                        : Collections.singletonList(getSamplesW2MutatedUpstreamRxns().get(i)).get(0).toString()
+                        new ArrayList<>(samplesW2MutatedUpstreamRxns.get(i)))
+                        : Collections.singletonList(samplesW2MutatedUpstreamRxns.get(i)).get(0).toString()
                         .replace("[", "")
                         .replace("]", ""),
-                getSamplesW3plusMutatedUpstreamRxns().get(i).size() > 1
+                samplesW3plusMutatedUpstreamRxns.get(i).size() > 1
                         ? org.gk.util.StringUtils.join("|",
-                        new ArrayList<>(getSamplesW3plusMutatedUpstreamRxns().get(i)))
-                        : Collections.singletonList(getSamplesW3plusMutatedUpstreamRxns().get(i)).get(0).toString()
+                        new ArrayList<>(samplesW3plusMutatedUpstreamRxns.get(i)))
+                        : Collections.singletonList(samplesW3plusMutatedUpstreamRxns.get(i)).get(0).toString()
                         .replace("[", "")
                         .replace("]", ""),
                 getSuperIndirectMutatedGenes().get(i).size() > 1
@@ -702,36 +755,32 @@ public class CooccurrenceResult {
                         : Collections.singletonList(getDirectMutatedGenes().get(i)).get(0).toString()
                         .replace("[", "")
                         .replace("]", ""),
-                getSuperIndirectMutations().get(i).size() > 1
+                superIndirectMutations.get(i).size() > 1
                         ? org.gk.util.StringUtils.join("|",
-                        new ArrayList<>(getSuperIndirectMutations().get(i)))
-                        : Collections.singletonList(getSuperIndirectMutations().get(i)).get(0).toString()
+                        new ArrayList<>(superIndirectMutations.get(i)))
+                        : Collections.singletonList(superIndirectMutations.get(i)).get(0).toString()
                         .replace("[", "")
                         .replace("]", ""),
-                getIndirectMutations().get(i).size() > 1
+                indirectMutations.get(i).size() > 1
                         ? org.gk.util.StringUtils.join("|",
-                        new ArrayList<>(getIndirectMutations().get(i)))
-                        : Collections.singletonList(getIndirectMutations().get(i)).get(0).toString()
+                        new ArrayList<>(indirectMutations.get(i)))
+                        : Collections.singletonList(indirectMutations.get(i)).get(0).toString()
                         .replace("[", "")
                         .replace("]", ""),
-                getSuperDirectMutations().get(i).size() > 1
+                superDirectMutations.get(i).size() > 1
                         ? org.gk.util.StringUtils.join("|",
-                        new ArrayList<>(getSuperDirectMutations().get(i)))
-                        : Collections.singletonList(getSuperDirectMutations().get(i)).get(0).toString()
+                        new ArrayList<>(superDirectMutations.get(i)))
+                        : Collections.singletonList(superDirectMutations.get(i)).get(0).toString()
                         .replace("[", "")
                         .replace("]", ""),
-                getDirectMutations().get(i).size() > 1
+                directMutations.get(i).size() > 1
                         ? org.gk.util.StringUtils.join("|",
-                        new ArrayList<>(getDirectMutations().get(i)))
-                        : Collections.singletonList(getDirectMutations().get(i)).get(0).toString()
+                        new ArrayList<>(directMutations.get(i)))
+                        : Collections.singletonList(directMutations.get(i)).get(0).toString()
                         .replace("[", "")
                         .replace("]", ""),
-                getpValues().get(i),
+                pValues.get(i),
                 bhAdjustedP,
                 empiricalP));
-    }
-
-    public List<Set<Patient>> getSamplesWTargetRxnMutations() {
-        return samplesWTargetRxnMutations;
     }
 }

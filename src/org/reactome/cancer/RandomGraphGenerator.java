@@ -18,17 +18,18 @@ public class RandomGraphGenerator {
         this.prng = new Random(this.randomSeed);
     }
 
-    public DirectedGraph<Long, DefaultEdge> GenerateRandomGraph() {
+    public DirectedGraph<Long, DefaultEdge> GenerateRandomGraph(boolean rewireLargestComponentOnly) {
         DefaultDirectedGraph<Long, DefaultEdge> rewiredReactionGraph =
                 new DefaultDirectedGraph<>(DefaultEdge.class);
         Graphs.addGraph(rewiredReactionGraph, this.reactionGraph);
 
-        RewireComponents(rewiredReactionGraph);
+        RewireComponents(rewiredReactionGraph,rewireLargestComponentOnly);
 
         return rewiredReactionGraph;
     }
 
-    private void RewireComponents(DefaultDirectedGraph<Long, DefaultEdge> rewiredReactionGraph) {
+    private void RewireComponents(DefaultDirectedGraph<Long, DefaultEdge> rewiredReactionGraph,
+                                  boolean rewireLargestComponentOnly) {
         ConnectivityInspector connectivityInspector = new ConnectivityInspector(rewiredReactionGraph);
         List<Set<Long>> connectedSets = connectivityInspector.connectedSets();
 
@@ -36,7 +37,20 @@ public class RandomGraphGenerator {
         int initialEdgeCount = rewiredReactionGraph.edgeSet().size();
         int initialVtxCount = rewiredReactionGraph.vertexSet().size();
 
+        Set<Long> largestComponent = new HashSet<>();
+        if(rewireLargestComponentOnly){
+           for(Set<Long> connectedSet : connectedSets){
+               if(connectedSet.size() > largestComponent.size()){
+                   largestComponent = connectedSet;
+               }
+           }
+        }
+
         for (Set<Long> connectedSet : connectedSets) {
+            if(rewireLargestComponentOnly &&
+                    !connectedSet.equals(largestComponent)){
+                continue;
+            }
             if (connectedSet.size() >= 3) {
 
                 if (connectedSet.size() >= initialVtxCount) {

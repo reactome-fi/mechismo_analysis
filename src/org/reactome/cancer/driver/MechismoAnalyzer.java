@@ -585,6 +585,7 @@ public class MechismoAnalyzer {
                                      boolean ignoreDependentUpstreamReactions,
                                      boolean ignoreIndependentUpstreamReactions,
                                      boolean excludeMultipleImmediateUpstreamReactions,
+                                     boolean rewireLargestComponentOnly,
                                      String rxnFilter) throws Exception {
         ResourceMonitor resourceMonitor = new ResourceMonitor();
         resourceMonitor.StartMethodTimer();
@@ -630,7 +631,7 @@ public class MechismoAnalyzer {
             resourceMonitor.StartLoopTimer();
 
             DirectedGraph<Long, DefaultEdge> rewiredReactionGraph =
-                    randomGraphGenerator.GenerateRandomGraph();
+                    randomGraphGenerator.GenerateRandomGraph(rewireLargestComponentOnly);
 
             ConnectivityInspector<Long, DefaultEdge> connectivityInspector =
                     new ConnectivityInspector<>(rewiredReactionGraph);
@@ -643,7 +644,7 @@ public class MechismoAnalyzer {
             CooccurrenceResult rewiredNetworkResult = reactionGraphAnalyzer.SearchRxnNetworkAndCalculateCooccurrencePValues(rewiredReactionGraph);
 
             rewiredNetworkResult.CalculateBHAdjustedPValues();
-            rewiredNetworkResult.writeToFile(outputDir, i + 1 + "");
+            rewiredNetworkResult.writeToFile(outputDir, "RandomRewiring_" + i + 1 + "_");
 
             resourceMonitor.CalculateMemUsed();
 

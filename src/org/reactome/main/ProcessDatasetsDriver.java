@@ -117,7 +117,7 @@ public class ProcessDatasetsDriver {
                         null,//"/home/burkhart/Software/Ogmios/datasets/Mechismo/tcga_mechismo_stat_pancancer.tsv",
                         "/home/burkhart/Software/Ogmios/results/Mechismo/",
                         "", //output filename prefix
-                        null, //set cancer type = null for pancancer
+                        "COAD", //set cancer type = null for pancancer
                         1,
                         10,
                         0.0,
@@ -125,6 +125,7 @@ public class ProcessDatasetsDriver {
                         true, // Ignore Dependent
                         false,
                         false,
+                        true,
                         "No" // Rxn Filter
                 );
             } else {

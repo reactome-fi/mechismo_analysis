@@ -282,7 +282,7 @@ public class ReactionGraphAnalyzer {
                         targetSamplesW0MutatedUpstreamRxns.addAll(A);
                         targetSamplesW1MutatedUpstreamRxn.addAll(B);
                         targetSamplesW1MutatedUpstreamRxn.addAll(C);
-                        targetSamplesW2MutatedUpstreamRxns.addAll(D);//remove samplesW3 later
+                        targetSamplesW2MutatedUpstreamRxns.addAll(D);//remove samplesW3plus later
 
                         //FisherExact uses numerical approximation and is sometimes > 1.0000000000
                         targetUpstreamReactionPValues.add(
@@ -314,16 +314,11 @@ public class ReactionGraphAnalyzer {
                     targetSamplesW0MutatedUpstreamRxns.removeAll(targetSamplesW1MutatedUpstreamRxn);
                     targetSamplesW0MutatedUpstreamRxns.removeAll(targetSamplesW2MutatedUpstreamRxns);
                     targetSamplesW0MutatedUpstreamRxns.removeAll(targetSamplesW3plusMutatedUpstreamRxns);
-                    targetSamplesW0MutatedUpstreamRxns.removeAll(targetSamplesWTargetRxnMutations);
 
                     targetSamplesW1MutatedUpstreamRxn.removeAll(targetSamplesW2MutatedUpstreamRxns);
                     targetSamplesW1MutatedUpstreamRxn.removeAll(targetSamplesW3plusMutatedUpstreamRxns);
-                    targetSamplesW1MutatedUpstreamRxn.removeAll(targetSamplesWTargetRxnMutations);
 
                     targetSamplesW2MutatedUpstreamRxns.removeAll(targetSamplesW3plusMutatedUpstreamRxns);
-                    targetSamplesW2MutatedUpstreamRxns.removeAll(targetSamplesWTargetRxnMutations);
-
-                    targetSamplesW3plusMutatedUpstreamRxns.removeAll(targetSamplesWTargetRxnMutations);
 
                     //we lose track of super relationships in upstream reaction pair context
                     targetIndirectMutations.removeAll(targetSuperIndirectMutations);
@@ -334,13 +329,13 @@ public class ReactionGraphAnalyzer {
                     targetSuperIndirectMutations.removeAll(targetSuperDirectMutations);
 
                     Double combinedPValue;
-                    if(targetUpstreamReactionABCDs.size() > 1){
+                    if (targetUpstreamReactionABCDs.size() > 1) {
                         combinedPValue = MathUtilities.calculatePValuesWithEmpiricalBrownsMethod(
                                 targetUpstreamReactionABCDs,
                                 targetUpstreamReactionPValues);
-                    }else{
-                        combinedPValue = MathUtilities.combinePValuesWithFisherMethod(
-                                targetUpstreamReactionPValues);
+                    } else {
+                        //exactly one upstream reaction pair results in exactly one p-value
+                        combinedPValue = targetUpstreamReactionPValues.get(0);
                     }
 
                     allTargetRxns.add(targetRxn);
