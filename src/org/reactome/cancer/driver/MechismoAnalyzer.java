@@ -298,14 +298,44 @@ public class MechismoAnalyzer {
     
     @Test
     public void calculateSampleDistancesOnReactionNetwork() throws IOException {
-        String srcFileName = "results/MechismoSamplesToReactions_103017.txt";
-
         String cancer = "GBM";
         cancer = "PAAD";
-        cancer = "SKCM";
-        cancer = "LGG";
-        cancer = "UCEC";
+//        cancer = "SKCM";
+//        cancer = "LGG";
+//        cancer = "UCEC";
+        cancer = "COADREAD";
+        cancer = "THCA";
+        cancer = "STAD";
+        cancer = "LUAD";
+        cancer = "HNSC";
+        
+//        Map<String, Set<String>> sampleToReactions = loadSampleToReactions(cancer);
+        Map<String, Set<String>> sampleToReactions = loadSampleToReactions(cancer, 0.01d);
 
+        // A quick quality check
+        sampleToReactions.forEach((sample, set) -> System.out.println(sample + "\t" + set.size()));
+
+        filterSamplesWithoutReactions(sampleToReactions);
+
+        // Some test code for two UCEC samples have many hit reactions
+//        String sample1 = "TCGA-A5-A0G3-01";
+//        String sample2 = "TCGA-A5-A0G9-01";
+//        calculateNetworkDistance(sampleToReactions, sample1, sample2);
+//        
+//        if (true)
+//            return;
+
+        String date = "103117";
+        date = "111317";
+        date = "111617"; // Should be a very quick way to calculate distances in BFS
+        
+        String fileName = "results/MechismoSamplePairWiseReactionNetworkDist_" + cancer + "_" + date + ".txt";
+        
+        generatePairWiseNetworkDistance(sampleToReactions, fileName);
+    }
+
+    private Map<String, Set<String>> loadSampleToReactions(String cancer) throws IOException {
+        String srcFileName = "results/MechismoSamplesToReactions_103017.txt";
         Map<String, Set<String>> sampleToReactions = new HashMap<>();
         fu.setInput(srcFileName);
         String line = fu.readLine();
@@ -322,19 +352,45 @@ public class MechismoAnalyzer {
             sampleToReactions.put(tokens[1], set);
         }
         fu.close();
-
-        // A quick quality check
-        sampleToReactions.forEach((sample, set) -> System.out.println(sample + "\t" + set.size()));
-
-        filterSamplesWithoutReactions(sampleToReactions);
-
-        // Some test code
-        //        String sample1 = "TCGA-BG-A0W1-01";
-        //        String sample2 = "TCGA-A5-A0GA-01";
-        //        calculateNetworkDistance(sampleToReactions, sample1, sample2);
-
-        String fileName = "results/MechismoSamplePairWiseReactionNetworkDist_" + cancer + "_103117.txt";
-        generatePairWiseNetworkDistance(sampleToReactions, fileName);
+        return sampleToReactions;
+    }
+    
+    /**
+     * Use this method to load sample to hit reactions using updated files from Francesco, which contain samples 
+     * in the analysis output.
+     * @param cancer
+     * @param fdrCutoff
+     * @return
+     * @throws IOException
+     */
+    private Map<String, Set<String>> loadSampleToReactions(String cancer, double fdrCutoff) throws IOException {
+        String srcFileName = "datasets/Mechismo/FrancescoResults/110317/tcga_mechismo_stat_cancer_wise_significant.tsv";
+        Map<String, Set<String>> sampleToReactions = new HashMap<>();
+        try (Stream<String> stream = Files.lines(Paths.get(srcFileName))) {
+            stream.map(line -> line.split("\t"))
+                  .filter(tokens -> tokens[0].equals(cancer)) // Filter to cancer type
+                  .filter(tokens -> !tokens[13].equals("-")) // Need to have reactions
+                  .filter(tokens -> Double.parseDouble(tokens[11]) < fdrCutoff) // Less than the predefined fdr cutoff
+                  .forEach(tokens -> {
+                      String[] reactionIds = tokens[13].split(",");
+                      // Get samples
+                      int index1 = tokens[15].indexOf("\'");
+                      int index2 = tokens[15].lastIndexOf("\'");
+                      String tmp = tokens[15].substring(index1, index2 + 1);
+                      String[] samples = tmp.split(", ");
+                      Arrays.asList(samples).forEach(sample -> {
+                          // Need to remove single quotes
+                          sample = sample.substring(1, sample.length() - 1);
+                          sampleToReactions.compute(sample, (key, set) -> {
+                              if (set == null)
+                                  set = new HashSet<>();
+                              set.addAll(Arrays.asList(reactionIds));
+                              return set;
+                          });
+                      });
+                  });
+        }
+        return sampleToReactions;
     }
 
     private void filterSamplesWithoutReactions(Map<String, Set<String>> sampleToReactions) {
@@ -408,8 +464,11 @@ public class MechismoAnalyzer {
 
         Set<String> set1 = sampleToReactions.get(sample1);
         Set<String> set2 = sampleToReactions.get(sample2);
+        long time1 = System.currentTimeMillis();
         double dist = bfs.calculateMinShortestPath(set1, set2, idToPartners);
+        long time2 = System.currentTimeMillis();
         System.out.println(dist);
+        System.out.println("Total time: " + (time2 - time1));
     }
 
     /**
@@ -437,6 +496,12 @@ public class MechismoAnalyzer {
         fu.setOutput(fileName);
         fu.printLine(builder.toString());
         builder.setLength(0);
+        
+        // Use a helper object
+        MechismoBFSHelper helper = new MechismoBFSHelper();
+        Map<String, Integer> pairToDist = helper.calculateShortestPath(sampleToReactions,
+                                                                       idToPartners,
+                                                                       bfs);
         for (int i = 0; i < samples.size(); i++) {
             String sample1 = samples.get(i);
             builder.append(sample1);
@@ -448,7 +513,9 @@ public class MechismoAnalyzer {
                     builder.append(0.0d);
                 else {
                     Set<String> set2 = sampleToReactions.get(sample2);
-                    double dist = bfs.calculateMinShortestPath(set1, set2, idToPartners);
+                    double dist = helper.calculateMinShortestPath(set1, 
+                                                                  set2, 
+                                                                  pairToDist);
                     builder.append(dist);
                 }
             }
