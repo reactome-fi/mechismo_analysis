@@ -7,7 +7,7 @@ import java.io.IOException;
 import java.util.*;
 
 public class CooccurrenceResult {
-    private final Double MAX_CLUSTER_EMPIRICAL_P_VALUE = 0.01;
+    private final Double MAX_CLUSTER_EMPIRICAL_P_VALUE = 0.05;
     private List<Reaction> targetRxns;
     private List<Set<Reaction>> cooccurringUpstreamRxns;
     private List<Set<FI>> cooccurringUpstreamRxnFIs;
@@ -528,44 +528,35 @@ public class CooccurrenceResult {
 
     private Map<Integer, List<List<Patient>>> getPatientsWith123TMutations() {
         if (this.patientsWith123TMutations == null) {
-            Set<Patient> affectedBy1Patients = new HashSet<>();
-            Set<Patient> affectedBy2Patients = new HashSet<>();
-            Set<Patient> affectedBy3Patients = new HashSet<>();
-            Set<Patient> affectedByTPatients = new HashSet<>();
             Map<Integer, List<List<Patient>>> clusterIDToPatients = new HashMap<>();
             for (int i = 0; i < targetRxns.size(); i++) {
                 if (pValue2EmpiricalPValueMap.get(pValues.get(i)) <= MAX_CLUSTER_EMPIRICAL_P_VALUE) {
-                    affectedBy1Patients.addAll(samplesW1MutatedUpstreamRxn.get(i));
-                    affectedBy2Patients.addAll(samplesW2MutatedUpstreamRxns.get(i));
-                    affectedBy3Patients.addAll(samplesW3plusMutatedUpstreamRxns.get(i));
-                    affectedByTPatients.addAll(samplesWTargetRxnMutations.get(i));
                     Integer clusterID = Math.abs(cooccurringUpstreamRxns.get(i).hashCode());
+                    List<List<Patient>> patientSetList;
                     if (!clusterIDToPatients.containsKey(clusterID)) {
-                        List<List<Patient>> patientSetList = new ArrayList<>();
+                        patientSetList = new ArrayList<>();
                         patientSetList.add(new ArrayList<>(samplesW1MutatedUpstreamRxn.get(i)));
                         patientSetList.add(new ArrayList<>(samplesW2MutatedUpstreamRxns.get(i)));
                         patientSetList.add(new ArrayList<>(samplesW3plusMutatedUpstreamRxns.get(i)));
                         patientSetList.add(new ArrayList<>(samplesWTargetRxnMutations.get(i)));
-                        clusterIDToPatients.put(clusterID, patientSetList);
+                    }else{
+                        patientSetList = clusterIDToPatients.get(clusterID);
+                        Set<Patient> pw1 = new HashSet<>(patientSetList.get(0));
+                        pw1.addAll(samplesW1MutatedUpstreamRxn.get(i));
+                        Set<Patient> pw2 = new HashSet<>(patientSetList.get(1));
+                        pw2.addAll(samplesW2MutatedUpstreamRxns.get(i));
+                        Set<Patient> pw3 = new HashSet<>(patientSetList.get(2));
+                        pw3.addAll(samplesW3plusMutatedUpstreamRxns.get(i));
+                        Set<Patient> pwT = new HashSet<>(patientSetList.get(3));
+                        pwT.addAll(samplesWTargetRxnMutations.get(i));
+                        patientSetList.add(0,new ArrayList<>(pw1));
+                        patientSetList.add(1,new ArrayList<>(pw2));
+                        patientSetList.add(2,new ArrayList<>(pw3));
+                        patientSetList.add(3,new ArrayList<>(pwT));
                     }
+                    clusterIDToPatients.put(clusterID, patientSetList);
                 }
             }
-            affectedBy1Patients.removeAll(affectedBy2Patients);
-            affectedBy1Patients.removeAll(affectedBy3Patients);
-            affectedBy1Patients.removeAll(affectedByTPatients);
-
-            affectedBy2Patients.removeAll(affectedBy3Patients);
-            affectedBy2Patients.removeAll(affectedByTPatients);
-
-            affectedBy3Patients.removeAll(affectedByTPatients);
-
-            List<List<Patient>> patientSetList = new ArrayList<>();
-            patientSetList.add(new ArrayList<>(affectedBy1Patients));
-            patientSetList.add(new ArrayList<>(affectedBy2Patients));
-            patientSetList.add(new ArrayList<>(affectedBy3Patients));
-            patientSetList.add(new ArrayList<>(affectedByTPatients));
-
-            clusterIDToPatients.put(0, patientSetList);
             this.patientsWith123TMutations = clusterIDToPatients;
         }
         return this.patientsWith123TMutations;
