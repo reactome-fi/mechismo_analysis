@@ -218,7 +218,7 @@ generate.survival.plot <-
     #       cex = 0.5)
     
     surv.diff <- survival::survdiff(surv ~ group)
-    pval <- pchisq(surv.diff$chisq, 0, lower.tail = FALSE)
+    pval <- pchisq(surv.diff$chisq, 1, lower.tail = FALSE)
     pvals <<- c(pval,pvals)
     mtext(paste("Chi squared p = ",
                 round(
