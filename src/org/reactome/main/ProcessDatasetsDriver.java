@@ -109,8 +109,8 @@ public class ProcessDatasetsDriver {
                         "datasets/firehose_data/all_oncotated_calls",
                         "datasets/guanming_known_drivers.txt");
             } else if (Integer.parseInt(ex) == 5) {
-                String[] cancerTypes = new String[]{"PAAD","SKCM","LIHC","LGG","HNSC","LUAD","OV","GBM"};
-                for(String cancerType : cancerTypes) {
+                //String[] cancerTypes = new String[]{"PAAD","SKCM","LIHC","LGG","HNSC","LUAD","OV","GBM"};
+                //for(String cancerType : cancerTypes) {
                     new MechismoAnalyzer().mapReactomeReactions(
                             cancerDriverReactomeAnalyzer,
                             "/home/burkhart/Software/Ogmios/datasets/Mechismo/TCGA_mech_output.tsv",
@@ -118,8 +118,8 @@ public class ProcessDatasetsDriver {
                             "/home/burkhart/Software/Ogmios/datasets/Mechismo/MechismoSamplesToReactions_103017.txt",
                             null,//"/home/burkhart/Software/Ogmios/datasets/Mechismo/tcga_mechismo_stat_pancancer.tsv",
                             "/home/burkhart/Software/Ogmios/results/Mechismo/",
-                            cancerType, //output filename prefix
-                            cancerType, //set cancer type = null for pancancer
+                            "Pancancer",//cancerType, //output filename prefix
+                            null,//cancerType, //set cancer type = null for pancancer
                             1,
                             100,
                             0.0,
@@ -127,10 +127,11 @@ public class ProcessDatasetsDriver {
                             true, // Ignore Dependent
                             false,
                             false,
-                            true,
+                            false,
+                            false,
                             "No" // Rxn Filter
                     );
-                }
+                //}
             } else {
                 System.out.println("An error occurred.");
             }

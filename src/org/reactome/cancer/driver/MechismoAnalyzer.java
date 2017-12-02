@@ -586,6 +586,7 @@ public class MechismoAnalyzer {
                                      boolean ignoreIndependentUpstreamReactions,
                                      boolean excludeMultipleImmediateUpstreamReactions,
                                      boolean rewireLargestComponentOnly,
+                                     boolean useRxnDist,
                                      String rxnFilter) throws Exception {
         ResourceMonitor resourceMonitor = new ResourceMonitor();
         resourceMonitor.StartMethodTimer();
@@ -641,7 +642,7 @@ public class MechismoAnalyzer {
                     rewiredReactionGraph.edgeSet().size(),
                     connectivityInspector.connectedSets().size()));
 
-            CooccurrenceResult rewiredNetworkResult = reactionGraphAnalyzer.SearchRxnNetworkAndCalculateCooccurrencePValues(rewiredReactionGraph);
+            CooccurrenceResult rewiredNetworkResult = reactionGraphAnalyzer.SearchRxnNetworkAndCalculateCooccurrencePValues(rewiredReactionGraph,useRxnDist);
 
             rewiredNetworkResult.CalculateBHAdjustedPValues();
             rewiredNetworkResult.writeToFile(outputDir, "RandomRewiring_" + (i + 1) + "_");
@@ -654,7 +655,7 @@ public class MechismoAnalyzer {
             resourceMonitor.EndLoopTimer(i + 1 + "");//start with iteration '1'
         }
 
-        CooccurrenceResult realResult = reactionGraphAnalyzer.SearchRxnNetworkAndCalculateCooccurrencePValues(reactionGraph);
+        CooccurrenceResult realResult = reactionGraphAnalyzer.SearchRxnNetworkAndCalculateCooccurrencePValues(reactionGraph,useRxnDist);
 
         realResult.CalculateBHAdjustedPValues();
         realResult.CalculateEmpiricalPValues(rewiredNetworkResults);

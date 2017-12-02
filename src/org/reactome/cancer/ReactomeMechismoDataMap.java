@@ -37,6 +37,10 @@ public class ReactomeMechismoDataMap {
         this.patientToFIsToMutations = mechismoOutputLoader.ExtractSamples2FIs2Muts();
     }
 
+    public Set<FI> getFIs(Patient patient){
+        return this.patientToFIsToMutations.get(patient).keySet();
+    }
+
     private Set<Mutation> getReactionPatientMutations(Reaction reaction, Patient patient) {
         Set<Mutation> mutations = new HashSet<>();
         if (this.reactionToFIs.keySet().contains(reaction)) {

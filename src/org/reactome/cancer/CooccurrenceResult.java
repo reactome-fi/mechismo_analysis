@@ -8,6 +8,8 @@ import java.util.*;
 
 public class CooccurrenceResult {
     private final Double MAX_CLUSTER_EMPIRICAL_P_VALUE = 0.05;
+    private final Integer MIN_NUM_TARGET_RXN_PATIENTS = 5;
+    private final Integer MIN_NUM_CO_RXN_PATIENTS = 5;
     private List<Reaction> targetRxns;
     private List<Set<Reaction>> cooccurringUpstreamRxns;
     private List<Set<FI>> cooccurringUpstreamRxnFIs;
@@ -29,6 +31,7 @@ public class CooccurrenceResult {
     private Map<Double, Double> pValue2EmpiricalPValueMap;
     private Map<Integer, List<List<Patient>>> patientsWith123TMutations;
     private Map<Integer, Set<Patient>> hashCodeToAgPatients;
+    private Boolean useRxnDist;
 
     public CooccurrenceResult(
             List<Reaction> targetRxns,
@@ -43,7 +46,8 @@ public class CooccurrenceResult {
             List<Set<Mutation>> indirectMutations,
             List<Set<Mutation>> superDirectMutations,
             List<Set<Mutation>> directMutations,
-            List<Double> pValues
+            List<Double> pValues,
+            Boolean useRxnDist
     ) {
         this.targetRxns = targetRxns;
         this.cooccurringUpstreamRxns = cooccurringUpstreamRxns;
@@ -58,6 +62,7 @@ public class CooccurrenceResult {
         this.superDirectMutations = superDirectMutations;
         this.directMutations = directMutations;
         this.pValues = pValues;
+        this.useRxnDist = useRxnDist;
 
         this.hashCodeToAgPatients = null;
         this.superIndirectMutatedGenes = null;
@@ -222,9 +227,9 @@ public class CooccurrenceResult {
         System.gc();
     }
 
-    private Integer calculateReactionDistanceBetweenPatients(Patient patient1,
-                                                             Patient patient2,
-                                                             ReactomeMechismoDataMap reactomeMechismoDataMap) {
+    private Integer calculateRxnDistanceBetweenPatients(Patient patient1,
+                                                        Patient patient2,
+                                                        ReactomeMechismoDataMap reactomeMechismoDataMap) {
 
         Set<Reaction> patient1Rxns = reactomeMechismoDataMap.getReactions(patient1);
         Set<Reaction> patient2Rxns = reactomeMechismoDataMap.getReactions(patient2);
@@ -241,12 +246,36 @@ public class CooccurrenceResult {
         return reactomeMechismoDataMap.getSupportedReactions().size();
     }
 
-    private Double calculateMeanReactionDistanceToReferencePatients(Patient queryPatient,
-                                                                    Collection<Patient> referencePatients,
-                                                                    ReactomeMechismoDataMap reactomeMechismoDataMap) {
+    private Integer calculateFIDistanceBetweenPatients(Patient patient1,
+                                                        Patient patient2,
+                                                        ReactomeMechismoDataMap reactomeMechismoDataMap) {
+
+        Set<FI> patient1FIs = reactomeMechismoDataMap.getFIs(patient1);
+        Set<FI> patient2FIs = reactomeMechismoDataMap.getFIs(patient2);
+
+        if (patient1FIs != null && patient2FIs != null) {
+            Set<FI> patient1FIsCpy = new HashSet<>(patient1FIs);
+            Set<FI> patient2FIsCpy = new HashSet<>(patient2FIs);
+            patient1FIsCpy.removeAll(patient2FIs);
+            Integer patient1OnlyFIs = patient1FIsCpy.size();
+            patient2FIsCpy.removeAll(patient1FIs);
+            Integer patient2OnlyFIs = patient2FIsCpy.size();
+            return patient1OnlyFIs + patient2OnlyFIs;
+        }
+        return reactomeMechismoDataMap.getFIs().size();
+    }
+
+    private Double calculateMeanDistanceToReferencePatients(Patient queryPatient,
+                                                            Collection<Patient> referencePatients,
+                                                            ReactomeMechismoDataMap reactomeMechismoDataMap) {
         Integer totalDistance = 0;
         for (Patient referencePatient : referencePatients) {
-            totalDistance += calculateReactionDistanceBetweenPatients(queryPatient, referencePatient, reactomeMechismoDataMap);
+            if(this.useRxnDist){
+                totalDistance += calculateRxnDistanceBetweenPatients(queryPatient, referencePatient, reactomeMechismoDataMap);
+            }
+            else{
+                totalDistance += calculateFIDistanceBetweenPatients(queryPatient, referencePatient, reactomeMechismoDataMap);
+            }
         }
         return (double) totalDistance / (double) referencePatients.size();
 
@@ -279,19 +308,19 @@ public class CooccurrenceResult {
                 ag3.size() +
                 agT.size();
 
-        Double ag1d = calculateMeanReactionDistanceToReferencePatients(
+        Double ag1d = calculateMeanDistanceToReferencePatients(
                 queryPatient,
                 ag1,
                 reactomeMechismoDataMap) * (double) ag1.size();
-        Double ag2d = calculateMeanReactionDistanceToReferencePatients(
+        Double ag2d = calculateMeanDistanceToReferencePatients(
                 queryPatient,
                 ag2,
                 reactomeMechismoDataMap) * (double) ag2.size();
-        Double ag3d = calculateMeanReactionDistanceToReferencePatients(
+        Double ag3d = calculateMeanDistanceToReferencePatients(
                 queryPatient,
                 ag3,
                 reactomeMechismoDataMap) * (double) ag3.size();
-        Double agTd = calculateMeanReactionDistanceToReferencePatients(
+        Double agTd = calculateMeanDistanceToReferencePatients(
                 queryPatient,
                 agT,
                 reactomeMechismoDataMap) * (double) agT.size();
@@ -332,19 +361,19 @@ public class CooccurrenceResult {
                 ag3.size() +
                 agT.size();
 
-        Double ag1d = calculateMeanReactionDistanceToReferencePatients(
+        Double ag1d = calculateMeanDistanceToReferencePatients(
                 queryPatient,
                 ag1,
                 reactomeMechismoDataMap) * (double) ag1.size();
-        Double ag2d = calculateMeanReactionDistanceToReferencePatients(
+        Double ag2d = calculateMeanDistanceToReferencePatients(
                 queryPatient,
                 ag2,
                 reactomeMechismoDataMap) * (double) ag2.size();
-        Double ag3d = calculateMeanReactionDistanceToReferencePatients(
+        Double ag3d = calculateMeanDistanceToReferencePatients(
                 queryPatient,
                 ag3,
                 reactomeMechismoDataMap) * (double) ag3.size();
-        Double agTd = calculateMeanReactionDistanceToReferencePatients(
+        Double agTd = calculateMeanDistanceToReferencePatients(
                 queryPatient,
                 agT,
                 reactomeMechismoDataMap) * (double) agT.size();
@@ -375,60 +404,52 @@ public class CooccurrenceResult {
                                             String outputFilePrefix,
                                             ReactomeMechismoDataMap reactomeMechismoDataMap) {
         Map<Patient, List<Double>> patientToDistanceList = new HashMap<>();
-        Map<Patient, List<Double>> patientToMembershipList = new HashMap<>();
-        Map<Integer, List<List<Patient>>> targetReactionGroupClusters = getPatientsWith123TMutations();
+        Map<Patient, List<Boolean>> patientToMembershipList = new HashMap<>();
+        Map<Integer, List<List<Patient>>> targetReactionGroupClusters = getTargetReactionGroupPatients();
         List<Integer> orderedClusterIDs = new ArrayList<>(targetReactionGroupClusters.keySet());
         Collections.sort(orderedClusterIDs);
 
         Integer patientCounter = 1;
         for (Patient patient : reactomeMechismoDataMap.getPatients()) {
             List<Double> distanceList = new ArrayList<>();
-            List<Double> membershipList = new ArrayList<>();
+            List<Boolean> membershipList = new ArrayList<>();
 
             //all Target Reaction Groups
 
             //TARGET REACTION GROUP DISTANCES
-            distanceList.add(calculateMeanReactionDistanceToReferencePatients(patient,
+            distanceList.add(calculateMeanDistanceToReferencePatients(patient,
                     aggregateAllPatients(samplesW1MutatedUpstreamRxn),
                     reactomeMechismoDataMap));
-            distanceList.add(calculateMeanReactionDistanceToReferencePatients(patient,
+            distanceList.add(calculateMeanDistanceToReferencePatients(patient,
                     aggregateAllPatients(samplesW2MutatedUpstreamRxns),
                     reactomeMechismoDataMap));
-            distanceList.add(calculateMeanReactionDistanceToReferencePatients(patient,
+            distanceList.add(calculateMeanDistanceToReferencePatients(patient,
                     aggregateAllPatients(samplesW3plusMutatedUpstreamRxns),
                     reactomeMechismoDataMap));
-            distanceList.add(calculateMeanReactionDistanceToReferencePatients(patient,
+            distanceList.add(calculateMeanDistanceToReferencePatients(patient,
                     aggregateAllPatients(samplesWTargetRxnMutations),
                     reactomeMechismoDataMap));
             distanceList.add(getMeanDistanceToAllClusteredPatients(patient, reactomeMechismoDataMap));
 
             //TARGET REACTION GROUP MEMBERSHIP
-            membershipList.add(aggregateAllPatients(samplesW1MutatedUpstreamRxn).contains(patient)
-                    ? 1.0d
-                    : 0.0d);
-            membershipList.add(aggregateAllPatients(samplesW2MutatedUpstreamRxns).contains(patient)
-                    ? 1.0d
-                    : 0.0d);
-            membershipList.add(aggregateAllPatients(samplesW3plusMutatedUpstreamRxns).contains(patient)
-                    ? 1.0d
-                    : 0.0d);
-            membershipList.add(aggregateAllPatients(samplesWTargetRxnMutations).contains(patient)
-                    ? 1.0d
-                    : 0.0d);
+            membershipList.add(aggregateAllPatients(samplesW1MutatedUpstreamRxn).contains(patient));
+            membershipList.add(aggregateAllPatients(samplesW2MutatedUpstreamRxns).contains(patient));
+            membershipList.add(aggregateAllPatients(samplesW3plusMutatedUpstreamRxns).contains(patient));
+            membershipList.add(aggregateAllPatients(samplesWTargetRxnMutations).contains(patient));
 
             //each Target Reaction Group
             for (Integer clusterID : orderedClusterIDs) {
                 //TARGET REACTION GROUP DISTANCES
-                distanceList.add(calculateMeanReactionDistanceToReferencePatients(patient,
+                distanceList.add(calculateMeanDistanceToReferencePatients(patient,
                         targetReactionGroupClusters.get(clusterID).get(0),
                         reactomeMechismoDataMap));
-                distanceList.add(calculateMeanReactionDistanceToReferencePatients(patient,
+                distanceList.add(calculateMeanDistanceToReferencePatients(patient,
                         targetReactionGroupClusters.get(clusterID).get(1),
                         reactomeMechismoDataMap));
-                distanceList.add(calculateMeanReactionDistanceToReferencePatients(patient,
+                distanceList.add(calculateMeanDistanceToReferencePatients(patient,
                         targetReactionGroupClusters.get(clusterID).get(2),
                         reactomeMechismoDataMap));
-                distanceList.add(calculateMeanReactionDistanceToReferencePatients(patient,
+                distanceList.add(calculateMeanDistanceToReferencePatients(patient,
                         targetReactionGroupClusters.get(clusterID).get(3),
                         reactomeMechismoDataMap));
                 distanceList.add(getMeanDistanceToTargetReactionGroupAllClusteredPatients(patient,
@@ -436,18 +457,10 @@ public class CooccurrenceResult {
                         targetReactionGroupClusters.get(clusterID)));
 
                 //TARGET REACTION GROUP MEMBERSHIP
-                membershipList.add(targetReactionGroupClusters.get(clusterID).get(0).contains(patient)
-                        ? 1.0d
-                        : 0.0d);
-                membershipList.add(targetReactionGroupClusters.get(clusterID).get(1).contains(patient)
-                        ? 1.0d
-                        : 0.0d);
-                membershipList.add(targetReactionGroupClusters.get(clusterID).get(2).contains(patient)
-                        ? 1.0d
-                        : 0.0d);
-                membershipList.add(targetReactionGroupClusters.get(clusterID).get(3).contains(patient)
-                        ? 1.0d
-                        : 0.0d);
+                membershipList.add(targetReactionGroupClusters.get(clusterID).get(0).contains(patient));
+                membershipList.add(targetReactionGroupClusters.get(clusterID).get(1).contains(patient));
+                membershipList.add(targetReactionGroupClusters.get(clusterID).get(2).contains(patient));
+                membershipList.add(targetReactionGroupClusters.get(clusterID).get(3).contains(patient));
             }
 
             patientToDistanceList.put(patient, distanceList);
@@ -503,12 +516,17 @@ public class CooccurrenceResult {
             for (Patient patient : patientToDistanceList.keySet()) {
                 StringBuilder patientData = new StringBuilder();
                 for (int i = 0; i < patientToDistanceList.get(patient).size(); i++) {
+                    Double dist = patientToDistanceList.get(patient).get(i);
+                    dist = dist.isNaN()
+                            ? -1.0d
+                            : dist;
                     patientData.append(String.format("%.100e,",
-                            patientToDistanceList.get(patient).get(i)));
+                            dist));
                 }
                 for (int i = 0; i < patientToMembershipList.get(patient).size(); i++) {
-                    patientData.append(String.format("%.100e,",
-                            patientToMembershipList.get(patient).get(i)));
+                    Boolean member = patientToMembershipList.get(patient).get(i);
+                    patientData.append(String.format("%d,",
+                            member ? 1 : 0));
                 }
                 patientData = new StringBuilder(patientData.substring(0, patientData.length() - 1));//remove trailing ','
 
@@ -526,11 +544,14 @@ public class CooccurrenceResult {
         }
     }
 
-    private Map<Integer, List<List<Patient>>> getPatientsWith123TMutations() {
+    private Map<Integer, List<List<Patient>>> getTargetReactionGroupPatients() {
         if (this.patientsWith123TMutations == null) {
             Map<Integer, List<List<Patient>>> clusterIDToPatients = new HashMap<>();
             for (int i = 0; i < targetRxns.size(); i++) {
-                if (pValue2EmpiricalPValueMap.get(pValues.get(i)) <= MAX_CLUSTER_EMPIRICAL_P_VALUE) {
+                if (pValue2EmpiricalPValueMap.get(pValues.get(i)) <= MAX_CLUSTER_EMPIRICAL_P_VALUE &&
+                        samplesWTargetRxnMutations.get(i).size() >= MIN_NUM_TARGET_RXN_PATIENTS &&
+                        (samplesW2MutatedUpstreamRxns.get(i).size() +
+                                samplesW3plusMutatedUpstreamRxns.get(i).size()) >= MIN_NUM_CO_RXN_PATIENTS) {
                     Integer clusterID = Math.abs(cooccurringUpstreamRxns.get(i).hashCode());
                     List<List<Patient>> patientSetList;
                     if (!clusterIDToPatients.containsKey(clusterID)) {
@@ -563,7 +584,7 @@ public class CooccurrenceResult {
     }
 
     public void writePatientGroupingsToFile(String outputDir, String outputFilePrefix) {
-        Map<Integer, List<List<Patient>>> clusterIDToPatients = getPatientsWith123TMutations();
+        Map<Integer, List<List<Patient>>> clusterIDToPatients = getTargetReactionGroupPatients();
 
         for (Integer clusterID : clusterIDToPatients.keySet()) {
             String outFilePath = outputDir + outputFilePrefix + "TargetReactionGroup" + clusterID + ".csv";
