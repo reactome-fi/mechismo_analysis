@@ -72,7 +72,7 @@ hinge.group.numeric.survival.data <- function(cancer.dist.column,
 
 generate.survival.plot <-
   function(cancer.code, surv, group, cancer.type, group.name) {
-    surv.fit <- survival::survfit(surv ~ group)
+    surv.fit <- survival::survfit(surv ~ group)# + cancer.type)
     
     png(
       paste(
@@ -84,7 +84,7 @@ generate.survival.plot <-
       )
     )
     par(mfrow = c(1, 1))
-    colors <- c("red", "green")
+    colors <- rainbow(length(unique(cancer.type)) * 2)
     plot(
       surv.fit,
       col = colors,
@@ -97,7 +97,7 @@ generate.survival.plot <-
     #       col = colors,
     #       cex = 0.5)
     
-    surv.diff <- survival::survdiff(surv ~ group)
+    surv.diff <- survival::survdiff(surv ~ group)# + cancer.type)
     chisq.pval <- pchisq(surv.diff$chisq, 1, lower.tail = FALSE)
     chisq.pvals <<- c(chisq.pval, chisq.pvals)
     mtext(paste("Chi squared p = ",
@@ -114,7 +114,7 @@ data.dir <-
   "/home/burkhart/Software/Ogmios/datasets/FirehoseClinical/"
 
 dist.file <- paste(result.dir,
-                   "PancancerTargetReactionGroupPatientDistances.csv",
+                   "HSNCTargetReactionGroupPatientDistances.csv",
                    sep = "")
 
 dist.df <- read.csv(dist.file,
@@ -127,7 +127,7 @@ dist.df <- read.csv(dist.file,
 for (column in 3:ncol(dist.df)) {
   print(paste("Processing column ", column, "...", sep = ""))
   clin.file <-
-    paste(data.dir, "pancancer.samplefeatures.txt", sep = "")
+    paste(data.dir, "HNSC-TP.samplefeatures.txt", sep = "")
   
   clin.df <- read.csv(
     clin.file,
@@ -159,7 +159,7 @@ for (column in 3:ncol(dist.df)) {
     dplyr::filter(tcga_participant_barcode %in%
                     cancer.dist.df$`Patient Barcode`)
   
-  cancer.code <- "Pancancer"
+  cancer.code <- "HNSC"
   cancer.dist.column <- as.matrix(cancer.dist.df[, c(1,2, column)])
   
     if (max(as.numeric(cancer.dist.column[, 3])) > 1) {
@@ -186,14 +186,22 @@ for (column in 3:ncol(dist.df)) {
         
         coxph.result <-
           survival::coxph(coxph.surv ~
-                            as.numeric(as.matrix(coxph.surv.clin[, 7]))) 
+                            as.numeric(as.matrix(coxph.surv.clin[, 7])))# +
+                            #as.factor(as.matrix(coxph.surv.clin[, 6]))) 
         
         coxph.summary <- summary(coxph.result)
+        
+        print(coxph.summary)
         
         logrank.pvals <<- coxph.summary$logtest[3]
         wald.pvals <<- coxph.summary$waldtest[3]
         score.pvals <<- coxph.summary$sctest[3]
       }
+      
+      cancer.clin.df <- cancer.clin.df %>%
+        dplyr::full_join(as.data.frame(cancer.dist.column),
+                         by=c("tcga_participant_barcode" = "Patient Barcode"))
+      
       surv.clin <-
         hinge.group.numeric.survival.data(cancer.dist.column,
                                           cancer.clin.df)
@@ -218,6 +226,10 @@ for (column in 3:ncol(dist.df)) {
     if (max(as.numeric(cancer.dist.column[, 3])) == 1) {
       included.patients <-
         cancer.dist.column[cancer.dist.column[, 3] == 1, ]
+      
+      cancer.clin.df <- cancer.clin.df %>%
+        dplyr::full_join(as.data.frame(cancer.dist.column),
+                         by=c("tcga_participant_barcode" = "Patient Barcode"))
       
       surv.clin <- cancer.clin.df %>%
         dplyr::rowwise() %>%
