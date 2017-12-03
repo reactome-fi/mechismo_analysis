@@ -114,7 +114,7 @@ data.dir <-
   "/home/burkhart/Software/Ogmios/datasets/FirehoseClinical/"
 
 dist.file <- paste(result.dir,
-                   "HSNCTargetReactionGroupPatientDistances.csv",
+                   "BLCATargetReactionGroupPatientDistances.csv",
                    sep = "")
 
 dist.df <- read.csv(dist.file,
@@ -127,7 +127,7 @@ dist.df <- read.csv(dist.file,
 for (column in 3:ncol(dist.df)) {
   print(paste("Processing column ", column, "...", sep = ""))
   clin.file <-
-    paste(data.dir, "HNSC-TP.samplefeatures.txt", sep = "")
+    paste(data.dir, "BLCA-TP.samplefeatures.txt", sep = "")
   
   clin.df <- read.csv(
     clin.file,
@@ -159,7 +159,7 @@ for (column in 3:ncol(dist.df)) {
     dplyr::filter(tcga_participant_barcode %in%
                     cancer.dist.df$`Patient Barcode`)
   
-  cancer.code <- "HNSC"
+  cancer.code <- "BLCA"
   cancer.dist.column <- as.matrix(cancer.dist.df[, c(1,2, column)])
   
     if (max(as.numeric(cancer.dist.column[, 3])) > 1) {

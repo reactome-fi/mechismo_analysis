@@ -8,8 +8,8 @@ import java.util.*;
 
 public class CooccurrenceResult {
     private final Double MAX_CLUSTER_EMPIRICAL_P_VALUE = 0.05;
-    private final Integer MIN_NUM_TARGET_RXN_PATIENTS = 5;
-    private final Integer MIN_NUM_CO_RXN_PATIENTS = 5;
+    private final Integer MIN_NUM_TARGET_RXN_PATIENTS = 3;
+    private final Integer MIN_NUM_CO_RXN_PATIENTS = 3;
     private List<Reaction> targetRxns;
     private List<Set<Reaction>> cooccurringUpstreamRxns;
     private List<Set<FI>> cooccurringUpstreamRxnFIs;
@@ -594,9 +594,11 @@ public class CooccurrenceResult {
             List<Patient> patientGroup3 = clusterIDToPatients.get(clusterID).get(2);
             List<Patient> patientGroup4 = clusterIDToPatients.get(clusterID).get(3);
             int numLines = Math.max(
-                    Math.max(patientGroup1.size(),
-                            patientGroup2.size()),
-                    patientGroup3.size());
+                    Math.max(
+                            Math.max(patientGroup1.size(),
+                                    patientGroup2.size()),
+                            patientGroup3.size()),
+                    patientGroup4.size());
             try {
                 fileUtility.setOutput(outFilePath);
                 fileUtility.printLine("1 Upstream Reaction Mutated," +

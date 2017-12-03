@@ -118,7 +118,7 @@ public class ProcessDatasetsDriver {
                             "/home/burkhart/Software/Ogmios/datasets/Mechismo/MechismoSamplesToReactions_103017.txt",
                             null,//"/home/burkhart/Software/Ogmios/datasets/Mechismo/tcga_mechismo_stat_pancancer.tsv",
                             "/home/burkhart/Software/Ogmios/results/Mechismo/",
-                            "Pancancer",//cancerType, //output filename prefix
+                            "",//cancerType, //output filename prefix
                             null,//cancerType, //set cancer type = null for pancancer
                             1,
                             100,
