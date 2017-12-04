@@ -8,8 +8,7 @@ import java.util.*;
 
 public class CooccurrenceResult {
     private final Double MAX_CLUSTER_EMPIRICAL_P_VALUE = 0.05;
-    private final Integer MIN_NUM_TARGET_RXN_PATIENTS = 3;
-    private final Integer MIN_NUM_CO_RXN_PATIENTS = 3;
+    private Integer MIN_NUM_TARGET_RXN_PATIENTS;
     private List<Reaction> targetRxns;
     private List<Set<Reaction>> cooccurringUpstreamRxns;
     private List<Set<FI>> cooccurringUpstreamRxnFIs;
@@ -47,7 +46,8 @@ public class CooccurrenceResult {
             List<Set<Mutation>> superDirectMutations,
             List<Set<Mutation>> directMutations,
             List<Double> pValues,
-            Boolean useRxnDist
+            Boolean useRxnDist,
+            Integer minNumTargetRxnPatients
     ) {
         this.targetRxns = targetRxns;
         this.cooccurringUpstreamRxns = cooccurringUpstreamRxns;
@@ -63,6 +63,7 @@ public class CooccurrenceResult {
         this.directMutations = directMutations;
         this.pValues = pValues;
         this.useRxnDist = useRxnDist;
+        this.MIN_NUM_TARGET_RXN_PATIENTS = minNumTargetRxnPatients;
 
         this.hashCodeToAgPatients = null;
         this.superIndirectMutatedGenes = null;
@@ -549,9 +550,7 @@ public class CooccurrenceResult {
             Map<Integer, List<List<Patient>>> clusterIDToPatients = new HashMap<>();
             for (int i = 0; i < targetRxns.size(); i++) {
                 if (pValue2EmpiricalPValueMap.get(pValues.get(i)) <= MAX_CLUSTER_EMPIRICAL_P_VALUE &&
-                        samplesWTargetRxnMutations.get(i).size() >= MIN_NUM_TARGET_RXN_PATIENTS &&
-                        (samplesW2MutatedUpstreamRxns.get(i).size() +
-                                samplesW3plusMutatedUpstreamRxns.get(i).size()) >= MIN_NUM_CO_RXN_PATIENTS) {
+                        samplesWTargetRxnMutations.get(i).size() >= MIN_NUM_TARGET_RXN_PATIENTS) {
                     Integer clusterID = Math.abs(cooccurringUpstreamRxns.get(i).hashCode());
                     List<List<Patient>> patientSetList;
                     if (!clusterIDToPatients.containsKey(clusterID)) {

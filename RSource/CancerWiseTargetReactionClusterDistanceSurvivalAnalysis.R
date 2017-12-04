@@ -6,6 +6,7 @@
 
 
 
+
 library(survival)
 library(magrittr)
 library(dplyr)
@@ -28,7 +29,7 @@ hinge.group.numeric.survival.data <- function(cancer.dist.column,
     head(quarterNumber) %>%
     max()
   lower.hinge.patients <-
-    cancer.dist.column[cancer.dist.column[, 3] <= lower.hinge, ]
+    cancer.dist.column[cancer.dist.column[, 3] <= lower.hinge,]
   upper.hinge <- cancer.dist.column %>%
     .[, 3] %>%
     as.numeric() %>%
@@ -36,7 +37,7 @@ hinge.group.numeric.survival.data <- function(cancer.dist.column,
     tail(quarterNumber) %>%
     min()
   upper.hinge.patients <-
-    cancer.dist.column[cancer.dist.column[, 3] >= upper.hinge, ]
+    cancer.dist.column[cancer.dist.column[, 3] >= upper.hinge,]
   return.df <- data.frame
   if (is.matrix(lower.hinge.patients) &
       is.matrix(upper.hinge.patients) &&
@@ -71,7 +72,11 @@ hinge.group.numeric.survival.data <- function(cancer.dist.column,
 
 
 generate.survival.plot <-
-  function(cancer.code, surv, group, cancer.type, group.name) {
+  function(cancer.code,
+           surv,
+           group,
+           cancer.type,
+           group.name) {
     surv.fit <- survival::survfit(surv ~ group)# + cancer.type)
     
     png(
@@ -109,12 +114,14 @@ generate.survival.plot <-
     print(surv.diff)
   }
 
+cancer.code <- "HNSC"
 result.dir <- "/home/burkhart/Software/Ogmios/results/Mechismo/"
 data.dir <-
   "/home/burkhart/Software/Ogmios/datasets/FirehoseClinical/"
 
 dist.file <- paste(result.dir,
-                   "BLCATargetReactionGroupPatientDistances.csv",
+                   cancer.code,
+                   "TargetReactionGroupPatientDistances.csv",
                    sep = "")
 
 dist.df <- read.csv(dist.file,
@@ -127,7 +134,7 @@ dist.df <- read.csv(dist.file,
 for (column in 3:ncol(dist.df)) {
   print(paste("Processing column ", column, "...", sep = ""))
   clin.file <-
-    paste(data.dir, "BLCA-TP.samplefeatures.txt", sep = "")
+    paste(data.dir, cancer.code, "-TP.samplefeatures.txt", sep = "")
   
   clin.df <- read.csv(
     clin.file,
@@ -159,89 +166,54 @@ for (column in 3:ncol(dist.df)) {
     dplyr::filter(tcga_participant_barcode %in%
                     cancer.dist.df$`Patient Barcode`)
   
-  cancer.code <- "BLCA"
-  cancer.dist.column <- as.matrix(cancer.dist.df[, c(1,2, column)])
+  cancer.dist.column <- as.matrix(cancer.dist.df[, c(1, 2, column)])
   
-    if (max(as.numeric(cancer.dist.column[, 3])) > 1) {
-      coxph.surv.clin <- cancer.clin.df %>%
-        dplyr::rowwise() %>%
-        dplyr::mutate(duration = ifelse(
-          vital_status == 1,
-          as.numeric(days_to_death),
-          as.numeric(days_to_last_followup)
-        )) %>%
-        dplyr::filter(!is.na(duration)) %>%
-        dplyr::filter(tcga_participant_barcode %in% cancer.dist.column[, 1]) %>%
-        dplyr::full_join(
-          as.data.frame(cancer.dist.column),
-          by = c("tcga_participant_barcode" = "Patient Barcode")
-        )
-      if (length(coxph.surv.clin$duration) > 1 &
-          length(coxph.surv.clin$vital_status) > 1) {
-        coxph.surv <- survival::Surv(
-          time = coxph.surv.clin$duration,
-          event = coxph.surv.clin$vital_status,
-          type = "right"
-        )
-        
-        coxph.result <-
-          survival::coxph(coxph.surv ~
-                            as.numeric(as.matrix(coxph.surv.clin[, 7])))# +
-                            #as.factor(as.matrix(coxph.surv.clin[, 6]))) 
-        
-        coxph.summary <- summary(coxph.result)
-        
-        print(coxph.summary)
-        
-        logrank.pvals <<- coxph.summary$logtest[3]
-        wald.pvals <<- coxph.summary$waldtest[3]
-        score.pvals <<- coxph.summary$sctest[3]
-      }
+  if (max(as.numeric(cancer.dist.column[, 3])) > 1) {
+    coxph.surv.clin <- cancer.clin.df %>%
+      dplyr::rowwise() %>%
+      dplyr::mutate(duration = ifelse(
+        vital_status == 1,
+        as.numeric(days_to_death),
+        as.numeric(days_to_last_followup)
+      )) %>%
+      dplyr::filter(!is.na(duration)) %>%
+      dplyr::filter(tcga_participant_barcode %in% cancer.dist.column[, 1]) %>%
+      dplyr::full_join(
+        as.data.frame(cancer.dist.column),
+        by = c("tcga_participant_barcode" = "Patient Barcode")
+      )
+    if (length(coxph.surv.clin$duration) > 1 &
+        length(coxph.surv.clin$vital_status) > 1) {
+      coxph.surv <- survival::Surv(
+        time = coxph.surv.clin$duration,
+        event = coxph.surv.clin$vital_status,
+        type = "right"
+      )
       
-      cancer.clin.df <- cancer.clin.df %>%
-        dplyr::full_join(as.data.frame(cancer.dist.column),
-                         by=c("tcga_participant_barcode" = "Patient Barcode"))
+      coxph.result <-
+        survival::coxph(coxph.surv ~
+                          as.numeric(as.matrix(coxph.surv.clin[, 7])))# +
+      #as.factor(as.matrix(coxph.surv.clin[, 6])))
       
-      surv.clin <-
-        hinge.group.numeric.survival.data(cancer.dist.column,
-                                          cancer.clin.df)
-      if (!is.null(dim(surv.clin))) {
-        if (length(surv.clin$duration) > 1 &
-            length(surv.clin$vital_status) > 1) {
-          surv <- survival::Surv(
-            time = surv.clin$duration,
-            event = surv.clin$vital_status,
-            type = "right"
-          )
-          
-          generate.survival.plot(cancer.code,
-                                 surv,
-                                 surv.clin$group,
-                                 surv.clin$`Cancer Type`,
-                                 colnames(cancer.dist.column)[3])
-        }
-      }
+      coxph.summary <- summary(coxph.result)
+      
+      print(coxph.summary)
+      
+      logrank.pvals <<- coxph.summary$logtest[3]
+      wald.pvals <<- coxph.summary$waldtest[3]
+      score.pvals <<- coxph.summary$sctest[3]
     }
     
-    if (max(as.numeric(cancer.dist.column[, 3])) == 1) {
-      included.patients <-
-        cancer.dist.column[cancer.dist.column[, 3] == 1, ]
-      
-      cancer.clin.df <- cancer.clin.df %>%
-        dplyr::full_join(as.data.frame(cancer.dist.column),
-                         by=c("tcga_participant_barcode" = "Patient Barcode"))
-      
-      surv.clin <- cancer.clin.df %>%
-        dplyr::rowwise() %>%
-        dplyr::mutate(duration = ifelse(
-          vital_status == 1,
-          as.numeric(days_to_death),
-          as.numeric(days_to_last_followup)
-        )) %>%
-        dplyr::filter(!is.na(duration)) %>%
-        dplyr::mutate(group = ifelse(tcga_participant_barcode %in% included.patients[, 1],
-                                     1,
-                                     0))
+    cancer.clin.df <- cancer.clin.df %>%
+      dplyr::full_join(
+        as.data.frame(cancer.dist.column),
+        by = c("tcga_participant_barcode" = "Patient Barcode")
+      )
+    
+    surv.clin <-
+      hinge.group.numeric.survival.data(cancer.dist.column,
+                                        cancer.clin.df)
+    if (!is.null(dim(surv.clin))) {
       if (length(surv.clin$duration) > 1 &
           length(surv.clin$vital_status) > 1) {
         surv <- survival::Surv(
@@ -249,15 +221,59 @@ for (column in 3:ncol(dist.df)) {
           event = surv.clin$vital_status,
           type = "right"
         )
-        
-        generate.survival.plot(cancer.code,
-                               surv,
-                               surv.clin$group,
-                               surv.clin$`Cancer Type`,
-                               colnames(cancer.dist.column)[3])
+        if (length(unique(surv.clin$group)) > 1) {
+          generate.survival.plot(
+            cancer.code,
+            surv,
+            surv.clin$group,
+            surv.clin$`Cancer Type`,
+            colnames(cancer.dist.column)[3]
+          )
+        }
       }
     }
   }
+  
+  if (max(as.numeric(cancer.dist.column[, 3])) == 1) {
+    included.patients <-
+      cancer.dist.column[cancer.dist.column[, 3] == 1,]
+    
+    cancer.clin.df <- cancer.clin.df %>%
+      dplyr::full_join(
+        as.data.frame(cancer.dist.column),
+        by = c("tcga_participant_barcode" = "Patient Barcode")
+      )
+    
+    surv.clin <- cancer.clin.df %>%
+      dplyr::rowwise() %>%
+      dplyr::mutate(duration = ifelse(
+        vital_status == 1,
+        as.numeric(days_to_death),
+        as.numeric(days_to_last_followup)
+      )) %>%
+      dplyr::filter(!is.na(duration)) %>%
+      dplyr::mutate(group = ifelse(tcga_participant_barcode %in% included.patients[, 1],
+                                   1,
+                                   0))
+    if (length(surv.clin$duration) > 1 &
+        length(surv.clin$vital_status) > 1) {
+      surv <- survival::Surv(
+        time = surv.clin$duration,
+        event = surv.clin$vital_status,
+        type = "right"
+      )
+      if (length(unique(surv.clin$group)) > 1) {
+        generate.survival.plot(
+          cancer.code,
+          surv,
+          surv.clin$group,
+          surv.clin$`Cancer Type`,
+          colnames(cancer.dist.column)[3]
+        )
+      }
+    }
+  }
+}
 
 bh.chisq.pvals <- p.adjust(chisq.pvals, method = "BH")
 bh.logrank.pvals <- p.adjust(logrank.pvals, method = "BH")

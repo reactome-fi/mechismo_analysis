@@ -587,7 +587,8 @@ public class MechismoAnalyzer {
                                      boolean excludeMultipleImmediateUpstreamReactions,
                                      boolean rewireLargestComponentOnly,
                                      boolean useRxnDist,
-                                     String rxnFilter) throws Exception {
+                                     String rxnFilter,
+                                     Integer minNumTargetRxnPatients) throws Exception {
         ResourceMonitor resourceMonitor = new ResourceMonitor();
         resourceMonitor.StartMethodTimer();
 
@@ -642,10 +643,14 @@ public class MechismoAnalyzer {
                     rewiredReactionGraph.edgeSet().size(),
                     connectivityInspector.connectedSets().size()));
 
-            CooccurrenceResult rewiredNetworkResult = reactionGraphAnalyzer.SearchRxnNetworkAndCalculateCooccurrencePValues(rewiredReactionGraph,useRxnDist);
+            CooccurrenceResult rewiredNetworkResult =
+                    reactionGraphAnalyzer.SearchRxnNetworkAndCalculateCooccurrencePValues(
+                            rewiredReactionGraph,
+                    useRxnDist,
+                    minNumTargetRxnPatients);
 
             rewiredNetworkResult.CalculateBHAdjustedPValues();
-            rewiredNetworkResult.writeToFile(outputDir, "RandomRewiring_" + (i + 1) + "_");
+            //rewiredNetworkResult.writeToFile(outputDir, "RandomRewiring_" + (i + 1) + "_");
 
             resourceMonitor.CalculateMemUsed();
 
@@ -655,7 +660,11 @@ public class MechismoAnalyzer {
             resourceMonitor.EndLoopTimer(i + 1 + "");//start with iteration '1'
         }
 
-        CooccurrenceResult realResult = reactionGraphAnalyzer.SearchRxnNetworkAndCalculateCooccurrencePValues(reactionGraph,useRxnDist);
+        CooccurrenceResult realResult =
+                reactionGraphAnalyzer.SearchRxnNetworkAndCalculateCooccurrencePValues(
+                        reactionGraph,
+                        useRxnDist,
+                        minNumTargetRxnPatients);
 
         realResult.CalculateBHAdjustedPValues();
         realResult.CalculateEmpiricalPValues(rewiredNetworkResults);

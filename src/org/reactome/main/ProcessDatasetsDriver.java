@@ -109,8 +109,57 @@ public class ProcessDatasetsDriver {
                         "datasets/firehose_data/all_oncotated_calls",
                         "datasets/guanming_known_drivers.txt");
             } else if (Integer.parseInt(ex) == 5) {
-                //String[] cancerTypes = new String[]{"PAAD","SKCM","LIHC","LGG","HNSC","LUAD","OV","GBM"};
-                //for(String cancerType : cancerTypes) {
+                String[] cancerTypes = new String[]{
+                        "BRCA",
+                        "KI",
+                        "GBM",
+                        "OV",
+                        "LUAD",
+                        "UCEC",
+                        "KIRC",
+                        "HNSC",
+                        "LGG",
+                        "THCA",
+                        "LUSC",
+                        "PRAD",
+                        "COAD",
+                        "STAD",
+                        "LIHC",
+                        "BLCA",
+                        "SKCM",
+                        "CESC",
+                        "KIRP",
+                        "SARC",
+                        "LAML",
+                        "PAAD"
+                };
+
+                Integer[] onePcts = new Integer[]{
+                        12,
+                        10,
+                        7,
+                        7,
+                        6,
+                        6,
+                        6,
+                        6,
+                        6,
+                        6,
+                        6,
+                        6,
+                        5,
+                        5,
+                        5,
+                        5,
+                        4,
+                        4,
+                        3,
+                        3,
+                        3,
+                        2
+                };
+
+                for(int i = 0; i < cancerTypes.length; i++) {
                     new MechismoAnalyzer().mapReactomeReactions(
                             cancerDriverReactomeAnalyzer,
                             "/home/burkhart/Software/Ogmios/datasets/Mechismo/TCGA_mech_output.tsv",
@@ -118,8 +167,8 @@ public class ProcessDatasetsDriver {
                             "/home/burkhart/Software/Ogmios/datasets/Mechismo/MechismoSamplesToReactions_103017.txt",
                             null,//"/home/burkhart/Software/Ogmios/datasets/Mechismo/tcga_mechismo_stat_pancancer.tsv",
                             "/home/burkhart/Software/Ogmios/results/Mechismo/",
-                            "",//cancerType, //output filename prefix
-                            null,//cancerType, //set cancer type = null for pancancer
+                            cancerTypes[i], //output filename prefix
+                            cancerTypes[i], //set cancer type = null for pancancer
                             1,
                             100,
                             0.0,
@@ -129,9 +178,10 @@ public class ProcessDatasetsDriver {
                             false,
                             false,
                             false,
-                            "No" // Rxn Filter
+                            "No", // Rxn Filter
+                            onePcts[i]
                     );
-                //}
+                }
             } else {
                 System.out.println("An error occurred.");
             }

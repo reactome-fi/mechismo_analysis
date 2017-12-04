@@ -34,7 +34,8 @@ public class ReactionGraphAnalyzer {
 
     public CooccurrenceResult SearchRxnNetworkAndCalculateCooccurrencePValues(
             DirectedGraph<Long, DefaultEdge> reactionGraph,
-            Boolean useRxnDist) throws MathException {
+            Boolean useRxnDist,
+            Integer minNumTargetRxnPatients) throws MathException {
 
         Set<TargetReactionCandidate> targetReactionCandidates = SearchRxnNetworkForTargetReactionCandidates(
                 reactionGraph);
@@ -45,7 +46,8 @@ public class ReactionGraphAnalyzer {
         return CalculateCooccurrencePValues(
                 targetReactionCandidates,
                 reactionGraph,
-                useRxnDist);
+                useRxnDist,
+                minNumTargetRxnPatients);
     }
 
     private Set<TargetReactionCandidate> SearchRxnNetworkForTargetReactionCandidates(
@@ -124,7 +126,8 @@ public class ReactionGraphAnalyzer {
     private CooccurrenceResult CalculateCooccurrencePValues(
             Set<TargetReactionCandidate> targetReactionCandidates,
             DirectedGraph<Long, DefaultEdge> reactionGraph,
-            Boolean useRxnDist) throws MathException {
+            Boolean useRxnDist,
+            Integer minNUmTargetRxnPatients) throws MathException {
 
         List<Reaction> allTargetRxns = new ArrayList<>();
         List<Set<Reaction>> allCooccurringUpstreamRxns = new ArrayList<>();
@@ -378,7 +381,8 @@ public class ReactionGraphAnalyzer {
                 allSuperDirectMutations,
                 allDirectMutations,
                 allPValues,
-                useRxnDist);
+                useRxnDist,
+                minNUmTargetRxnPatients);
     }
 
     private Set<Reaction[]> GenerateReactionSetPairs(Set<Reaction> reactionSet) {
