@@ -30,19 +30,24 @@ public class MechismoOutputLoader {
     private final String patientPatternString = "([A-Z]+:TCGA-[0-9A-Z-]+)";
     private double mechScoreLowerBoundInclusive;
     private double eThresh;
-    private String tcgaCancerType = null;
-    private String mechismoOuputFilePath = null;
-    private String mechismoFIFilterFilePath = null;
-    private Set<FI> fis = null;
-    private Set<String> fiFilter = null;
-    private Map<Mutation, Integer> mut2SampleCount = null;
-    private Map<Gene, Integer> gene2SampleCount = null;
-    private Map<Patient, Set<FI>> samples2fis = null;
-    private Map<FI, Set<Patient>> fis2Samples = null;
-    //TODO: decide whether or not to add protein B pos/res info to muts?
-    private Map<Patient, Map<FI, Set<Mutation>>> samples2fis2muts = null;
-    private Pattern sampleIDPattern = null;
-    private Matcher sampleIDMatcher = null;
+    private String tcgaCancerType;
+    private String mechismoOuputFilePath;
+    private String mechismoFIFilterFilePath;
+
+    private Set<FI> fis;
+    private Map<Patient, Set<FI>> patientsToFIs;
+    private Map<FI, Set<Patient>> fisToPatients;
+    private Map<Patient, Map<FI, Set<Mutation>>> patientToFIsToMutations;
+
+    private Map<Gene, Integer> gene2SampleCount;
+    private Map<Mutation, Integer> mut2SampleCount;
+    private Set<String> fiFilter;
+    private Pattern sampleIDPattern;
+    private Matcher sampleIDMatcher;
+
+    public MechismoOutputLoader(String mechismoOuputFilePath){
+        this(mechismoOuputFilePath,null,null,0.0d,1.0d);
+    }
 
     public MechismoOutputLoader(String mechismoOutputFilePath,
                                 String mechismoFIFilterFilePath,
@@ -55,6 +60,31 @@ public class MechismoOutputLoader {
         this.mechScoreLowerBoundInclusive = mechScoreLowerBoundInclusive;
         this.eThresh = eThresh;
         this.sampleIDPattern = Pattern.compile(this.patientPatternString);
+        ParseMechismoOutputFile(mechismoOuputFilePath);
+    }
+
+    public Set<FI> getFIs(Patient patient){
+        return this.patientToFIsToMutations.get(patient).keySet();
+    }
+
+    public Set<FI> getFIs(){
+        return this.fis;
+    }
+
+    public Set<Patient> getPatients(FI fi){
+        return this.fisToPatients.get(fi);
+    }
+
+    public Set<Patient> getPatients(){
+       return this.patientsToFIs.keySet();
+    }
+
+    public Boolean hasMutations(Patient patient){
+        return this.patientToFIsToMutations.containsKey(patient);
+    }
+
+    public Set<Mutation> getMutations(Patient patient, FI fi){
+        return this.patientToFIsToMutations.get(patient).get(fi);
     }
 
     private void ParseMechismoFIFilterFile() {
@@ -91,11 +121,11 @@ public class MechismoOutputLoader {
     private void ParseMechismoOutputFile(String mechismoOuputFilePath) {
         ParseMechismoFIFilterFile();
         this.fis = new HashSet<>();
-        this.samples2fis = new HashMap<>();
-        this.fis2Samples = new HashMap<>();
+        this.patientsToFIs = new HashMap<>();
+        this.fisToPatients = new HashMap<>();
         this.mut2SampleCount = new HashMap<>();
         this.gene2SampleCount = new HashMap<>();
-        this.samples2fis2muts = new HashMap<>();
+        this.patientToFIsToMutations = new HashMap<>();
         FileUtility fileUtility = new FileUtility();
         try {
             fileUtility.setInput(mechismoOuputFilePath);
@@ -149,33 +179,34 @@ public class MechismoOutputLoader {
                                         }
                                         this.mut2SampleCount.put(mutation, mutationCount);
 
-                                        //update samples2fis
+                                        //update patientsToFIs
                                         Patient patient = new Patient(
                                                 patientData[1].trim().toUpperCase(),
                                                 patientData[0].trim().toUpperCase());
+
                                         Set<FI> sampleFIs;
-                                        if (samples2fis.containsKey(patient)) {
-                                            sampleFIs = samples2fis.get(patient);
+                                        if (patientsToFIs.containsKey(patient)) {
+                                            sampleFIs = patientsToFIs.get(patient);
                                         } else {
                                             sampleFIs = new HashSet<>();
                                         }
                                         sampleFIs.add(fi);
-                                        samples2fis.put(patient, sampleFIs);
+                                        patientsToFIs.put(patient, sampleFIs);
 
                                         //update fis2samples
                                         Set<Patient> fiSamples;
-                                        if (fis2Samples.containsKey(fi)) {
-                                            fiSamples = fis2Samples.get(fi);
+                                        if (fisToPatients.containsKey(fi)) {
+                                            fiSamples = fisToPatients.get(fi);
                                         } else {
                                             fiSamples = new HashSet<>();
                                         }
                                         fiSamples.add(patient);
-                                        fis2Samples.put(fi, fiSamples);
+                                        fisToPatients.put(fi, fiSamples);
 
-                                        //update samples2fis2muts
+                                        //update patientToFIsToMutations
                                         Map<FI, Set<Mutation>> fis2muts;
-                                        if (samples2fis2muts.containsKey(patient)) {
-                                            fis2muts = samples2fis2muts.get(patient);
+                                        if (patientToFIsToMutations.containsKey(patient)) {
+                                            fis2muts = patientToFIsToMutations.get(patient);
                                         } else {
                                             fis2muts = new HashMap<>();
                                         }
@@ -187,7 +218,7 @@ public class MechismoOutputLoader {
                                         }
                                         muts.add(mutation);
                                         fis2muts.put(fi, muts);
-                                        samples2fis2muts.put(patient, fis2muts);
+                                        patientToFIsToMutations.put(patient, fis2muts);
                                         fis.add(fi);
                                     }
                                 }
@@ -203,57 +234,5 @@ public class MechismoOutputLoader {
                     ioe.getMessage(),
                     Arrays.toString(ioe.getStackTrace())));
         }
-    }
-
-    public Map<Patient, Map<FI, Set<Mutation>>> ExtractSamples2FIs2Muts() {
-        return this.ExtractSamples2FIs2Muts(this.mechismoOuputFilePath);
-    }
-
-    public Map<Patient, Map<FI, Set<Mutation>>> ExtractSamples2FIs2Muts(String mechismoOuputFilePath) {
-        if (this.samples2fis2muts == null) {
-            this.ParseMechismoOutputFile(mechismoOuputFilePath);
-        }
-        return this.samples2fis2muts;
-    }
-
-    public Map<FI, Set<Patient>> ExtractFIs2Samples() {
-        return this.ExtractFIs2Samples(this.mechismoOuputFilePath);
-    }
-
-    public Map<FI, Set<Patient>> ExtractFIs2Samples(String mechismoOuputFilePath) {
-        if (this.fis2Samples == null) {
-            this.ParseMechismoOutputFile(mechismoOuputFilePath);
-        }
-        return this.fis2Samples;
-    }
-
-    public Map<Patient, Set<FI>> ExtractPatientsToFIs() {
-        return this.ExtractPatientsToFIs(this.mechismoOuputFilePath);
-    }
-
-    public Map<Patient, Set<FI>> ExtractPatientsToFIs(String mechismoOuputFilePath) {
-        if (this.samples2fis == null) {
-            this.ParseMechismoOutputFile(mechismoOuputFilePath);
-        }
-        return this.samples2fis;
-    }
-
-    public Set<FI> ExtractMechismoFIs() {
-        return this.ExtractMechismoFIs(this.mechismoOuputFilePath);
-    }
-
-    public Set<FI> ExtractMechismoFIs(String mechismoOuputFilePath) {
-        if (this.fis == null) {
-            this.ParseMechismoOutputFile(mechismoOuputFilePath);
-        }
-        return this.fis;
-    }
-
-    public Map<Mutation, Integer> getMut2SampleCount() {
-        return mut2SampleCount;
-    }
-
-    public Map<Gene, Integer> getGene2SampleCount() {
-        return gene2SampleCount;
     }
 }

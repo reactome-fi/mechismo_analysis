@@ -2,9 +2,9 @@ package org.reactome.cancer;
 
 import java.util.Objects;
 
-public class Reaction{
-    private Long reactionID;
-    private String reactionName;
+public final class Reaction{
+    private final Long reactionID;
+    private final String reactionName;
     public Reaction(Long reactionID,
                     String reactionName){
         this.reactionID = reactionID;

@@ -680,4 +680,77 @@ public class MechismoAnalyzer {
         resourceMonitor.CalculateMemUsed();
         resourceMonitor.EndMethodTimer();
     }
+    public void analyzeInterfaceCooccurrence(CancerDriverReactomeAnalyzer cancerDriverReactomeAnalyzer,
+                                             String mechismoOutputFilePath,
+                                             String reactomeReactionNetworkFilePath,
+                                             String outputDir) throws Exception {
+        System.out.println("Loading reactome data...");
+        ReactomeReactionGraphLoader reactomeReactionGraphLoader =
+                new ReactomeReactionGraphLoader(
+                        reactomeReactionNetworkFilePath);
+
+        System.out.println("Loading mechismo data...");
+        MechismoOutputLoader mechismoOutputLoader =
+                new MechismoOutputLoader(mechismoOutputFilePath);
+
+        System.out.println("Mapping reactome & mechismo data...");
+        ReactomeMechismoDataMap reactomeMechismoDataMap =
+                new ReactomeMechismoDataMap(
+                        cancerDriverReactomeAnalyzer,
+                        mechismoOutputLoader,
+                        reactomeReactionGraphLoader);
+
+        //accumulate cooccurrence of FI pairs with hashMap
+        Map<Set<FI>,Double> fiPairCooccurrence = new HashMap<>();
+
+        Integer nPatients = reactomeMechismoDataMap.getNumPatients();
+
+        FisherExact fisherExact = new FisherExact(nPatients);
+
+        int x = 0;
+
+        for(FI fi : reactomeMechismoDataMap.getFIs()){
+            Set<Patient> patientsAffectedByFirstFI = reactomeMechismoDataMap.getPatients(fi);
+            Set<FI> cooccurringFIs = new HashSet<>();
+            for(Patient patient : patientsAffectedByFirstFI){
+                cooccurringFIs.addAll(reactomeMechismoDataMap.getFIs(patient));
+            }
+            //find ABCDs -- this will find every pair multiple times... check hash first
+            for(FI cooccurringFI : cooccurringFIs){
+                if(!fi.equals(cooccurringFI)) {
+                    Set<FI> fiPair = new HashSet<>();
+                    fiPair.add(fi);
+                    fiPair.add(cooccurringFI);
+                    if (!fiPairCooccurrence.containsKey(fiPair)) {
+                        Set<Patient> patientsAffectedBySecondFI =
+                                reactomeMechismoDataMap.getPatients(cooccurringFI);
+
+                        Set<Patient> patientsAffectedByBothFIs = new HashSet<>(patientsAffectedByFirstFI);
+                        patientsAffectedByBothFIs.retainAll(patientsAffectedBySecondFI);
+                        Integer D = patientsAffectedByBothFIs.size();
+
+                        if (D > 5) {
+                            Set<Patient> patientsAffectedBySecondFIOnly = new HashSet<>(patientsAffectedBySecondFI);
+                            patientsAffectedBySecondFIOnly.removeAll(patientsAffectedByBothFIs);
+                            Integer C = patientsAffectedBySecondFIOnly.size();
+
+                            Set<Patient> patientsAffectedByFirstFIOnly = new HashSet<>(patientsAffectedByFirstFI);
+                            patientsAffectedByFirstFIOnly.removeAll(patientsAffectedByBothFIs);
+                            Integer B = patientsAffectedByFirstFIOnly.size();
+
+                            Integer A = nPatients - (B + C + D);
+
+                            Double p = fisherExact.getRightTailedP(A, B, C, D);
+                            fiPairCooccurrence.put(fiPair, p);
+                        }
+                    }
+                }
+            }
+            x++;
+            if(x % 1000 == 0) {
+                System.out.println("processed " + x + " of " + reactomeMechismoDataMap.getFIs().size() + " fis...");
+            }
+        }
+        System.out.println("done.");
+    }
 }

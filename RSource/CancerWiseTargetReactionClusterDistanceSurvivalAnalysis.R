@@ -114,7 +114,7 @@ generate.survival.plot <-
     print(surv.diff)
   }
 
-cancer.code <- "HNSC"
+cancer.code <- "SKCM"
 result.dir <- "/home/burkhart/Software/Ogmios/results/Mechismo/"
 data.dir <-
   "/home/burkhart/Software/Ogmios/datasets/FirehoseClinical/"
@@ -150,8 +150,8 @@ for (column in 3:ncol(dist.df)) {
       is.na(`Patient Barcode`),
       NA,
       stringr::str_extract(`Patient Barcode`,
-                           "TCGA-[0-9A-Z]{2}-[0-9A-Z]{4}")
-    ))
+                           "TCGA-[0-9A-Z]{2}-[0-9A-Z]{4}"))) %>%
+    dplyr::filter(as.character(`Cancer Type`) == cancer.code)
   
   cancer.clin.df <- clin.df %>%
     dplyr::mutate(
@@ -210,9 +210,52 @@ for (column in 3:ncol(dist.df)) {
         by = c("tcga_participant_barcode" = "Patient Barcode")
       )
     
-    surv.clin <-
-      hinge.group.numeric.survival.data(cancer.dist.column,
-                                        cancer.clin.df)
+    quarterNumber <- round(nrow(cancer.dist.column) / 4)
+    lower.hinge <- cancer.dist.column %>%
+      .[, 3] %>%
+      as.numeric() %>%
+      sort() %>%
+      head(quarterNumber) %>%
+      max()
+    lower.hinge.patients <-
+      cancer.dist.column[cancer.dist.column[, 3] <= lower.hinge,]
+    upper.hinge <- cancer.dist.column %>%
+      .[, 3] %>%
+      as.numeric() %>%
+      sort() %>%
+      tail(quarterNumber) %>%
+      min()
+    upper.hinge.patients <-
+      cancer.dist.column[cancer.dist.column[, 3] >= upper.hinge,]
+    surv.clin <- data.frame
+    if (is.matrix(lower.hinge.patients) &
+        is.matrix(upper.hinge.patients) &&
+        nrow(lower.hinge.patients > 1) &&
+        nrow(upper.hinge.patients > 1)) {
+      surv.clin <- cancer.clin.df %>%
+        dplyr::rowwise() %>%
+        dplyr::mutate(duration = ifelse(
+          vital_status == 1,
+          as.numeric(days_to_death),
+          as.numeric(days_to_last_followup)
+        )) %>%
+        dplyr::filter(!is.na(duration)) %>%
+        dplyr::mutate(
+          group = ifelse(
+            tcga_participant_barcode %in% lower.hinge.patients[, 1],
+            "L",
+            "X"
+          ),
+          group = ifelse(
+            tcga_participant_barcode %in% upper.hinge.patients[, 1],
+            "U",
+            group
+          )
+        ) %>%
+        dplyr::filter(group != "X") %>%
+        dplyr::mutate(group = as.factor(group))
+    }
+    
     if (!is.null(dim(surv.clin))) {
       if (length(surv.clin$duration) > 1 &
           length(surv.clin$vital_status) > 1) {

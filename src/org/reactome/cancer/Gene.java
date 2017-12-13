@@ -2,15 +2,14 @@ package org.reactome.cancer;
 
 import java.util.Objects;
 
-public class Gene implements Comparable<Gene> {
-    private String hgncName;
-    private String uniprotID;
+public final class Gene implements Comparable<Gene> {
+    private final String hgncName;
+    private final String uniprotID;
     public Gene(String hgncName,
                 String uniprotID){
         this.hgncName = hgncName.toUpperCase();
         this.uniprotID = uniprotID.toUpperCase();
     }
-
 
     public String getHgncName() {
         return hgncName;
@@ -27,8 +26,7 @@ public class Gene implements Comparable<Gene> {
 
     @Override
     public int hashCode(){
-        return Objects.hash(this.hgncName,
-                this.uniprotID);
+        return Objects.hash(this.hgncName,this.uniprotID);
     }
 
     @Override

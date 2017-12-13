@@ -51,6 +51,7 @@ public class ProcessDatasetsDriver {
                 "Prepare Heatmap Data 3\n" +
                 "Compare Known Drivers 4\n" +
                 "Map Mechismo Reactome Reactions 5\n" +
+                "Analyze Mechismo Interface Co-occurrence 6\n" +
                 "Cancel <enter>\n");
         Scanner scanner = new Scanner(System.in);
         String ex = scanner.nextLine();
@@ -182,6 +183,13 @@ public class ProcessDatasetsDriver {
                             onePcts[i]
                     );
                 }
+            }else if(Integer.parseInt(ex) == 6){
+                new MechismoAnalyzer().analyzeInterfaceCooccurrence(
+                        cancerDriverReactomeAnalyzer,
+                        "/home/burkhart/Software/Ogmios/datasets/Mechismo/TCGA_mech_output.tsv",
+                        "/home/burkhart/Software/Ogmios/datasets/ReactionNetwork_070517.txt",
+                        "/home/burkhart/Software/Ogmios/results/Mechismo/"
+                );
             } else {
                 System.out.println("An error occurred.");
             }

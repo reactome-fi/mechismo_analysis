@@ -1,22 +1,26 @@
 package org.reactome.cancer;
 
-import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Objects;
 
-public class FI{
-    private Gene[] genes;
+public final class FI{
+    private final List<Gene> genes;
     public FI(Gene gene1, Gene gene2){
-        this.genes = new Gene[]{gene1,gene2};
-        Arrays.sort(this.genes);
+        this.genes = new ArrayList<>();
+        this.genes.add(gene1);
+        this.genes.add(gene2);
+        Collections.sort(this.genes);
     }
 
-    public Gene[] getGenes() {
+    public List<Gene> getGenes() {
         return genes;
     }
 
     @Override
     public int hashCode(){
-        return Objects.hash(this.genes);
+        return Objects.hash(this.genes.get(0),this.genes.get(1));
     }
 
     @Override
@@ -29,7 +33,7 @@ public class FI{
     @Override
     public String toString(){
         return String.format("%s-%s",
-                genes[0].getHgncName(),
-                genes[1].getHgncName());
+                genes.get(0).getHgncName(),
+                genes.get(1).getHgncName());
     }
 }

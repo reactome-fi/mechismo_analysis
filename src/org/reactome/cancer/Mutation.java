@@ -2,11 +2,11 @@ package org.reactome.cancer;
 
 import java.util.Objects;
 
-public class Mutation{
-    private Gene gene;
-    private Integer position;
-    private Character normalResidue;
-    private Character mutResidue;
+public final class Mutation{
+    private final Gene gene;
+    private final Integer position;
+    private final Character normalResidue;
+    private final Character mutResidue;
     public Mutation(Gene gene,
                     Integer position,
                     Character normalResidue,

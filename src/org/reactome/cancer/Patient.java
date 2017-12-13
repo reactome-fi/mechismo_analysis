@@ -2,9 +2,9 @@ package org.reactome.cancer;
 
 import java.util.Objects;
 
-public class Patient {
-    private String tcgaBarcode;
-    private String cancerType;
+public final class Patient {
+    private final String tcgaBarcode;
+    private final String cancerType;
     public Patient(String tcgaBarcode,String cancerType){
         this.tcgaBarcode = tcgaBarcode;
         this.cancerType = cancerType;
