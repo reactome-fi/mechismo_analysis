@@ -11,7 +11,6 @@ import org.gk.model.GKInstance;
 import org.gk.persistence.MySQLAdaptor;
 import org.junit.Test;
 import org.reactome.cancer.InteractionInterfaceAnalyzer;
-import org.reactome.data.ReactomeDatabaseModifier;
 import org.reactome.r3.CosmicAnalyzer;
 import org.reactome.r3.Interactome3dAnalyzer;
 import org.reactome.r3.ReactomeAnalyzer;

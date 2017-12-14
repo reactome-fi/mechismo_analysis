@@ -28,6 +28,7 @@ import org.apache.commons.math.MathException;
 import org.apache.commons.math.stat.correlation.PearsonsCorrelation;
 import org.apache.commons.math.stat.correlation.SpearmansCorrelation;
 import org.gk.model.GKInstance;
+import org.gk.persistence.MySQLAdaptor;
 import org.junit.Test;
 import org.reactome.annotate.AnnotationHelper;
 import org.reactome.annotate.GeneSetAnnotation;
@@ -297,20 +298,132 @@ public class MechismoAnalyzer {
     }
     
     @Test
+    public void analyzeSampleClusterReactions() throws Exception {
+        String cancer = "LGG";
+        cancer = "UCEC";
+        cancer = "HNSC";
+        
+        String fileName = "results/" + cancer + "TwoClusters_112917.txt";
+        
+        String srcFileName = "datasets/Mechismo/FrancescoResults/110317/tcga_mechismo_stat_cancer_wise_significant.tsv";
+        double fdrCutoff = 0.01d;
+        boolean hasHeader = false;
+
+        Map<String, Set<String>> sampleToReactions = loadSampleToReactions(srcFileName,
+                cancer,
+                fdrCutoff, 
+                hasHeader);
+
+        // Generate reaction names
+        CancerDriverReactomeAnalyzer reactomeAnalyzer = new CancerDriverReactomeAnalyzer();
+        MySQLAdaptor dba = reactomeAnalyzer.getDBA();
+        
+        
+        Map<String, Set<String>> clusterToSamples = loadSampleCluseters(fileName);
+        Map<String, List<String>> clusterToReactions = new HashMap<>();
+        clusterToSamples.forEach((cluster, samples) -> {
+            Set<String> reactions = new HashSet<>();
+            samples.forEach(sample -> reactions.addAll(sampleToReactions.get(sample)));
+            List<String> idList = new ArrayList<>(reactions);
+            idList.sort(Comparator.naturalOrder());
+            System.out.println(cluster + ": " + samples.size() + " samples, " + reactions.size() + " reactions");
+            try {
+                for (String id : idList) {
+                    GKInstance reaction = dba.fetchInstance(new Long(id));
+                    System.out.println(id + "\t" + reaction.getDisplayName());
+                }
+            }
+            catch(Exception e) {}
+            System.out.println();
+            clusterToReactions.put(cluster, idList);
+        });
+        
+        // Get shared reactions
+        List<String> shared = new ArrayList<>();
+        clusterToReactions.forEach((cluster, reactions) -> {
+            if (shared.size() == 0)
+                shared.addAll(reactions);
+            else
+                shared.retainAll(reactions);
+        });
+        System.out.println("\nShared reactions: " + shared.size());
+        for (String id : shared) {
+            GKInstance reaction = dba.fetchInstance(new Long(id));
+            System.out.println(id + "\t" + reaction.getDisplayName());
+        }
+        
+        // Get different reactions
+        System.out.println("\nUnique reactions:");
+        for (String cluster : clusterToReactions.keySet()) {
+            List<String> reactions = clusterToReactions.get(cluster);
+            reactions.removeAll(shared);
+            System.out.println("\n" + cluster + ": " + reactions.size() + " reactions");
+            for (String id : reactions) {
+                GKInstance reaction = dba.fetchInstance(new Long(id));
+                System.out.println(id + "\t" + reaction.getDisplayName());
+            }
+        }
+    }
+    
+    /**
+     * Load sample cluster results output from R script.
+     * @param fileName
+     * @return
+     * @throws IOException
+     */
+    private Map<String, Set<String>> loadSampleCluseters(String fileName) throws IOException {
+        Map<String, Set<String>> clusterToSamples = new HashMap<>();
+        fu.setInput(fileName);
+        String line = null;
+        String cluster = null;
+        while ((line = fu.readLine()) != null) {
+            if (line.startsWith("Total clusters"))
+                continue;
+            if (line.startsWith("Cluster ")) {
+                int index = line.indexOf(":");
+                cluster = line.substring(0, index).trim();
+                continue;
+            }
+            if (cluster != null) {
+                String[] tokens = line.split("\t");
+                Set<String> set = Arrays.asList(tokens).stream().collect(Collectors.toSet());
+                clusterToSamples.put(cluster,  set);
+                cluster = null;
+            }
+        }
+        
+        fu.close();
+        return clusterToSamples;
+    }
+    
+    @Test
     public void calculateSampleDistancesOnReactionNetwork() throws IOException {
+        
         String cancer = "GBM";
         cancer = "PAAD";
-//        cancer = "SKCM";
+        cancer = "SKCM";
 //        cancer = "LGG";
 //        cancer = "UCEC";
         cancer = "COADREAD";
-        cancer = "THCA";
-        cancer = "STAD";
-        cancer = "LUAD";
-        cancer = "HNSC";
+//        cancer = "THCA";
+//        cancer = "STAD";
+//        cancer = "LUAD";
+//        cancer = "HNSC";
         
-//        Map<String, Set<String>> sampleToReactions = loadSampleToReactions(cancer);
-        Map<String, Set<String>> sampleToReactions = loadSampleToReactions(cancer, 0.01d);
+        // Generate distances based on significant reactions only
+//        String srcFileName = "datasets/Mechismo/FrancescoResults/110317/tcga_mechismo_stat_cancer_wise_significant.tsv";
+//        double fdrCutoff = 0.01d;
+//        boolean hasHeader = false;
+        
+        // Generate distances based on all reactions
+        String srcFileName = "datasets/Mechismo/FrancescoResults/110317/tcga_mechismo_stat_cancer_wise.tsv";
+        double fdrCutoff = 1.01d;
+        boolean hasHeader = true;
+
+        Map<String, Set<String>> sampleToReactions = loadSampleToReactions(srcFileName,
+                                                                           cancer,
+                                                                           fdrCutoff, 
+                                                                           hasHeader);
 
         // A quick quality check
         sampleToReactions.forEach((sample, set) -> System.out.println(sample + "\t" + set.size()));
@@ -328,6 +441,7 @@ public class MechismoAnalyzer {
         String date = "103117";
         date = "111317";
         date = "111617"; // Should be a very quick way to calculate distances in BFS
+        date = "112817"; // Use all reactions
         
         String fileName = "results/MechismoSamplePairWiseReactionNetworkDist_" + cancer + "_" + date + ".txt";
         
@@ -363,11 +477,14 @@ public class MechismoAnalyzer {
      * @return
      * @throws IOException
      */
-    private Map<String, Set<String>> loadSampleToReactions(String cancer, double fdrCutoff) throws IOException {
-        String srcFileName = "datasets/Mechismo/FrancescoResults/110317/tcga_mechismo_stat_cancer_wise_significant.tsv";
+    private Map<String, Set<String>> loadSampleToReactions(String srcFileName,
+                                                           String cancer, 
+                                                           double fdrCutoff,
+                                                           boolean hasHeader) throws IOException {
         Map<String, Set<String>> sampleToReactions = new HashMap<>();
         try (Stream<String> stream = Files.lines(Paths.get(srcFileName))) {
-            stream.map(line -> line.split("\t"))
+            stream.skip(hasHeader ? 1 : 0)
+                  .map(line -> line.split("\t"))
                   .filter(tokens -> tokens[0].equals(cancer)) // Filter to cancer type
                   .filter(tokens -> !tokens[13].equals("-")) // Need to have reactions
                   .filter(tokens -> Double.parseDouble(tokens[11]) < fdrCutoff) // Less than the predefined fdr cutoff
