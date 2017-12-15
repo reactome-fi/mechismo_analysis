@@ -27,6 +27,7 @@ public class MechismoOutputLoader {
     private final int resB1Idx = 38;
     private final int ebIdx = 43;
     private final String rxnKlass = "hetero";
+    private final String junkString = "{ECO:0000312";
     private final String patientPatternString = "([A-Z]+:TCGA-[0-9A-Z-]+)";
     private double mechScoreLowerBoundInclusive;
     private double eThresh;
@@ -137,6 +138,12 @@ public class MechismoOutputLoader {
                         rxnKlass.equals(tokens[rxnKlassIdx]) &&
                         new Double(tokens[eaIdx]) < eThresh &&
                         new Double(tokens[ebIdx]) < eThresh) {
+                    //remove junk strings
+                    for(int i = 0; i < tokens.length; i++){
+                        if(tokens[i].contains(junkString)){
+                            tokens[i] = tokens[i].split(" ")[0];
+                        }
+                    }
                     String hgncNameA = tokens[nameA1Idx];
                     String hgncNameB = tokens[nameB1Idx];
                     if (this.fiFilter == null ||

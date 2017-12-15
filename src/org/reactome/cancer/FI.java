@@ -5,7 +5,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
-public final class FI{
+public final class FI implements Comparable<FI>{
     private final List<Gene> genes;
     public FI(Gene gene1, Gene gene2){
         this.genes = new ArrayList<>();
@@ -21,6 +21,11 @@ public final class FI{
     @Override
     public int hashCode(){
         return Objects.hash(this.genes.get(0),this.genes.get(1));
+    }
+
+    @Override
+    public int compareTo(FI o) {
+        return o.getGenes().get(0).getHgncName().compareTo(this.genes.get(0).getHgncName());
     }
 
     @Override

@@ -700,8 +700,15 @@ public class MechismoAnalyzer {
                         mechismoOutputLoader,
                         reactomeReactionGraphLoader);
 
-        //accumulate cooccurrence of FI pairs with hashMap
-        Map<Set<FI>,Double> fiPairCooccurrence = new HashMap<>();
+        //accumulate cooccurrence of FI pairs & p-values
+        List<Set<FI>> fiPairs = new ArrayList<>();
+        Set<Set<FI>> fiPairsSet = new HashSet<>();
+        List<Double> pvalues = new ArrayList<>();
+
+        List<Integer> avalues = new ArrayList<>();
+        List<Integer> bvalues = new ArrayList<>();
+        List<Integer> cvalues = new ArrayList<>();
+        List<Integer> dvalues = new ArrayList<>();
 
         Integer nPatients = reactomeMechismoDataMap.getNumPatients();
 
@@ -717,11 +724,14 @@ public class MechismoAnalyzer {
             }
             //find ABCDs -- this will find every pair multiple times... check hash first
             for(FI cooccurringFI : cooccurringFIs){
-                if(!fi.equals(cooccurringFI)) {
+                Set<Gene> pairGenes = new HashSet<>();
+                pairGenes.addAll(fi.getGenes());
+                pairGenes.addAll(cooccurringFI.getGenes());
+                if(pairGenes.size() == 4) { // ensure FI pairs don't share genes
                     Set<FI> fiPair = new HashSet<>();
                     fiPair.add(fi);
                     fiPair.add(cooccurringFI);
-                    if (!fiPairCooccurrence.containsKey(fiPair)) {
+                    if (!fiPairsSet.contains(fiPair)) {
                         Set<Patient> patientsAffectedBySecondFI =
                                 reactomeMechismoDataMap.getPatients(cooccurringFI);
 
@@ -729,7 +739,7 @@ public class MechismoAnalyzer {
                         patientsAffectedByBothFIs.retainAll(patientsAffectedBySecondFI);
                         Integer D = patientsAffectedByBothFIs.size();
 
-                        if (D > 5) {
+                        if (D > 3) {
                             Set<Patient> patientsAffectedBySecondFIOnly = new HashSet<>(patientsAffectedBySecondFI);
                             patientsAffectedBySecondFIOnly.removeAll(patientsAffectedByBothFIs);
                             Integer C = patientsAffectedBySecondFIOnly.size();
@@ -741,7 +751,13 @@ public class MechismoAnalyzer {
                             Integer A = nPatients - (B + C + D);
 
                             Double p = fisherExact.getRightTailedP(A, B, C, D);
-                            fiPairCooccurrence.put(fiPair, p);
+                            avalues.add(A);
+                            bvalues.add(B);
+                            cvalues.add(C);
+                            dvalues.add(D);
+                            fiPairs.add(fiPair);
+                            fiPairsSet.add(fiPair);
+                            pvalues.add(p);
                         }
                     }
                 }
@@ -750,6 +766,44 @@ public class MechismoAnalyzer {
             if(x % 1000 == 0) {
                 System.out.println("processed " + x + " of " + reactomeMechismoDataMap.getFIs().size() + " fis...");
             }
+        }
+        //calculate FDR
+        Map<Double,Double> pvalueFDRMap = new HashMap<>();
+        List<Double> pvaluesSorted = new ArrayList<>(pvalues);
+        List<Double> fdrs = MathUtilities.calculateFDRWithBenjaminiHochberg(pvaluesSorted);
+        for(int i = 0; i < fdrs.size(); i++){
+            pvalueFDRMap.put(pvaluesSorted.get(i),fdrs.get(i));
+        }
+        FileUtility fileUtility = new FileUtility();
+        String outFilePath = outputDir + "fiInterfaceCooccurrence.csv";
+        try{
+            fileUtility.setOutput(outFilePath);
+            fileUtility.printLine("FI Pair," +
+                    "#Samples With Neither Interface Mutated," +
+                    "#Samples With First Interface Mutated," +
+                    "#Samples With Second Interface Mutated," +
+                    "#Samples With Both Interfaces Mutated," +
+                    "Fisher Exact P-value," +
+                    "BH Adjusted P-value");
+            for(int i = 0; i < fiPairs.size();i++){
+                List<FI> fiPair = new ArrayList<>(fiPairs.get(i));
+                Collections.sort(fiPair);
+                fileUtility.printLine(String.format("%s | %s,%d,%d,%d,%d,%.100e,%.100e",
+                        fiPair.get(0),
+                        fiPair.get(1),
+                        avalues.get(i),
+                        bvalues.get(i),
+                        cvalues.get(i),
+                        dvalues.get(i),
+                        pvalues.get(i),
+                        pvalueFDRMap.get(pvalues.get(i))));
+            }
+            fileUtility.close();
+        }catch(IOException ioe){
+            System.out.println(String.format("Couldn't use %s, %s: %s",
+                    outFilePath,
+                    ioe.getMessage(),
+                    Arrays.toString(ioe.getStackTrace())));
         }
         System.out.println("done.");
     }
