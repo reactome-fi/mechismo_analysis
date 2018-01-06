@@ -47,7 +47,11 @@ public class MechismoOutputLoader {
     private Matcher sampleIDMatcher;
 
     public MechismoOutputLoader(String mechismoOuputFilePath){
-        this(mechismoOuputFilePath,null,null,0.0d,1.0d);
+        this(mechismoOuputFilePath,
+                null,
+                null,
+                0.0d,
+                1.0d);
     }
 
     public MechismoOutputLoader(String mechismoOutputFilePath,

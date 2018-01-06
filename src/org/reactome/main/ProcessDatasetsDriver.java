@@ -187,6 +187,11 @@ public class ProcessDatasetsDriver {
                 new MechismoAnalyzer().analyzeInterfaceCooccurrence(
                         cancerDriverReactomeAnalyzer,
                         "/home/burkhart/Software/Ogmios/datasets/Mechismo/TCGA_mech_output.tsv",
+                        null,
+                        "SKCM",
+                        0.0d,
+                        1.0d,
+                        "/home/burkhart/Software/Ogmios/datasets/FIsInGene_031516_with_annotations.txt",
                         "/home/burkhart/Software/Ogmios/datasets/ReactionNetwork_070517.txt",
                         "/home/burkhart/Software/Ogmios/results/Mechismo/"
                 );

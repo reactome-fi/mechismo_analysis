@@ -10,9 +10,14 @@ import org.apache.commons.math.stat.correlation.SpearmansCorrelation;
 import org.apache.log4j.Logger;
 import org.gk.model.GKInstance;
 import org.jgrapht.DirectedGraph;
+import org.jgrapht.GraphPath;
 import org.jgrapht.alg.ConnectivityInspector;
+import org.jgrapht.alg.shortestpath.ALTAdmissibleHeuristic;
+import org.jgrapht.alg.shortestpath.AStarShortestPath;
+import org.jgrapht.alg.shortestpath.GraphMeasurer;
 import org.jgrapht.graph.DefaultDirectedGraph;
 import org.jgrapht.graph.DefaultEdge;
+import org.jgrapht.graph.Pseudograph;
 import org.junit.Test;
 import org.reactome.annotate.AnnotationHelper;
 import org.reactome.annotate.GeneSetAnnotation;
@@ -646,8 +651,8 @@ public class MechismoAnalyzer {
             CooccurrenceResult rewiredNetworkResult =
                     reactionGraphAnalyzer.SearchRxnNetworkAndCalculateCooccurrencePValues(
                             rewiredReactionGraph,
-                    useRxnDist,
-                    minNumTargetRxnPatients);
+                            useRxnDist,
+                            minNumTargetRxnPatients);
 
             rewiredNetworkResult.CalculateBHAdjustedPValues();
             //rewiredNetworkResult.writeToFile(outputDir, "RandomRewiring_" + (i + 1) + "_");
@@ -680,8 +685,14 @@ public class MechismoAnalyzer {
         resourceMonitor.CalculateMemUsed();
         resourceMonitor.EndMethodTimer();
     }
+
     public void analyzeInterfaceCooccurrence(CancerDriverReactomeAnalyzer cancerDriverReactomeAnalyzer,
                                              String mechismoOutputFilePath,
+                                             String mechismoFIFilterFilePath,
+                                             String tcgaCancerType,
+                                             double mechScoreLowerBoundInclusive,
+                                             double eThresh,
+                                             String fiNetworkFilePath,
                                              String reactomeReactionNetworkFilePath,
                                              String outputDir) throws Exception {
         System.out.println("Loading reactome data...");
@@ -691,7 +702,11 @@ public class MechismoAnalyzer {
 
         System.out.println("Loading mechismo data...");
         MechismoOutputLoader mechismoOutputLoader =
-                new MechismoOutputLoader(mechismoOutputFilePath);
+                new MechismoOutputLoader(mechismoOutputFilePath,
+                        mechismoFIFilterFilePath,
+                        tcgaCancerType,
+                        mechScoreLowerBoundInclusive,
+                        eThresh);
 
         System.out.println("Mapping reactome & mechismo data...");
         ReactomeMechismoDataMap reactomeMechismoDataMap =
@@ -700,7 +715,72 @@ public class MechismoAnalyzer {
                         mechismoOutputLoader,
                         reactomeReactionGraphLoader);
 
-        //accumulate cooccurrence of FI pairs & p-values
+        System.out.println("Generating FI network...");
+        FIGraphLoader fiGraphLoader =
+                new FIGraphLoader(
+                        fiNetworkFilePath,
+                        cancerDriverReactomeAnalyzer);
+
+        System.out.println("Converting to edgetic network...");
+        Pseudograph<FI, DefaultEdge> edgeticFIGraph = fiGraphLoader.getEdgeticFIGraph();
+
+        Map<Patient, Set<FI>> patientGraphCenters = calculatePatientGraphFIs(
+                edgeticFIGraph,
+                reactomeMechismoDataMap);
+
+        ConnectivityInspector connectivityInspector = new ConnectivityInspector(edgeticFIGraph);
+        GraphMeasurer graphMeasurer = new GraphMeasurer(edgeticFIGraph);
+        //Set<FI> graphCenter = graphMeasurer.getGraphCenter();
+        List<FI> randomOrderVertexes = new ArrayList<>(edgeticFIGraph.vertexSet());
+        Set<FI> fakeGraphCenter = new HashSet<>();
+        fakeGraphCenter.add(randomOrderVertexes.get(0));
+        fakeGraphCenter.add(randomOrderVertexes.get(1));
+        fakeGraphCenter.add(randomOrderVertexes.get(2));
+        fakeGraphCenter.add(randomOrderVertexes.get(3));
+        fakeGraphCenter.add(randomOrderVertexes.get(4));
+        ALTAdmissibleHeuristic altAdmissibleHeuristic = new ALTAdmissibleHeuristic(edgeticFIGraph,
+                fakeGraphCenter);
+        AStarShortestPath aStarShortestPath = new AStarShortestPath(edgeticFIGraph,
+                altAdmissibleHeuristic);
+
+        System.out.println("Calculating shortest paths between patient pairs...");
+        List<Patient> patientList = new ArrayList<>(reactomeMechismoDataMap.getPatients());
+        FileUtility fileUtility0 = new FileUtility();
+        String outFilePath0 = outputDir + "patientPairAvgShortestPathLengths.csv";
+        try {
+            fileUtility0.setOutput(outFilePath0);
+            fileUtility0.printLine("Patient 1," +
+                    "Patient 2," +
+                    "Average Shortest Path Length");
+            for (int i = 0; i < patientList.size() - 1; i++) {
+                for (int j = i + 1; j < patientList.size(); j++) {
+                    Patient patient1 = patientList.get(i);
+                    Patient patient2 = patientList.get(j);
+                    Double avgShortestPathLength =
+                            FindAverageShortestPathLengthBetweenPatients(
+                                    patientGraphCenters.get(patient1),
+                                    patientGraphCenters.get(patient2),
+                                    connectivityInspector,
+                                    aStarShortestPath);
+                    //write to file
+                    fileUtility0.printLine(String.format("%s,%s,%.3f",
+                            patient1,
+                            patient2,
+                            avgShortestPathLength));
+                }
+                System.out.println(String.format("Processed %d of %d patient pair distances...",
+                        i,
+                        (i * i) / 2));
+            }
+            fileUtility0.close();
+        } catch (IOException ioe) {
+            System.out.println(String.format("Couldn't use %s, %s: %s",
+                    outFilePath0,
+                    ioe.getMessage(),
+                    Arrays.toString(ioe.getStackTrace())));
+        }
+
+        System.out.println("Accumulating FI pair cooccurrences & p-values...");
         List<Set<FI>> fiPairs = new ArrayList<>();
         Set<Set<FI>> fiPairsSet = new HashSet<>();
         List<Double> pvalues = new ArrayList<>();
@@ -716,18 +796,18 @@ public class MechismoAnalyzer {
 
         int x = 0;
 
-        for(FI fi : reactomeMechismoDataMap.getFIs()){
+        for (FI fi : reactomeMechismoDataMap.getFIs()) {
             Set<Patient> patientsAffectedByFirstFI = reactomeMechismoDataMap.getPatients(fi);
             Set<FI> cooccurringFIs = new HashSet<>();
-            for(Patient patient : patientsAffectedByFirstFI){
+            for (Patient patient : patientsAffectedByFirstFI) {
                 cooccurringFIs.addAll(reactomeMechismoDataMap.getFIs(patient));
             }
             //find ABCDs -- this will find every pair multiple times... check hash first
-            for(FI cooccurringFI : cooccurringFIs){
+            for (FI cooccurringFI : cooccurringFIs) {
                 Set<Gene> pairGenes = new HashSet<>();
                 pairGenes.addAll(fi.getGenes());
                 pairGenes.addAll(cooccurringFI.getGenes());
-                if(pairGenes.size() == 4) { // ensure FI pairs don't share genes
+                if (pairGenes.size() == 4) { // ensure FI pairs don't share genes
                     Set<FI> fiPair = new HashSet<>();
                     fiPair.add(fi);
                     fiPair.add(cooccurringFI);
@@ -739,7 +819,7 @@ public class MechismoAnalyzer {
                         patientsAffectedByBothFIs.retainAll(patientsAffectedBySecondFI);
                         Integer D = patientsAffectedByBothFIs.size();
 
-                        if (D > 3) {
+                        if (D > 1) {
                             Set<Patient> patientsAffectedBySecondFIOnly = new HashSet<>(patientsAffectedBySecondFI);
                             patientsAffectedBySecondFIOnly.removeAll(patientsAffectedByBothFIs);
                             Integer C = patientsAffectedBySecondFIOnly.size();
@@ -763,20 +843,20 @@ public class MechismoAnalyzer {
                 }
             }
             x++;
-            if(x % 1000 == 0) {
+            if (x % 1000 == 0) {
                 System.out.println("processed " + x + " of " + reactomeMechismoDataMap.getFIs().size() + " fis...");
             }
         }
         //calculate FDR
-        Map<Double,Double> pvalueFDRMap = new HashMap<>();
+        Map<Double, Double> pvalueFDRMap = new HashMap<>();
         List<Double> pvaluesSorted = new ArrayList<>(pvalues);
         List<Double> fdrs = MathUtilities.calculateFDRWithBenjaminiHochberg(pvaluesSorted);
-        for(int i = 0; i < fdrs.size(); i++){
-            pvalueFDRMap.put(pvaluesSorted.get(i),fdrs.get(i));
+        for (int i = 0; i < fdrs.size(); i++) {
+            pvalueFDRMap.put(pvaluesSorted.get(i), fdrs.get(i));
         }
         FileUtility fileUtility = new FileUtility();
         String outFilePath = outputDir + "fiInterfaceCooccurrence.csv";
-        try{
+        try {
             fileUtility.setOutput(outFilePath);
             fileUtility.printLine("FI Pair," +
                     "#Samples With Neither Interface Mutated," +
@@ -785,7 +865,7 @@ public class MechismoAnalyzer {
                     "#Samples With Both Interfaces Mutated," +
                     "Fisher Exact P-value," +
                     "BH Adjusted P-value");
-            for(int i = 0; i < fiPairs.size();i++){
+            for (int i = 0; i < fiPairs.size(); i++) {
                 List<FI> fiPair = new ArrayList<>(fiPairs.get(i));
                 Collections.sort(fiPair);
                 fileUtility.printLine(String.format("%s | %s,%d,%d,%d,%d,%.100e,%.100e",
@@ -799,12 +879,58 @@ public class MechismoAnalyzer {
                         pvalueFDRMap.get(pvalues.get(i))));
             }
             fileUtility.close();
-        }catch(IOException ioe){
+        } catch (IOException ioe) {
             System.out.println(String.format("Couldn't use %s, %s: %s",
                     outFilePath,
                     ioe.getMessage(),
                     Arrays.toString(ioe.getStackTrace())));
         }
         System.out.println("done.");
+    }
+
+    private Map<Patient, Set<FI>> calculatePatientGraphFIs(Pseudograph<FI, DefaultEdge> edgeticFIGraph,
+                                                           ReactomeMechismoDataMap reactomeMechismoDataMap) {
+        Map<Patient, Set<FI>> patientGraphCenters = new HashMap<>();
+        for (Patient patient : reactomeMechismoDataMap.getPatients()) {
+            Set<FI> patientFIs = new HashSet<>(reactomeMechismoDataMap.getFIs(patient));
+            patientFIs.retainAll(edgeticFIGraph.vertexSet());
+            patientGraphCenters.put(patient, patientFIs);
+        }
+        return patientGraphCenters;
+    }
+
+    private Double FindAverageShortestPathLengthBetweenPatients(Set<FI> patient1GraphCenter,
+                                                                Set<FI> patient2GraphCenter,
+                                                                ConnectivityInspector connectivityInspector,
+                                                                AStarShortestPath aStarShortestPath) {
+        double pathLengthSum = 0.0d;
+        int pathCount = 0;
+
+        for (FI patient1FI : patient1GraphCenter) {
+            for (FI patient2FI : patient2GraphCenter) {
+                if (!patient1FI.equals(patient2FI) &&
+                        connectivityInspector.pathExists(patient1FI, patient2FI)) {
+                    pathCount++;
+                    try {
+                        GraphPath graphPath = aStarShortestPath.getPath(
+                                patient1FI,
+                                patient2FI);
+                        if (graphPath != null) {
+                            pathLengthSum +=
+                                    (double) graphPath.getLength();
+                        } else {
+                            int debug = 1;
+                        }
+                    } catch (NoSuchMethodError nme) {
+                        int debug = 1;
+                    }
+                    System.out.println(String.format("pathLengthSum = %.3f",
+                            pathLengthSum));
+                }
+            }
+        }
+        pathLengthSum = pathLengthSum / (double) pathCount;
+
+        return pathLengthSum;
     }
 }

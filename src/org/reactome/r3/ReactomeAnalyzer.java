@@ -403,6 +403,33 @@ public class ReactomeAnalyzer {
         return uniProtToGene;
     }
 
+    public Map<String, String> getGeneToUniprotMap(MySQLAdaptor dba) throws Exception {
+        Collection<GKInstance> refGeneProduct = dba.fetchInstanceByAttribute(ReactomeJavaConstants.ReferenceGeneProduct,
+                ReactomeJavaConstants.species,
+                "=",
+                48887L);
+        dba.loadInstanceAttributeValues(refGeneProduct, new String[]{
+                ReactomeJavaConstants.geneName,
+                ReactomeJavaConstants.identifier,
+                ReactomeJavaConstants.dataSource
+        });
+        Map<String, String> geneToUniprot = new HashMap<>();
+        for (GKInstance inst : refGeneProduct) {
+            GKInstance dataSource = (GKInstance) inst.getAttributeValue(ReactomeJavaConstants.dataSource);
+            // We want to use reactome only
+            if (dataSource != null)
+                continue;
+            String uniprotId = (String) inst.getAttributeValue(ReactomeJavaConstants.identifier);
+            String geneName = (String) inst.getAttributeValue(ReactomeJavaConstants.geneName);
+            if (uniprotId == null || geneName == null) {
+                System.err.println(inst + " doesn't have a gene name!");
+                continue;
+            }
+            geneToUniprot.put(geneName,uniprotId);
+        }
+        return geneToUniprot;
+    }
+
     public void generateFIsForReactionsWithFeatures(MySQLAdaptor dba,
                                                     Collection<Long> dbIds,
                                                     String fileName,
