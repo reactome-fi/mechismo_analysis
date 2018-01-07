@@ -1,7 +1,7 @@
 package org.reactome.cancer;
 
 import org.apache.commons.math.MathException;
-import org.jgrapht.DirectedGraph;
+import org.jgrapht.Graph;
 import org.jgrapht.graph.DefaultEdge;
 import org.reactome.r3.util.FisherExact;
 import org.reactome.r3.util.MathUtilities;
@@ -33,7 +33,7 @@ public class ReactionGraphAnalyzer {
     }
 
     public CooccurrenceResult SearchRxnNetworkAndCalculateCooccurrencePValues(
-            DirectedGraph<Long, DefaultEdge> reactionGraph,
+            Graph<Long, DefaultEdge> reactionGraph,
             Boolean useRxnDist,
             Integer minNumTargetRxnPatients) throws MathException {
 
@@ -51,7 +51,7 @@ public class ReactionGraphAnalyzer {
     }
 
     private Set<TargetReactionCandidate> SearchRxnNetworkForTargetReactionCandidates(
-            DirectedGraph<Long, DefaultEdge> reactionGraph) {
+            Graph<Long, DefaultEdge> reactionGraph) {
         Set<DefaultEdge> outgoingEdges = new HashSet<>();
         Set<Reaction> downstreamReactions = new HashSet<>();
         Set<TargetReactionCandidate> targetReactionCandidates = new HashSet<>();
@@ -75,7 +75,7 @@ public class ReactionGraphAnalyzer {
     }
 
     private TargetReactionCandidate CreateTargetReactionCandidate(
-            DirectedGraph<Long, DefaultEdge> reactionGraph,
+            Graph<Long, DefaultEdge> reactionGraph,
             Reaction downstreamReaction) {
         Set<DefaultEdge> incomingEdgesCpy = new HashSet<>(reactionGraph.incomingEdgesOf(downstreamReaction.getReactionID()));
         Set<Reaction> upstreamReactions = new HashSet<>();
@@ -125,7 +125,7 @@ public class ReactionGraphAnalyzer {
 
     private CooccurrenceResult CalculateCooccurrencePValues(
             Set<TargetReactionCandidate> targetReactionCandidates,
-            DirectedGraph<Long, DefaultEdge> reactionGraph,
+            Graph<Long, DefaultEdge> reactionGraph,
             Boolean useRxnDist,
             Integer minNUmTargetRxnPatients) throws MathException {
 

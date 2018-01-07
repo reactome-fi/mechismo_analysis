@@ -9,12 +9,13 @@ import org.apache.commons.math.stat.correlation.PearsonsCorrelation;
 import org.apache.commons.math.stat.correlation.SpearmansCorrelation;
 import org.apache.log4j.Logger;
 import org.gk.model.GKInstance;
-import org.jgrapht.DirectedGraph;
+import org.jgrapht.Graph;
 import org.jgrapht.GraphPath;
 import org.jgrapht.alg.ConnectivityInspector;
 import org.jgrapht.alg.shortestpath.ALTAdmissibleHeuristic;
 import org.jgrapht.alg.shortestpath.AStarShortestPath;
 import org.jgrapht.alg.shortestpath.GraphMeasurer;
+import org.jgrapht.graph.AsSubgraph;
 import org.jgrapht.graph.DefaultDirectedGraph;
 import org.jgrapht.graph.DefaultEdge;
 import org.jgrapht.graph.Pseudograph;
@@ -637,7 +638,7 @@ public class MechismoAnalyzer {
         for (int i = 0; i < numPermutations; i++) {
             resourceMonitor.StartLoopTimer();
 
-            DirectedGraph<Long, DefaultEdge> rewiredReactionGraph =
+            Graph<Long, DefaultEdge> rewiredReactionGraph =
                     randomGraphGenerator.GenerateRandomGraph(rewireLargestComponentOnly);
 
             ConnectivityInspector<Long, DefaultEdge> connectivityInspector =
@@ -734,10 +735,8 @@ public class MechismoAnalyzer {
         List<FI> randomOrderVertexes = new ArrayList<>(edgeticFIGraph.vertexSet());
         Set<FI> fakeGraphCenter = new HashSet<>();
         fakeGraphCenter.add(randomOrderVertexes.get(0));
-        fakeGraphCenter.add(randomOrderVertexes.get(1));
-        fakeGraphCenter.add(randomOrderVertexes.get(2));
-        fakeGraphCenter.add(randomOrderVertexes.get(3));
-        fakeGraphCenter.add(randomOrderVertexes.get(4));
+        //fakeGraphCenter.add(randomOrderVertexes.get(1));
+        //fakeGraphCenter.add(randomOrderVertexes.get(2));
         ALTAdmissibleHeuristic altAdmissibleHeuristic = new ALTAdmissibleHeuristic(edgeticFIGraph,
                 fakeGraphCenter);
         AStarShortestPath aStarShortestPath = new AStarShortestPath(edgeticFIGraph,
@@ -756,21 +755,24 @@ public class MechismoAnalyzer {
                 for (int j = i + 1; j < patientList.size(); j++) {
                     Patient patient1 = patientList.get(i);
                     Patient patient2 = patientList.get(j);
-                    Double avgShortestPathLength =
-                            FindAverageShortestPathLengthBetweenPatients(
-                                    patientGraphCenters.get(patient1),
-                                    patientGraphCenters.get(patient2),
-                                    connectivityInspector,
-                                    aStarShortestPath);
-                    //write to file
-                    fileUtility0.printLine(String.format("%s,%s,%.3f",
-                            patient1,
-                            patient2,
-                            avgShortestPathLength));
+                    if(patientGraphCenters.containsKey(patient1) &&
+                            patientGraphCenters.containsKey(patient2)) {
+                        Double avgShortestPathLength =
+                                FindAverageShortestPathLengthBetweenPatients(
+                                        patientGraphCenters.get(patient1),
+                                        patientGraphCenters.get(patient2),
+                                        connectivityInspector,
+                                        aStarShortestPath);
+                        //write to file
+                        fileUtility0.printLine(String.format("%s,%s,%.3f",
+                                patient1,
+                                patient2,
+                                avgShortestPathLength));
+                    }
                 }
                 System.out.println(String.format("Processed %d of %d patient pair distances...",
-                        i,
-                        (i * i) / 2));
+                        (i + 1) * patientList.size() - ((i + 1)*(i + 1))/2,
+                        (patientList.size() * patientList.size()) / 2));
             }
             fileUtility0.close();
         } catch (IOException ioe) {
@@ -894,7 +896,22 @@ public class MechismoAnalyzer {
         for (Patient patient : reactomeMechismoDataMap.getPatients()) {
             Set<FI> patientFIs = new HashSet<>(reactomeMechismoDataMap.getFIs(patient));
             patientFIs.retainAll(edgeticFIGraph.vertexSet());
-            patientGraphCenters.put(patient, patientFIs);
+            AsSubgraph<FI,DefaultEdge> patientSubgraph = new AsSubgraph<>(edgeticFIGraph,
+                    patientFIs);
+            GraphMeasurer graphMeasurer = new GraphMeasurer(patientSubgraph);
+            /*if(!patientFIs.isEmpty()) {
+                List<FI> fiList = new ArrayList<>(patientFIs);
+                int half = (fiList.size() / 2) + 1;
+                Set<FI> halfFISet = new HashSet<>();
+                for (int i = 0; i < half; i++) {
+                    halfFISet.add(fiList.get(i));
+                }
+                patientGraphCenters.put(patient, halfFISet);
+            }*/
+            patientGraphCenters.put(patient,graphMeasurer.getGraphCenter());
+            System.out.println(String.format("Calculated graph center for %d of %d patients...",
+                    patientGraphCenters.keySet().size(),
+                    reactomeMechismoDataMap.getPatients().size()));
         }
         return patientGraphCenters;
     }
@@ -924,12 +941,15 @@ public class MechismoAnalyzer {
                     } catch (NoSuchMethodError nme) {
                         int debug = 1;
                     }
-                    System.out.println(String.format("pathLengthSum = %.3f",
-                            pathLengthSum));
+                    //System.out.println(String.format("Calculated %d of %d possible paths between patients",
+                    //        pathCount,
+                    //        patient1GraphCenter.size() * patient2GraphCenter.size()));
                 }
             }
         }
-        pathLengthSum = pathLengthSum / (double) pathCount;
+        pathLengthSum = pathCount > 0
+        ? pathLengthSum / (double) pathCount
+        : (double) (patient1GraphCenter.size() * patient2GraphCenter.size());
 
         return pathLengthSum;
     }
