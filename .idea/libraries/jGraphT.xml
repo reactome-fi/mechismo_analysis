@@ -1,0 +1,20 @@
+<component name="libraryTable">
+  <library name="jGraphT">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/lib/jGraphT/jgraph-5.13.0.0.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/jGraphT/jgraph.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/jGraphT/jgrapht-core-1.0.0.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/jGraphT/jgrapht-core-1.1.0.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/jGraphT/jgrapht-demo-1.1.0.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/jGraphT/jgrapht-ext-1.1.0-uber.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/jGraphT/jgrapht-ext-1.1.0.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/jGraphT/jgrapht-io-1.1.0-uber.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/jGraphT/jgrapht-io-1.1.0.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/jGraphT/jgrapht-jdk1.5.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/jGraphT/jgraphx-2.0.0.1.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/jGraphT/TGGraphLayout.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

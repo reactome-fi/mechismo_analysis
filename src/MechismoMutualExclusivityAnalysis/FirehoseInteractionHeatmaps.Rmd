@@ -1,0 +1,137 @@
+---
+output:
+pdf_document: default
+html_document: default
+---
+# libs
+```{r}
+library(magrittr)
+library(dplyr)
+library(reshape2)
+library(ggplot2)
+library(ggdendro)
+library(Heatplus)
+library(gtable)
+library(grid)
+library(plotly)
+library(pheatmap)
+```
+
+# load ACC
+```{r}
+sample_df <- read.csv(input_csv_path,header = TRUE, sep=",")
+```
+# filter low 
+```{r}
+processed_ppi_sample_df <- sample_df %>%
+  dplyr::select(Sample,Interaction,Interface.Mutation.Present)
+
+processed_ppi_sample_df$Sample <- sub("(^[0-9A-Z-]+).*","\\1",as.character(processed_ppi_sample_df$Sample))
+processed_ppi_sample_df$Interaction <- sub("(.*)\t(.*)","\\1 \\2",as.character(processed_ppi_sample_df$Interaction))
+```
+
+# ggplot2 tile heatmap
+```{r}
+processed_ppi_sample_df %>%
+  ggplot2::ggplot(aes(x=as.character(Sample),y=Interaction,fill=Interface.Mutation.Present)) +
+  geom_tile() +
+  ylim(rev(sort(unique(as.character(processed_ppi_sample_df$Interaction))))) +
+  xlim(sort(unique(as.character(processed_ppi_sample_df$Sample)))) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.background = element_blank()) +
+  labs(title="Sample/Interaction p-value",
+       x="Sample",
+       y="Interaction") +
+  scale_fill_gradient2(name = "p-value",
+                       midpoint = 0.5,
+                       low="blue",
+                       mid="green",
+                       high="red")
+```
+
+# custom heatmap with dendrogram
+
+```{r}
+ppi_dendro <- processed_ppi_sample_df %>%
+  reshape(idvar = "Sample", timevar = "Interaction", direction = "wide")
+
+names(ppi_dendro) <- gsub("Interface.Mutation.Present.(.*)","\\1",names(ppi_dendro))
+
+rownames(ppi_dendro) <- ppi_dendro[,1]
+ppi_dendro <- ppi_dendro[,-1]
+ppi_dendro[is.na(ppi_dendro)] <- 0
+
+#dendogram data
+x <- as.matrix(ppi_dendro)
+
+dd.col <- as.dendrogram(hclust(dist(x)))
+dd.row <- as.dendrogram(hclust(dist(t(x))))
+
+dx <- dendro_data(dd.row)
+dy <- dendro_data(dd.col)
+
+# helper function for creating dendograms
+ggdend <- function(df) {
+  ggplot() +
+    geom_segment(data = df, aes(x=x, y=y, xend=xend, yend=yend)) +
+    labs(x = "", y = "") + theme_minimal() +
+    theme(axis.text = element_blank(), axis.ticks = element_blank(),
+          panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(),
+          panel.background = element_blank(),            
+          panel.grid = element_blank())
+}
+
+# x/y dendograms
+px <- ggdend(dx$segments)
+py <- ggdend(dy$segments) + coord_flip()
+
+# heatmap
+col.ord <- order.dendrogram(dd.col)
+row.ord <- order.dendrogram(dd.row)
+xx <- ppi_dendro[col.ord, row.ord]
+xx$sample <- rownames(xx)
+xx$sample <- with(xx, factor(sample, levels=sample))
+
+map <- reshape2::melt(xx, id.vars="sample") %>%
+  ggplot2::ggplot(aes(x=variable,y=sample,fill=value)) +
+  geom_tile() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.background = element_blank(),
+        legend.position="none") +
+  labs(x="Interaction",
+       y=paste("Sample (default)",sep="")) +
+  scale_fill_gradient2(name = "p-value",
+                       midpoint = 0.5,
+                       low="blue",
+                       mid="green",
+                       high="red")
+
+# from http://stackoverflow.com/questions/6673162/reproducing-lattice-dendrogram-graph-with-ggplot2
+### Draw graphic ###
+# width, height, x, y
+heatmap_image=c(0.7,0.8,0.4,0.45)
+ydendro=c(0.2,0.71,0.8,0.49)
+xdendro=c(0.58,0.2,0.45,0.9)
+
+grid.newpage()
+print(map, vp=viewport(width=heatmap_image[1], height=heatmap_image[2], x=heatmap_image[3], y=heatmap_image[4]))
+print(px, vp=viewport(width=xdendro[1], height=xdendro[2], x=xdendro[3], y=xdendro[4]))
+print(py, vp=viewport(width=ydendro[1], height=ydendro[2], x=ydendro[3], y=ydendro[4]))
+```
+
+# built-in heatmap libraries
+```{r}
+m <- ppi_dendro %>%
+  as.matrix()
+
+rownames(m) <- m[,1]
+m <- m[,-1]
+m[is.na(m)] <- 0
+Heatplus::heatmap_plus(m)
+pheatmap::pheatmap(m)
+```

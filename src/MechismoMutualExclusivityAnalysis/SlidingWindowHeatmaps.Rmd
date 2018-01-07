@@ -1,0 +1,77 @@
+---
+title: "Firehose PanCancer Interaction Heatmap"
+author: "Joshua Burkhart"
+date: "July 20, 2017"
+output:
+  pdf_document:
+    latex_engine: xelatex
+---
+
+# libs
+```{r}
+library(magrittr)
+library(plyr)
+library(dplyr)
+library(reshape2)
+library(ggplot2)
+library(ggdendro)
+library(Heatplus)
+library(gtable)
+library(grid)
+library(plotly)
+library(pheatmap)
+library(rJava)
+library(xlsxjars)
+library(openxlsx)
+
+output_xlsx1 <- "/media/burkhart/Media/Software/Ogmios/results/knownDriverData/KnownDriverHotspots.xlsx"
+output_svg1 <- "/home/burkhart/Software/Ogmios/results/knownDriverData/FirehosePanCancerKnownDriverHotspotHeatmap.svg"
+
+input_csvs <- list.files("/media/burkhart/Media/Software/Ogmios/results/knownDriverData/",pattern = "firehose_.*_mutationSignificance.csv",full.names = TRUE)
+input_known_drivers <- "/media/burkhart/Media/Software/Ogmios/datasets/guanming_known_drivers.txt"
+
+all_csvs <- lapply(input_csvs,read.csv,header=TRUE,sep=",")
+for(csvIdx in 1:length(all_csvs)){
+  all_csvs[[csvIdx]]$CancerType = sub(".*firehose_([A-Z]+)_.*","\\1",input_csvs[csvIdx])
+}
+
+sample_df <- do.call("rbind.fill",all_csvs)
+processed_ppi_sample_df <- sample_df %>%
+  dplyr::select(CancerType,Gene.Symbol,FDR) %>%
+  dplyr::mutate(N.Log10.FDR = -log10(FDR + 0.00001)) %>%
+  #dplyr::filter(FDR < 0.05) %>%
+  dplyr::select(CancerType,Gene.Symbol,N.Log10.FDR)
+
+ppi_dendro <- processed_ppi_sample_df %>%
+  reshape(idvar = "CancerType", timevar = "Gene.Symbol", direction = "wide")
+
+names(ppi_dendro) <- gsub("N.Log10.FDR.(.*)","\\1",names(ppi_dendro))
+
+rownames(ppi_dendro) <- ppi_dendro[,1]
+ppi_dendro <- ppi_dendro[,-1]
+ppi_dendro[is.na(ppi_dendro)] <- 0
+
+```
+
+```{r write_xlsx}
+sample_df %>%
+  write.xlsx(file=output_xlsx1)
+```
+
+```{r}
+m <- data.matrix(ppi_dendro, rownames.force = TRUE)
+
+img_height = 6
+img_width = 24
+svg(filename = output_svg1, width = img_width, height = img_height)
+pheatmap::pheatmap(m,
+                   color = c("white","grey","yellow","orange","red","darkred","purple"),
+                   main = "Known Driver Hotspot -log10(FDR) for Sliding Window of 5 AA",
+                   clustering_distance_cols = "euclidean",
+                   clustering_distance_rows = "euclidean",
+                   fontsize = 8,
+                   clustering_method = "complete",
+                   width = img_width,
+                   height = img_height)
+dev.off()
+```

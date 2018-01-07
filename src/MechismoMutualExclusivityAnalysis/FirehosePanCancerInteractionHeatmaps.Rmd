@@ -1,0 +1,124 @@
+---
+title: "Firehose PanCancer Interaction Heatmap"
+author: "Joshua Burkhart"
+date: "July 20, 2017"
+output:
+  pdf_document:
+    latex_engine: xelatex
+---
+
+# libs
+```{r}
+library(magrittr)
+library(plyr)
+library(dplyr)
+library(reshape2)
+library(ggplot2)
+library(ggdendro)
+library(Heatplus)
+library(gtable)
+library(grid)
+library(plotly)
+library(pheatmap)
+library(rJava)
+library(xlsxjars)
+library(openxlsx)
+
+output_xlsx1 <- "/media/burkhart/Media/Software/Ogmios/results/heatmapData/PPIsVsKnownDrivers.xlsx"
+output_xlsx2 <- "/media/burkhart/Media/Software/Ogmios/results/heatmapData/EnrichedNonDriverPPIs.xlsx"
+output_svg1 <- "/home/burkhart/Software/Ogmios/results/heatmapData/FirehosePanCancerInteractionHeatmap.svg"
+output_svg2 <- "/home/burkhart/Software/Ogmios/results/heatmapData/FirehosePanCancerNonDriverInteractionHeatmap.svg"
+
+input_csvs <- list.files("/media/burkhart/Media/Software/Ogmios/results/heatmapData/",pattern = "*total_interactions_with_mutated_interfaces.csv",full.names = TRUE)
+input_known_drivers <- "/media/burkhart/Media/Software/Ogmios/datasets/guanming_known_drivers.txt"
+
+all_csvs <- lapply(input_csvs,read.csv,header=TRUE,sep=",")
+for(csvIdx in 1:length(all_csvs)){
+  all_csvs[[csvIdx]]$CancerType = sub(".*firehose_([A-Z]+).*","\\1",input_csvs[csvIdx])
+}
+
+sample_df <- do.call("rbind.fill",all_csvs)
+processed_ppi_sample_df <- sample_df %>%
+  dplyr::select(CancerType,Interaction,P.Value,FDR) %>%
+  dplyr::mutate(N.Log10.FDR = -log10(FDR + 0.00001)) %>%
+  dplyr::filter(FDR < 0.05) %>%
+  dplyr::select(CancerType,Interaction,N.Log10.FDR)
+
+processed_ppi_sample_df$Interaction <- sub("(.*)\t(.*)","\\1 \\2",as.character(processed_ppi_sample_df$Interaction))
+ppi_dendro <- processed_ppi_sample_df %>%
+  reshape(idvar = "CancerType", timevar = "Interaction", direction = "wide")
+
+names(ppi_dendro) <- gsub("N.Log10.FDR.(.*)","\\1",names(ppi_dendro))
+
+rownames(ppi_dendro) <- ppi_dendro[,1]
+ppi_dendro <- ppi_dendro[,-1]
+ppi_dendro[is.na(ppi_dendro)] <- 0
+
+```
+
+```{r write_xlsx}
+colGenes <- c()
+for(colIdx in 1:ncol(ppi_dendro)){
+  colname <- colnames(ppi_dendro)[colIdx]
+  colGenes <- c(list(c(colname, unlist(strsplit(colname, split = " ")))), colGenes)
+}
+#colGenes <- unique(colGenes)
+
+colGenes <- data.frame(t(data.frame(colGenes))) %>%
+  dplyr::transmute(Interaction = as.character(X1),
+                   GeneName1 = as.character(X2),
+                   GeneName2 = as.character(X3))
+colGenes$InterfaceEnriched <- TRUE
+
+knownGenes <- read.table(file=input_known_drivers,header = FALSE) %>%
+  dplyr::transmute(GeneName = as.character(V1))
+knownGenes$KnownDriver <- TRUE
+
+enrichedVsKnown_df <- colGenes %>%
+  dplyr::left_join(by = c("GeneName1" = "GeneName"), knownGenes) %>%
+  dplyr::left_join(by = c("GeneName2" = "GeneName"), knownGenes) %>%
+  dplyr::mutate(NonDriverInteraction = (is.na(KnownDriver.x) & is.na(KnownDriver.y)))
+
+enrichedVsKnown_df %>%
+  write.xlsx(file=output_xlsx1)
+
+enrichedNonDriver_df <- enrichedVsKnown_df %>%
+  dplyr::filter(NonDriverInteraction == TRUE)
+
+sample_df %>%
+  dplyr::filter(Interaction %in% enrichedNonDriver_df$Interaction) %>%
+  write.xlsx(file=output_xlsx2)
+```
+
+```{r}
+m <- data.matrix(ppi_dendro, rownames.force = TRUE)
+
+img_height = 6
+img_width = 24
+svg(filename = output_svg1, width = img_width, height = img_height)
+pheatmap::pheatmap(m,
+                   color = c("white","grey","yellow","orange","red","darkred","purple"),
+                   main = "Pan Cancer Interaction -log10(FDR) for Interactions with FDR < 0.05",
+                   clustering_distance_cols = "euclidean",
+                   clustering_distance_rows = "euclidean",
+                   fontsize = 8,
+                   clustering_method = "complete",
+                   width = img_width,
+                   height = img_height)
+dev.off()
+
+enrichedNonDrivers <- m[,enrichedNonDriver_df$Interaction]
+img_height = 6
+img_width = 24
+svg(filename = output_svg2, width = img_width, height = img_height)
+pheatmap::pheatmap(enrichedNonDrivers,
+                   color = c("white","grey","yellow","orange","red","darkred","purple"),
+                   main = "Pan Cancer Interaction -log10(FDR) for Non-Driver Interactions with FDR < 0.05",
+                   clustering_distance_cols = "euclidean",
+                   clustering_distance_rows = "euclidean",
+                   fontsize = 8,
+                   clustering_method = "complete",
+                   width = img_width,
+                   height = img_height)
+dev.off()
+```

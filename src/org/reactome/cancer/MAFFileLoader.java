@@ -497,7 +497,7 @@ public class MAFFileLoader {
                         mutationMap = new HashMap<>();
                         mutationMap.put(coord1,new HashSet<>(Arrays.asList(mut1)));
                         mutationMap.put(coord2,new HashSet<>(Arrays.asList(mut2)));
-                        sampleGeneMap.put(geneSymbol,mutationMap);
+                        sampleMutatedGeneMap.put(geneSymbol,mutationMap);
                     }
                 }
                 else {
@@ -522,7 +522,7 @@ public class MAFFileLoader {
                     else {
                         mutationMap = new HashMap<>();
                         mutationMap.put(coord,new HashSet<>(Arrays.asList(mut)));
-                        sampleGeneMap.put(geneSymbol,mutationMap);
+                        sampleMutatedGeneMap.put(geneSymbol,mutationMap);
                     }
                 }
             }
@@ -535,7 +535,7 @@ public class MAFFileLoader {
             }
         }
         fu.close();
-        return sampleGeneMap;
+        return sampleMutatedGeneMap;
     }
 
     @Test

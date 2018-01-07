@@ -4,61 +4,59 @@
  */
 package org.reactome.cancer.driver;
 
+import org.apache.commons.math.MathException;
+import org.apache.commons.math.stat.correlation.PearsonsCorrelation;
+import org.apache.commons.math.stat.correlation.SpearmansCorrelation;
+import org.apache.log4j.Logger;
+import org.gk.model.GKInstance;
+import org.gk.persistence.MySQLAdaptor;
+import org.jgrapht.Graph;
+import org.jgrapht.GraphPath;
+import org.jgrapht.alg.ConnectivityInspector;
+import org.jgrapht.alg.shortestpath.ALTAdmissibleHeuristic;
+import org.jgrapht.alg.shortestpath.AStarShortestPath;
+import org.jgrapht.alg.shortestpath.GraphMeasurer;
+import org.jgrapht.graph.AsSubgraph;
+import org.jgrapht.graph.DefaultDirectedGraph;
+import org.jgrapht.graph.DefaultEdge;
+import org.jgrapht.graph.Pseudograph;
+import org.junit.Test;
+import org.reactome.annotate.AnnotationHelper;
+import org.reactome.annotate.GeneSetAnnotation;
+import org.reactome.annotate.PathwayBasedAnnotator;
+import org.reactome.cancer.*;
+import org.reactome.r3.Interactome3dAnalyzer;
+import org.reactome.r3.ReactionMapGenerator;
+import org.reactome.r3.ReactomeAnalyzer;
+import org.reactome.r3.graph.BreadthFirstSearch;
+import org.reactome.r3.util.*;
+
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import org.apache.commons.math.MathException;
-import org.apache.commons.math.stat.correlation.PearsonsCorrelation;
-import org.apache.commons.math.stat.correlation.SpearmansCorrelation;
-import org.gk.model.GKInstance;
-import org.gk.persistence.MySQLAdaptor;
-import org.junit.Test;
-import org.reactome.annotate.AnnotationHelper;
-import org.reactome.annotate.GeneSetAnnotation;
-import org.reactome.annotate.PathwayBasedAnnotator;
-import org.reactome.r3.Interactome3dAnalyzer;
-import org.reactome.r3.ReactionMapGenerator;
-import org.reactome.r3.ReactomeAnalyzer;
-import org.reactome.r3.graph.BreadthFirstSearch;
-import org.reactome.r3.util.FileUtility;
-import org.reactome.r3.util.FisherExact;
-import org.reactome.r3.util.InteractionUtilities;
-import org.reactome.r3.util.MathUtilities;
-import org.reactome.r3.util.Plotter;
-
 /**
  * @author gwu
- *
  */
 public class MechismoAnalyzer {
+    private final static Logger logger = Logger.getLogger(MechismoOutputLoader.class);
     private String dirName = "datasets/Mechismo/";
     private String outputFileName = dirName + "COSMICv74_somatic_noSNPs_GWS_mechismo_output.tsv";
     private String pciContactFile = dirName + "human_pci_contact_hits.tsv";
     private FileUtility fu = new FileUtility();
-    
+
     /**
      * Default constructor.
      */
     public MechismoAnalyzer() {
     }
-    
+
     public static void main(String[] args) throws Exception {
         MechismoAnalyzer analyzer = new MechismoAnalyzer();
         analyzer.analyzeDistribution();
@@ -649,34 +647,35 @@ public class MechismoAnalyzer {
                 .map(line -> line.split("\t"))
                 .filter(tokens -> tokens[tokens.length - 1].length() > 0)
                 .collect(Collectors.toMap(tokens -> tokens[1],
-                                          tokens -> new Double(tokens[tokens.length - 1]),
-                                          (v1, v2) -> (Math.abs(v1) > Math.abs(v2) ? v1 : v2)));
+                        tokens -> new Double(tokens[tokens.length - 1]),
+                        (v1, v2) -> (Math.abs(v1) > Math.abs(v2) ? v1 : v2)));
         System.out.println("Total reactions in mechismo scores: " + reactionToMechismo.size());
         return reactionToMechismo;
     }
-    
+
     /**
      * Analyze correlations between different measurements for Reactome reactions.
+     *
      * @throws IOException
      */
     @Test
     public void analyzeCorrelations() throws Exception {
         String resultDir = "results/";
-        
+
         // Check correlation between cancer driver gene enrichment scores and maximum Mechismo scores
         Map<String, Double> reactionToDriverEnrichment = new CancerDriverReactomeAnalyzer().loadReactionToCancerGeneEnrichment();
         Map<String, Double> reactionToMechismo = loadReactionToMaxMechismoScore();
         Map<String, Double> reactionToInteractome3dScore = new Interactome3dDriverAnalyzer().loadReactionTo3dScore();
-        
+
         System.out.println("\nCorrelation between driver enrichment and mechismo score:");
         analyzeCorrelation(reactionToDriverEnrichment, reactionToMechismo);
-        
+
         System.out.println("\nCorrelation between driver enrichment and interaction3d score:");
         analyzeCorrelation(reactionToDriverEnrichment, reactionToInteractome3dScore);
-        
+
         System.out.println("\nCorrelation between interaction3d score and driver enrichment:");
         analyzeCorrelation(reactionToInteractome3dScore, reactionToDriverEnrichment);
-        
+
         System.out.println("\nCorrelation between interaction3d and mechismo score:");
         analyzeCorrelation(reactionToInteractome3dScore, reactionToMechismo);
     }
@@ -688,32 +687,32 @@ public class MechismoAnalyzer {
 //        double scoreCutoff = 1.3d;
         double scoreCutoff = 2.0d;
         reactionToScore1.forEach((reaction, enrichment) -> {
-           if (enrichment < scoreCutoff) // Choose cutoff < 0.01
-               return;
-           if (reactionToScore2.containsKey(reaction)) { 
-               values1.add(enrichment);
-               values2.add(Math.abs(reactionToScore2.get(reaction)));
-           }
+            if (enrichment < scoreCutoff) // Choose cutoff < 0.01
+                return;
+            if (reactionToScore2.containsKey(reaction)) {
+                values1.add(enrichment);
+                values2.add(Math.abs(reactionToScore2.get(reaction)));
+            }
         });
         System.out.println("Score cutoff: " + scoreCutoff);
         System.out.println("Total selected reactions for correlation: " + values1.size());
-        
+
         PearsonsCorrelation correlation = MathUtilities.constructPearsonCorrelation(values1, values2);
-        System.out.println(correlation.getCorrelationMatrix().getEntry(0, 1) + ", " + 
-                           correlation.getCorrelationPValues().getEntry(0, 1));
-        
+        System.out.println(correlation.getCorrelationMatrix().getEntry(0, 1) + ", " +
+                correlation.getCorrelationPValues().getEntry(0, 1));
+
         SpearmansCorrelation spearman = MathUtilities.constructSpearmansCorrelation(values1, values2);
         correlation = spearman.getRankCorrelation();
-        System.out.printf("Correlation (rank): %f, correlation (via Pearson): %f, p-value: %f\n", 
-                          spearman.getCorrelationMatrix().getEntry(0, 1),
-                          correlation.getCorrelationMatrix().getEntry(0, 1),
-                          correlation.getCorrelationPValues().getEntry(0, 1));
-        
-        performFisherTest(reactionToScore1, 
-                          reactionToScore2);
+        System.out.printf("Correlation (rank): %f, correlation (via Pearson): %f, p-value: %f\n",
+                spearman.getCorrelationMatrix().getEntry(0, 1),
+                correlation.getCorrelationMatrix().getEntry(0, 1),
+                correlation.getCorrelationPValues().getEntry(0, 1));
+
+        performFisherTest(reactionToScore1,
+                reactionToScore2);
     }
 
-    protected void performFisherTest(Map<String, Double> reactionToScore1, 
+    protected void performFisherTest(Map<String, Double> reactionToScore1,
                                      Map<String, Double> reactionToScore2) {
         // Perform a Fisher exact test for sharing top reactions
         List<String> list1 = new ArrayList<>(reactionToScore1.keySet());
@@ -736,64 +735,64 @@ public class MechismoAnalyzer {
         // Take top 100
         int top = 100;
         Set<String> topShared = InteractionUtilities.getShared(list1.subList(0, top),
-                                                               list2.subList(0, top));
+                list2.subList(0, top));
         System.out.println("Chosen top reactions: " + top);
         System.out.println("Top shared: " + topShared.size());
         FisherExact fisherExact = new FisherExact(list1.size());
         double pvalue = fisherExact.getRightTailedP(topShared.size(),
-                                                    top - topShared.size(), 
-                                                    top - topShared.size(),
-                                                    list1.size() - 2 * top + topShared.size());
+                top - topShared.size(),
+                top - topShared.size(),
+                list1.size() - 2 * top + topShared.size());
         System.out.println("p-value from Fisher Exact test: " + pvalue);
     }
-    
+
     @Test
     public void analyzeDistribution() throws IOException {
         // Get scores involved known cancer genes only
         Set<String> cancerGenes = new CancerDriverAnalyzer().getDriverGenes(null);
         System.out.println("Total cancer genes: " + cancerGenes.size());
-        
+
         Path filePath = Paths.get(outputFileName);
-        
+
         List<Double> values = new ArrayList<>();
         List<Double> cancerGeneValues = new ArrayList<>();
         Map<String, Double> geneToMaxValue = new HashMap<>();
-        
+
         // Get scores
         Files.lines(filePath)
-        .map(line -> line.split("\t"))
-        .filter(tokens -> tokens.length >= 28)
+                .map(line -> line.split("\t"))
+                .filter(tokens -> tokens.length >= 28)
 //        .filter(tokens -> tokens[19].trim().length() > 0)
-        .forEach(tokens -> {
-            if (tokens[27].trim().length() == 0)
-                return;
-            Double value = new Double(tokens[27]);
-            values.add(value);
-            if (cancerGenes.contains(tokens[0]))
-                cancerGeneValues.add(value);
-            BiFunction<String, Double, Double> func = (k, v) -> 
-                                    (v == null || Math.abs(v) < Math.abs(value)) ? value : v;
-            geneToMaxValue.compute(tokens[0], func);
-        });
-        
+                .forEach(tokens -> {
+                    if (tokens[27].trim().length() == 0)
+                        return;
+                    Double value = new Double(tokens[27]);
+                    values.add(value);
+                    if (cancerGenes.contains(tokens[0]))
+                        cancerGeneValues.add(value);
+                    BiFunction<String, Double, Double> func = (k, v) ->
+                            (v == null || Math.abs(v) < Math.abs(value)) ? value : v;
+                    geneToMaxValue.compute(tokens[0], func);
+                });
+
         System.out.println("Total values: " + values.size());
         System.out.println("\tMinimum value: " + values.stream().mapToDouble(Double::doubleValue).min());
         System.out.println("Total cancer gene values: " + cancerGeneValues.size());
         System.out.println("\tMinimum value: " + cancerGeneValues.stream().mapToDouble(Double::doubleValue).min());
         System.out.println("Max values: " + geneToMaxValue.size());
         System.out.println("\tMinimum value: " + geneToMaxValue.values().stream().mapToDouble(Double::doubleValue).min());
-        
+
         // Two plots
         // All values
         Plotter plotter = new Plotter("Plot");
         Map<String, List<Double>> datasetToName = new HashMap<>();
         datasetToName.put("All Scores", values);
         datasetToName.put("Cancer Gene Scores", cancerGeneValues);
-        plotter.plotHistograpm(datasetToName, 
-                               11,
-                               "Histogram of Mechismo Score",
-                               "Mechismo Score",
-                               "Frequency");
+        plotter.plotHistograpm(datasetToName,
+                11,
+                "Histogram of Mechismo Score",
+                "Mechismo Score",
+                "Frequency");
         // Maximum values
         plotter = new Plotter("Plot");
         datasetToName = new HashMap<>();
@@ -802,23 +801,23 @@ public class MechismoAnalyzer {
         cancerGeneToMax.putAll(geneToMaxValue);
         cancerGeneToMax.keySet().retainAll(cancerGenes);
         datasetToName.put("Cancer Genes", new ArrayList<Double>(cancerGeneToMax.values()));
-        plotter.plotHistograpm(datasetToName, 
-                               11,
-                               "Histogram of Maximum Mechismo Score",
-                               "Mechismo Maximum Score",
-                               "Frequency");
+        plotter.plotHistograpm(datasetToName,
+                11,
+                "Histogram of Maximum Mechismo Score",
+                "Mechismo Maximum Score",
+                "Frequency");
     }
-    
+
     @Test
     public void performPathwayEnrichmentAnalysisForReactions() throws Exception {
         String reactionsFileName = "results/ReactionsInMechismo_051017.txt";
-        
+
         AnnotationHelper annotationHelper = new AnnotationHelper();
         annotationHelper.setReactionIdToPathwayFile("resources/ReactomeReactionsToPathways_051017.txt");
         PathwayBasedAnnotator annotator = new PathwayBasedAnnotator();
         annotator.setUseBenjaminiHochbergForFDR(true);
         annotator.setAnnotationHelper(annotationHelper);
-        
+
         // Choose a threshold to get reactions to be analyzed
         double[] thresholds = new double[]{5.0d, 4.0d, 3.0d};
         for (double threshold : thresholds) {
@@ -827,19 +826,19 @@ public class MechismoAnalyzer {
             System.out.println("Threshold: " + threshold + " with total selected reactions: " + reactionIds.size());
             System.out.println("Pathway\tNumberInPathway\tRatioOfPathway\tHitNumber\tpValue\tFDR\tHitIds");
             for (GeneSetAnnotation annotation : annotations) {
-                System.out.println(annotation.getTopic() + "\t" + 
-                                   annotation.getNumberInTopic() + "\t" + 
-                                   annotation.getRatioOfTopic() + "\t" + 
-                                   annotation.getHitNumber() + "\t" + 
-                                   annotation.getPValue() + "\t" + 
-                                   annotation.getFdr() + "\t" + 
-                                   annotation.getHitIds());
+                System.out.println(annotation.getTopic() + "\t" +
+                        annotation.getNumberInTopic() + "\t" +
+                        annotation.getRatioOfTopic() + "\t" +
+                        annotation.getHitNumber() + "\t" +
+                        annotation.getPValue() + "\t" +
+                        annotation.getFdr() + "\t" +
+                        annotation.getHitIds());
             }
             System.out.println();
         }
     }
-    
-    private List<String> getReactionIds(String fileName, 
+
+    private List<String> getReactionIds(String fileName,
                                         double threshold) throws IOException {
         fu.setInput(fileName);
         String line = fu.readLine();
@@ -855,16 +854,17 @@ public class MechismoAnalyzer {
         fu.close();
         return rtn;
     }
-    
+
     /**
      * Load ppi to maximum interaction effect score using the default output filename.
+     *
      * @return
      * @throws IOException
      */
     public Map<String, Double> loadPPIToMaxScore() throws IOException {
         return loadPPIToMaxScore(outputFileName);
     }
-    
+
     @Test
     public void checkAllHumanReactions() throws Exception {
         String output = "results/ReactionsInMechismo_051017.txt";
@@ -878,9 +878,10 @@ public class MechismoAnalyzer {
         						  targetReactionId,
         						  output);
     }
-    
+
     /**
      * Check all human reactions based on mechismo data.
+     *
      * @throws Exception
      */
     public void checkAllHumanReactions(CancerDriverReactomeAnalyzer reactomeAnalyzer,
@@ -892,7 +893,7 @@ public class MechismoAnalyzer {
 
         Map<String, Double> ppiToScore = loadPPIToMaxScore();
         System.out.println("Total PPIs in mechismo: " + ppiToScore.size());
-        
+
         ReactomeAnalyzer reactomeDataAnalyzer = new ReactomeAnalyzer();
         if (targetReactionId == null) {
         		fu.setOutput(outputFileName);
@@ -929,8 +930,8 @@ public class MechismoAnalyzer {
             					(score == null ? "" : score));
             }
             if (overlap > 0)
-                total ++;
-            checkedReactions ++;
+                total++;
+            checkedReactions++;
         }
         if (targetReactionId == null)
         		fu.close();
@@ -942,14 +943,14 @@ public class MechismoAnalyzer {
 //        Total checked reactions: 4589
 //        Total reactions having FIs in mechsimo: 1265
     }
-    
+
     @Test
     public void testLoadPPIToMaxScore() throws IOException {
         Map<String, Double> ppiToScore = loadPPIToMaxScore();
         System.out.println("Total PPIs: " + ppiToScore.size());
         // The above output should be: Total PPIs: 13323
     }
-    
+
     @Test
     public void checkKnownCancerDriverGenes() throws IOException {
         CancerDriverAnalyzer driverAnalyzer = new CancerDriverAnalyzer();
@@ -1066,13 +1067,12 @@ public class MechismoAnalyzer {
 //        mapGenerator.generateSubNetwork(reactionIds);
         mapGenerator.generateSubNetworkForAll(reactionIds, new HashMap<>());
     }
-    
+
     /**
      * Load the largest functional impact scores for mutations listed in cosmic between two proteins
      * interacting each other. The functional impact scores for mutations are reported in column 27
      * ( ie: interaction effect for all contacts of the site with this interactor).
-     * @param mechismoOutputFilePath
-     * @param mechismoInteractionScorePattern
+     *
      * @return
      * @throws IOException
      */
@@ -1081,18 +1081,18 @@ public class MechismoAnalyzer {
         Comparator<Double> comparator = (v1, v2) -> Double.compare(Math.abs(v1), Math.abs(v2));
         // Use new Java 8 stream API
         Map<String, Optional<Double>> ppiToScore = Files.lines(path)
-                                                        .map(line -> line.split("\t"))
-                                                        .filter(tokens -> tokens.length >= 28)
-                                                        .filter(tokens -> tokens[19].trim().length() > 0)
-                                                        .collect(Collectors.groupingBy(tokens -> InteractionUtilities.generateFIFromGene(tokens[1], tokens[19]), // Key by PPI
-                                                                                       Collectors.mapping(tokens -> new Double(tokens[27]), Collectors.maxBy(comparator)))); // Value should be maximum
+                .map(line -> line.split("\t"))
+                .filter(tokens -> tokens.length >= 28)
+                .filter(tokens -> tokens[19].trim().length() > 0)
+                .collect(Collectors.groupingBy(tokens -> InteractionUtilities.generateFIFromGene(tokens[1], tokens[19]), // Key by PPI
+                        Collectors.mapping(tokens -> new Double(tokens[27]), Collectors.maxBy(comparator)))); // Value should be maximum
         Map<String, Double> rtn = new HashMap<>();
         ppiToScore.forEach((ppi, score) -> {
             if (score.isPresent())
                 rtn.put(ppi, score.get());
         });
         return rtn;
-        
+
 //        while ((line = fu.readLine()) != null) {
 //            String[] tokens = line.split("\t");
 //            if (tokens.length < 28)
@@ -1108,27 +1108,27 @@ public class MechismoAnalyzer {
 //                ppiToScore.put(ppi, currentScore);
 //        }
     }
-    
+
     @Test
     public void testGetMechismoInteractions() throws IOException {
         Set<String> interactions = getInteractions(outputFileName);
         System.out.println("Total interactions: " + interactions.size());
         // Output is: 13323
     }
-    
+
     @Test
     public void checkOverlapWithInteractome3d() throws IOException {
         Set<String> mechismoPPIs = getInteractions(outputFileName);
         System.out.println("Total PPIs in mechismo output: " + mechismoPPIs.size());
         fu.saveInteractions(mechismoPPIs, "results/MechismoPPIs_051017.txt");
-        
+
         Interactome3dAnalyzer interactomeAnalyser = new Interactome3dAnalyzer();
         String interactomeDirName = "datasets/interactome3d/2016_06/prebuilt/representative/";
         Map<String, File> fiToPDB = interactomeAnalyser.loadPPIToPDBFile(interactomeDirName,
-                                                                         false);
+                false);
         System.out.println("Total PPIs in interactome3d: " + fiToPDB.size());
         fu.saveInteractions(fiToPDB.keySet(), "results/Interactome3dPPIs_051017.txt");
-        
+
         Set<String> shared = InteractionUtilities.getShared(mechismoPPIs, fiToPDB.keySet());
         System.out.println("Shared: " + shared.size());
         // Output:
@@ -1138,11 +1138,10 @@ public class MechismoAnalyzer {
         // TODO: The 50% coverage of interactome3d by mechismo may result from no cosmic mutations are found in other
         // PPIs. We should check the original cosmic mutation data and then compare the outputs.
     }
-    
+
     /**
      * Get the interactions reported in the mechismo output file.
-     * @param mechismoOutputFilePath
-     * @param mechismoInteractionScorePattern
+     *
      * @return
      * @throws IOException
      */
@@ -1163,33 +1162,34 @@ public class MechismoAnalyzer {
         fu.close();
         return interactions;
     }
-    
+
     /**
-     * The mechismo scores are calculated for each mutation in a specific coordinate in a specific protein. It is 
-     * collected from scores for this specific mutation across all interactions invovled in the protein having 
+     * The mechismo scores are calculated for each mutation in a specific coordinate in a specific protein. It is
+     * collected from scores for this specific mutation across all interactions invovled in the protein having
      * the mutation. So they are unique regard mutation, coordinate, and protein. However, scores used for cancer
      * analysis are not: the interacting partners need to be considered. In other words,
      * they are specific to mutations, coordinates, and two proteins involved in the interaction.
+     *
      * @throws IOException
      */
     @Test
     public void checkMechismoScores() throws IOException {
         String fileName = dirName + "SOS1_RAS.txt";
         fileName = outputFileName;
-        
+
         fu.setInput(fileName);
         String line = null;
         Map<String, String> mutationToScore = new HashMap<>();
         Set<String> scores = new HashSet<>();
         while ((line = fu.readLine()) != null) {
             String[] tokens = line.split("\t");
-            
+
             //            for (int i = 0; i < tokens.length; i++) {
             //                System.out.println(i + "\t" + tokens[i]);
             //            }
             //            if (true)
             //                break;
-            
+
             if (tokens.length < 20) {
                 //                System.out.println(line);
                 continue;
@@ -1211,7 +1211,7 @@ public class MechismoAnalyzer {
         for (String score : scores)
             System.out.println(score);
     }
-    
+
     @Test
     public void checkOutputFile() throws IOException {
         try (Stream<String> stream = Files.lines(Paths.get(outputFileName))) {
@@ -1226,7 +1226,7 @@ public class MechismoAnalyzer {
             });
         }
     }
-    
+
     @Test
     public void checkPCIContactFile() throws IOException {
 //        String targetGene = "AKT1";
@@ -1235,7 +1235,7 @@ public class MechismoAnalyzer {
 //        String pdbId = "2uvm";
         
         Map<String, String> idSeqA1ToGene = loadIdSeqA1ToGene();
-        
+
         try (Stream<String> stream = Files.lines(Paths.get(pciContactFile))) {
             stream.skip(1)
                   .filter(line -> {
@@ -1249,16 +1249,16 @@ public class MechismoAnalyzer {
                   .forEach(System.out::println);
         }
     }
-    
+
     private Map<String, String> loadIdSeqA1ToGene() throws IOException {
         try (Stream<String> stream = Files.lines(Paths.get(outputFileName))) {
             Map<String, String> idToGene = new HashMap<>();
             stream.map(line -> line.split("\t"))
-                  .forEach(tokens -> idToGene.put(tokens[2], tokens[0]));
+                    .forEach(tokens -> idToGene.put(tokens[2], tokens[0]));
             return idToGene;
         }
     }
-    
+
     @Test
     public void pickRows() throws IOException {
     		boolean needChemical = false;
@@ -1273,7 +1273,7 @@ public class MechismoAnalyzer {
         Set<String> geneSet = new HashSet<>();
         for (String gene : targetGenes)
             geneSet.add(gene);
-        
+
         String fileName = outputFileName;
         //        fileName = dirName + "HRAS_mechismo_op.tsv";
         try (Stream<String> stream = Files.lines(Paths.get(fileName))) {
@@ -1301,5 +1301,382 @@ public class MechismoAnalyzer {
 //        }
 //        fu.close();
     }
-    
+
+    public void mapReactomeReactions(CancerDriverReactomeAnalyzer cancerDriverReactomeAnalyzer,
+                                     String mechismoOutputFilePath,
+                                     String reactomeReactionNetworkFilePath,
+                                     String mechismoSamples2SigReactionsFilePath,
+                                     String mechismoFIFilterFilePath,
+                                     String outputDir,
+                                     String outputFilePrefix,
+                                     String tcgaCancerType,
+                                     int depth,
+                                     int numPermutations,
+                                     double mechScoreLowerBoundInclusive,
+                                     double eThresh,
+                                     boolean ignoreDependentUpstreamReactions,
+                                     boolean ignoreIndependentUpstreamReactions,
+                                     boolean excludeMultipleImmediateUpstreamReactions,
+                                     boolean rewireLargestComponentOnly,
+                                     boolean useRxnDist,
+                                     String rxnFilter,
+                                     Integer minNumTargetRxnPatients) throws Exception {
+        ResourceMonitor resourceMonitor = new ResourceMonitor();
+        resourceMonitor.StartMethodTimer();
+
+        System.out.println("Loading reactome data...");
+        ReactomeReactionGraphLoader reactomeReactionGraphLoader =
+                new ReactomeReactionGraphLoader(
+                        reactomeReactionNetworkFilePath,
+                        mechismoSamples2SigReactionsFilePath,
+                        rxnFilter);
+
+        System.out.println("Loading mechismo data...");
+        MechismoOutputLoader mechismoOutputLoader =
+                new MechismoOutputLoader(mechismoOutputFilePath,
+                        mechismoFIFilterFilePath,
+                        tcgaCancerType,
+                        mechScoreLowerBoundInclusive,
+                        eThresh);
+
+        System.out.println("Mapping reactome & mechismo data...");
+        ReactomeMechismoDataMap reactomeMechismoDataMap =
+                new ReactomeMechismoDataMap(
+                        cancerDriverReactomeAnalyzer,
+                        mechismoOutputLoader,
+                        reactomeReactionGraphLoader);
+
+        List<CooccurrenceResult> rewiredNetworkResults = new ArrayList<>();
+
+        System.out.println("Creating reaction graph...");
+        DefaultDirectedGraph<Long, DefaultEdge> reactionGraph =
+                reactomeReactionGraphLoader.getReactionGraph();
+
+        ReactionGraphAnalyzer reactionGraphAnalyzer = new ReactionGraphAnalyzer(
+                depth,
+                reactomeMechismoDataMap,
+                ignoreDependentUpstreamReactions,
+                ignoreIndependentUpstreamReactions,
+                excludeMultipleImmediateUpstreamReactions);
+
+        RandomGraphGenerator randomGraphGenerator = new RandomGraphGenerator(reactionGraph);
+
+        for (int i = 0; i < numPermutations; i++) {
+            resourceMonitor.StartLoopTimer();
+
+            Graph<Long, DefaultEdge> rewiredReactionGraph =
+                    randomGraphGenerator.GenerateRandomGraph(rewireLargestComponentOnly);
+
+            ConnectivityInspector<Long, DefaultEdge> connectivityInspector =
+                    new ConnectivityInspector<>(rewiredReactionGraph);
+
+            System.out.println(String.format("Created reaction graph permutation with %d vertices, %d edges, %d components",
+                    rewiredReactionGraph.vertexSet().size(),
+                    rewiredReactionGraph.edgeSet().size(),
+                    connectivityInspector.connectedSets().size()));
+
+            CooccurrenceResult rewiredNetworkResult =
+                    reactionGraphAnalyzer.SearchRxnNetworkAndCalculateCooccurrencePValues(
+                            rewiredReactionGraph,
+                            useRxnDist,
+                            minNumTargetRxnPatients);
+
+            rewiredNetworkResult.CalculateBHAdjustedPValues();
+            //rewiredNetworkResult.writeToFile(outputDir, "RandomRewiring_" + (i + 1) + "_");
+
+            resourceMonitor.CalculateMemUsed();
+
+            rewiredNetworkResult.MagicallyShrinkMemoryFootprint();
+            rewiredNetworkResults.add(rewiredNetworkResult);
+
+            resourceMonitor.EndLoopTimer(i + 1 + "");//start with iteration '1'
+        }
+
+        CooccurrenceResult realResult =
+                reactionGraphAnalyzer.SearchRxnNetworkAndCalculateCooccurrencePValues(
+                        reactionGraph,
+                        useRxnDist,
+                        minNumTargetRxnPatients);
+
+        realResult.CalculateBHAdjustedPValues();
+        realResult.CalculateEmpiricalPValues(rewiredNetworkResults);
+
+        reactomeMechismoDataMap.WriteRxn2SamplesToFile(outputDir, "");
+
+        realResult.writeToFile(outputDir, outputFilePrefix);
+        realResult.writePatientGroupingsToFile(outputDir, outputFilePrefix);
+        realResult.writePatientDistancesToFile(outputDir,
+                outputFilePrefix,
+                reactomeMechismoDataMap);
+
+        resourceMonitor.CalculateMemUsed();
+        resourceMonitor.EndMethodTimer();
+    }
+
+    public void analyzeInterfaceCooccurrence(CancerDriverReactomeAnalyzer cancerDriverReactomeAnalyzer,
+                                             String mechismoOutputFilePath,
+                                             String mechismoFIFilterFilePath,
+                                             String tcgaCancerType,
+                                             double mechScoreLowerBoundInclusive,
+                                             double eThresh,
+                                             String fiNetworkFilePath,
+                                             String reactomeReactionNetworkFilePath,
+                                             String outputDir) throws Exception {
+        System.out.println("Loading reactome data...");
+        ReactomeReactionGraphLoader reactomeReactionGraphLoader =
+                new ReactomeReactionGraphLoader(
+                        reactomeReactionNetworkFilePath);
+
+        System.out.println("Loading mechismo data...");
+        MechismoOutputLoader mechismoOutputLoader =
+                new MechismoOutputLoader(mechismoOutputFilePath,
+                        mechismoFIFilterFilePath,
+                        tcgaCancerType,
+                        mechScoreLowerBoundInclusive,
+                        eThresh);
+
+        System.out.println("Mapping reactome & mechismo data...");
+        ReactomeMechismoDataMap reactomeMechismoDataMap =
+                new ReactomeMechismoDataMap(
+                        cancerDriverReactomeAnalyzer,
+                        mechismoOutputLoader,
+                        reactomeReactionGraphLoader);
+
+        System.out.println("Generating FI network...");
+        FIGraphLoader fiGraphLoader =
+                new FIGraphLoader(
+                        fiNetworkFilePath,
+                        cancerDriverReactomeAnalyzer);
+
+        System.out.println("Converting to edgetic network...");
+        Pseudograph<FI, DefaultEdge> edgeticFIGraph = fiGraphLoader.getEdgeticFIGraph();
+
+        Map<Patient, Set<FI>> patientGraphCenters = calculatePatientGraphFIs(
+                edgeticFIGraph,
+                reactomeMechismoDataMap);
+
+        ConnectivityInspector connectivityInspector = new ConnectivityInspector(edgeticFIGraph);
+        GraphMeasurer graphMeasurer = new GraphMeasurer(edgeticFIGraph);
+        //Set<FI> graphCenter = graphMeasurer.getGraphCenter();
+        List<FI> randomOrderVertexes = new ArrayList<>(edgeticFIGraph.vertexSet());
+        Set<FI> fakeGraphCenter = new HashSet<>();
+        fakeGraphCenter.add(randomOrderVertexes.get(0));
+        //fakeGraphCenter.add(randomOrderVertexes.get(1));
+        //fakeGraphCenter.add(randomOrderVertexes.get(2));
+        ALTAdmissibleHeuristic altAdmissibleHeuristic = new ALTAdmissibleHeuristic(edgeticFIGraph,
+                fakeGraphCenter);
+        AStarShortestPath aStarShortestPath = new AStarShortestPath(edgeticFIGraph,
+                altAdmissibleHeuristic);
+
+        System.out.println("Calculating shortest paths between patient pairs...");
+        List<Patient> patientList = new ArrayList<>(reactomeMechismoDataMap.getPatients());
+        FileUtility fileUtility0 = new FileUtility();
+        String outFilePath0 = outputDir + "patientPairAvgShortestPathLengths.csv";
+        try {
+            fileUtility0.setOutput(outFilePath0);
+            fileUtility0.printLine("Patient 1," +
+                    "Patient 2," +
+                    "Average Shortest Path Length");
+            for (int i = 0; i < patientList.size() - 1; i++) {
+                for (int j = i + 1; j < patientList.size(); j++) {
+                    Patient patient1 = patientList.get(i);
+                    Patient patient2 = patientList.get(j);
+                    if(patientGraphCenters.containsKey(patient1) &&
+                            patientGraphCenters.containsKey(patient2)) {
+                        Double avgShortestPathLength =
+                                FindAverageShortestPathLengthBetweenPatients(
+                                        patientGraphCenters.get(patient1),
+                                        patientGraphCenters.get(patient2),
+                                        connectivityInspector,
+                                        aStarShortestPath);
+                        //write to file
+                        fileUtility0.printLine(String.format("%s,%s,%.3f",
+                                patient1,
+                                patient2,
+                                avgShortestPathLength));
+                    }
+                }
+                System.out.println(String.format("Processed %d of %d patient pair distances...",
+                        (i + 1) * patientList.size() - ((i + 1)*(i + 1))/2,
+                        (patientList.size() * patientList.size()) / 2));
+            }
+            fileUtility0.close();
+        } catch (IOException ioe) {
+            System.out.println(String.format("Couldn't use %s, %s: %s",
+                    outFilePath0,
+                    ioe.getMessage(),
+                    Arrays.toString(ioe.getStackTrace())));
+        }
+
+        System.out.println("Accumulating FI pair cooccurrences & p-values...");
+        List<Set<FI>> fiPairs = new ArrayList<>();
+        Set<Set<FI>> fiPairsSet = new HashSet<>();
+        List<Double> pvalues = new ArrayList<>();
+
+        List<Integer> avalues = new ArrayList<>();
+        List<Integer> bvalues = new ArrayList<>();
+        List<Integer> cvalues = new ArrayList<>();
+        List<Integer> dvalues = new ArrayList<>();
+
+        Integer nPatients = reactomeMechismoDataMap.getNumPatients();
+
+        FisherExact fisherExact = new FisherExact(nPatients);
+
+        int x = 0;
+
+        for (FI fi : reactomeMechismoDataMap.getFIs()) {
+            Set<Patient> patientsAffectedByFirstFI = reactomeMechismoDataMap.getPatients(fi);
+            Set<FI> cooccurringFIs = new HashSet<>();
+            for (Patient patient : patientsAffectedByFirstFI) {
+                cooccurringFIs.addAll(reactomeMechismoDataMap.getFIs(patient));
+            }
+            //find ABCDs -- this will find every pair multiple times... check hash first
+            for (FI cooccurringFI : cooccurringFIs) {
+                Set<Gene> pairGenes = new HashSet<>();
+                pairGenes.addAll(fi.getGenes());
+                pairGenes.addAll(cooccurringFI.getGenes());
+                if (pairGenes.size() == 4) { // ensure FI pairs don't share genes
+                    Set<FI> fiPair = new HashSet<>();
+                    fiPair.add(fi);
+                    fiPair.add(cooccurringFI);
+                    if (!fiPairsSet.contains(fiPair)) {
+                        Set<Patient> patientsAffectedBySecondFI =
+                                reactomeMechismoDataMap.getPatients(cooccurringFI);
+
+                        Set<Patient> patientsAffectedByBothFIs = new HashSet<>(patientsAffectedByFirstFI);
+                        patientsAffectedByBothFIs.retainAll(patientsAffectedBySecondFI);
+                        Integer D = patientsAffectedByBothFIs.size();
+
+                        if (D > 1) {
+                            Set<Patient> patientsAffectedBySecondFIOnly = new HashSet<>(patientsAffectedBySecondFI);
+                            patientsAffectedBySecondFIOnly.removeAll(patientsAffectedByBothFIs);
+                            Integer C = patientsAffectedBySecondFIOnly.size();
+
+                            Set<Patient> patientsAffectedByFirstFIOnly = new HashSet<>(patientsAffectedByFirstFI);
+                            patientsAffectedByFirstFIOnly.removeAll(patientsAffectedByBothFIs);
+                            Integer B = patientsAffectedByFirstFIOnly.size();
+
+                            Integer A = nPatients - (B + C + D);
+
+                            Double p = fisherExact.getRightTailedP(A, B, C, D);
+                            avalues.add(A);
+                            bvalues.add(B);
+                            cvalues.add(C);
+                            dvalues.add(D);
+                            fiPairs.add(fiPair);
+                            fiPairsSet.add(fiPair);
+                            pvalues.add(p);
+                        }
+                    }
+                }
+            }
+            x++;
+            if (x % 1000 == 0) {
+                System.out.println("processed " + x + " of " + reactomeMechismoDataMap.getFIs().size() + " fis...");
+            }
+        }
+        //calculate FDR
+        Map<Double, Double> pvalueFDRMap = new HashMap<>();
+        List<Double> pvaluesSorted = new ArrayList<>(pvalues);
+        List<Double> fdrs = MathUtilities.calculateFDRWithBenjaminiHochberg(pvaluesSorted);
+        for (int i = 0; i < fdrs.size(); i++) {
+            pvalueFDRMap.put(pvaluesSorted.get(i), fdrs.get(i));
+        }
+        FileUtility fileUtility = new FileUtility();
+        String outFilePath = outputDir + "fiInterfaceCooccurrence.csv";
+        try {
+            fileUtility.setOutput(outFilePath);
+            fileUtility.printLine("FI Pair," +
+                    "#Samples With Neither Interface Mutated," +
+                    "#Samples With First Interface Mutated," +
+                    "#Samples With Second Interface Mutated," +
+                    "#Samples With Both Interfaces Mutated," +
+                    "Fisher Exact P-value," +
+                    "BH Adjusted P-value");
+            for (int i = 0; i < fiPairs.size(); i++) {
+                List<FI> fiPair = new ArrayList<>(fiPairs.get(i));
+                Collections.sort(fiPair);
+                fileUtility.printLine(String.format("%s | %s,%d,%d,%d,%d,%.100e,%.100e",
+                        fiPair.get(0),
+                        fiPair.get(1),
+                        avalues.get(i),
+                        bvalues.get(i),
+                        cvalues.get(i),
+                        dvalues.get(i),
+                        pvalues.get(i),
+                        pvalueFDRMap.get(pvalues.get(i))));
+            }
+            fileUtility.close();
+        } catch (IOException ioe) {
+            System.out.println(String.format("Couldn't use %s, %s: %s",
+                    outFilePath,
+                    ioe.getMessage(),
+                    Arrays.toString(ioe.getStackTrace())));
+        }
+        System.out.println("done.");
+    }
+
+    private Map<Patient, Set<FI>> calculatePatientGraphFIs(Pseudograph<FI, DefaultEdge> edgeticFIGraph,
+                                                           ReactomeMechismoDataMap reactomeMechismoDataMap) {
+        Map<Patient, Set<FI>> patientGraphCenters = new HashMap<>();
+        for (Patient patient : reactomeMechismoDataMap.getPatients()) {
+            Set<FI> patientFIs = new HashSet<>(reactomeMechismoDataMap.getFIs(patient));
+            patientFIs.retainAll(edgeticFIGraph.vertexSet());
+            AsSubgraph<FI,DefaultEdge> patientSubgraph = new AsSubgraph<>(edgeticFIGraph,
+                    patientFIs);
+            GraphMeasurer graphMeasurer = new GraphMeasurer(patientSubgraph);
+            /*if(!patientFIs.isEmpty()) {
+                List<FI> fiList = new ArrayList<>(patientFIs);
+                int half = (fiList.size() / 2) + 1;
+                Set<FI> halfFISet = new HashSet<>();
+                for (int i = 0; i < half; i++) {
+                    halfFISet.add(fiList.get(i));
+                }
+                patientGraphCenters.put(patient, halfFISet);
+            }*/
+            patientGraphCenters.put(patient,graphMeasurer.getGraphCenter());
+            System.out.println(String.format("Calculated graph center for %d of %d patients...",
+                    patientGraphCenters.keySet().size(),
+                    reactomeMechismoDataMap.getPatients().size()));
+        }
+        return patientGraphCenters;
+    }
+
+    private Double FindAverageShortestPathLengthBetweenPatients(Set<FI> patient1GraphCenter,
+                                                                Set<FI> patient2GraphCenter,
+                                                                ConnectivityInspector connectivityInspector,
+                                                                AStarShortestPath aStarShortestPath) {
+        double pathLengthSum = 0.0d;
+        int pathCount = 0;
+
+        for (FI patient1FI : patient1GraphCenter) {
+            for (FI patient2FI : patient2GraphCenter) {
+                if (!patient1FI.equals(patient2FI) &&
+                        connectivityInspector.pathExists(patient1FI, patient2FI)) {
+                    pathCount++;
+                    try {
+                        GraphPath graphPath = aStarShortestPath.getPath(
+                                patient1FI,
+                                patient2FI);
+                        if (graphPath != null) {
+                            pathLengthSum +=
+                                    (double) graphPath.getLength();
+                        } else {
+                            int debug = 1;
+                        }
+                    } catch (NoSuchMethodError nme) {
+                        int debug = 1;
+                    }
+                    //System.out.println(String.format("Calculated %d of %d possible paths between patients",
+                    //        pathCount,
+                    //        patient1GraphCenter.size() * patient2GraphCenter.size()));
+                }
+            }
+        }
+        pathLengthSum = pathCount > 0
+        ? pathLengthSum / (double) pathCount
+        : (double) (patient1GraphCenter.size() * patient2GraphCenter.size());
+
+        return pathLengthSum;
+    }
 }

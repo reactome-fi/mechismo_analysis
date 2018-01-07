@@ -93,7 +93,7 @@
       <src_folder value="file://$MODULE_DIR$/src" expected_position="0" />
     </src_description>
   </component>
-  <component name="NewModuleRootManager" inherit-compiler-output="false">
+  <component name="NewModuleRootManager">
     <output url="file://$MODULE_DIR$/classes" />
     <exclude-output />
     <content url="file://$MODULE_DIR$">
@@ -337,15 +337,6 @@
         <SOURCES>
           <root url="file:///Users/guanming/ProgramFiles/smile/src_jsmile_1_2/java_library/src" />
         </SOURCES>
-      </library>
-    </orderEntry>
-    <orderEntry type="module-library" exported="">
-      <library name="jgraph.jar">
-        <CLASSES>
-          <root url="jar://$MODULE_DIR$/lib/jGraphT/jgraph.jar!/" />
-        </CLASSES>
-        <JAVADOC />
-        <SOURCES />
       </library>
     </orderEntry>
     <orderEntry type="module-library" exported="">
@@ -932,15 +923,29 @@
         <SOURCES />
       </library>
     </orderEntry>
+    <orderEntry type="library" exported="" name="org.hamcrest.core_1.3.0.v201303031735" level="project" />
     <orderEntry type="module-library" exported="">
-      <library name="jgrapht-jdk1.5.jar">
+      <library>
         <CLASSES>
-          <root url="jar://$MODULE_DIR$/lib/jGraphT/jgrapht-jdk1.5.jar!/" />
+          <root url="jar://$MODULE_DIR$/lib/jGraphT/jgrapht-core-1.1.0.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES />
       </library>
     </orderEntry>
-    <orderEntry type="library" exported="" name="org.hamcrest.core_1.3.0.v201303031735" level="project" />
+    <orderEntry type="module-library" exported="">
+      <library>
+        <CLASSES>
+          <root url="jar://$MODULE_DIR$/lib/reactome/caBigR3.jar!/" />
+          <root url="jar://$MODULE_DIR$/lib/reactome/fiNetworkBuild.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES>
+          <root url="jar://$MODULE_DIR$/lib/reactome/caBigR3.jar!/" />
+          <root url="jar://$MODULE_DIR$/lib/reactome/fiNetworkBuild.jar!/" />
+          <root url="jar://$MODULE_DIR$/lib/reactome/reactome.jar!/" />
+        </SOURCES>
+      </library>
+    </orderEntry>
   </component>
 </module>
