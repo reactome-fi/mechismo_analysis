@@ -39,7 +39,6 @@ import java.util.*;
 public class ReactomeAnalyzer {
     private boolean excludeComplex = false;
     protected PersistenceAdaptor dba;
-    private boolean excludeComplex = false;
     // A helper class
     private ReactomeAnalyzerTopicHelper topicHelper;
     
@@ -49,10 +48,6 @@ public class ReactomeAnalyzer {
     
     public void setExcludeComplex(boolean value) {
         this.excludeComplex = value;
-    }
-    
-    public void setMySQLAdaptor(MySQLAdaptor dba) {
-        this.dba = dba;
     }
     
     public PersistenceAdaptor getMySQLAdaptor() throws Exception {

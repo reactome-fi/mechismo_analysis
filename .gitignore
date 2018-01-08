@@ -10,6 +10,8 @@ src/*/*.zip
 .idea/*.iws
 *.fuse*
 *.orig
+*.local
+*.remote
 /classes/
 /datasets/
 /results/

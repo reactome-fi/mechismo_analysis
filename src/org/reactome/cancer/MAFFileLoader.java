@@ -4,19 +4,6 @@
  */
 package org.reactome.cancer;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
 import org.apache.log4j.Logger;
 import org.junit.Test;
@@ -26,6 +13,12 @@ import org.reactome.r3.UniProtAnalyzer;
 import org.reactome.r3.util.FileUtility;
 import org.reactome.r3.util.InteractionUtilities;
 import org.reactome.structure.model.ProteinMutation;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * This file is used to load MAF (mutation annotation format) based on this URL: 
@@ -497,7 +490,7 @@ public class MAFFileLoader {
                         mutationMap = new HashMap<>();
                         mutationMap.put(coord1,new HashSet<>(Arrays.asList(mut1)));
                         mutationMap.put(coord2,new HashSet<>(Arrays.asList(mut2)));
-                        sampleMutatedGeneMap.put(geneSymbol,mutationMap);
+                        sampleGeneMap.put(geneSymbol,mutationMap);
                     }
                 }
                 else {
@@ -522,7 +515,7 @@ public class MAFFileLoader {
                     else {
                         mutationMap = new HashMap<>();
                         mutationMap.put(coord,new HashSet<>(Arrays.asList(mut)));
-                        sampleMutatedGeneMap.put(geneSymbol,mutationMap);
+                        sampleGeneMap.put(geneSymbol,mutationMap);
                     }
                 }
             }
@@ -535,7 +528,7 @@ public class MAFFileLoader {
             }
         }
         fu.close();
-        return sampleMutatedGeneMap;
+        return sampleGeneMap;
     }
 
     @Test

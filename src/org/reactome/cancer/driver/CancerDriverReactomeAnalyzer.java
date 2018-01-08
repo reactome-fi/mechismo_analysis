@@ -15,6 +15,7 @@ import org.reactome.annotate.AnnotationHelper;
 import org.reactome.annotate.AnnotationType;
 import org.reactome.annotate.GeneSetAnnotation;
 import org.reactome.annotate.PathwayBasedAnnotator;
+import org.reactome.data.ReactomeAnalyzer;
 import org.reactome.r3.ReactionMapGenerator;
 import org.reactome.r3.graph.GraphAnalyzer;
 import org.reactome.r3.util.*;

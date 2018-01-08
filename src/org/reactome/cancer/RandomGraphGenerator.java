@@ -1,6 +1,6 @@
 package org.reactome.cancer;
 
-import org.jgrapht.DirectedGraph;
+import org.jgrapht.Graph;
 import org.jgrapht.Graphs;
 import org.jgrapht.alg.ConnectivityInspector;
 import org.jgrapht.graph.DefaultDirectedGraph;
@@ -18,7 +18,7 @@ public class RandomGraphGenerator {
         this.prng = new Random(this.randomSeed);
     }
 
-    public DirectedGraph<Long, DefaultEdge> GenerateRandomGraph(boolean rewireLargestComponentOnly) {
+    public Graph<Long, DefaultEdge> GenerateRandomGraph(boolean rewireLargestComponentOnly) {
         DefaultDirectedGraph<Long, DefaultEdge> rewiredReactionGraph =
                 new DefaultDirectedGraph<>(DefaultEdge.class);
         Graphs.addGraph(rewiredReactionGraph, this.reactionGraph);
