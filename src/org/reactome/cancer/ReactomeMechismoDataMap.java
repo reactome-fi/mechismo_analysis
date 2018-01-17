@@ -35,6 +35,8 @@ public class ReactomeMechismoDataMap {
         return this.mechismoOutputLoader.getFIs(patient);
     }
 
+    public Set<String> getGeneStrings(Patient patient) {return this.mechismoOutputLoader.getGeneStrings(patient);}
+
     private Set<Mutation> getReactionPatientMutations(Reaction reaction, Patient patient) {
         Set<Mutation> mutations = new HashSet<>();
         if (this.reactionToFIs.keySet().contains(reaction)) {

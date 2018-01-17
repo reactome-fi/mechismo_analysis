@@ -39,6 +39,7 @@ public class MechismoOutputLoader {
     private Map<Patient, Set<FI>> patientsToFIs;
     private Map<FI, Set<Patient>> fisToPatients;
     private Map<Patient, Map<FI, Set<Mutation>>> patientToFIsToMutations;
+    private Map<Patient, Set<String>> patientToGeneStrings;
 
     private Map<Gene, Integer> gene2SampleCount;
     private Map<Mutation, Integer> mut2SampleCount;
@@ -70,6 +71,10 @@ public class MechismoOutputLoader {
 
     public Set<FI> getFIs(Patient patient){
         return this.patientToFIsToMutations.get(patient).keySet();
+    }
+
+    public Set<String> getGeneStrings(Patient patient){
+        return this.patientToGeneStrings.get(patient);
     }
 
     public Set<FI> getFIs(){
@@ -131,6 +136,7 @@ public class MechismoOutputLoader {
         this.mut2SampleCount = new HashMap<>();
         this.gene2SampleCount = new HashMap<>();
         this.patientToFIsToMutations = new HashMap<>();
+        this.patientToGeneStrings = new HashMap<>();
         FileUtility fileUtility = new FileUtility();
         try {
             fileUtility.setInput(mechismoOuputFilePath);
@@ -216,10 +222,13 @@ public class MechismoOutputLoader {
 
                                         //update patientToFIsToMutations
                                         Map<FI, Set<Mutation>> fis2muts;
+                                        Set<String> geneStrings;
                                         if (patientToFIsToMutations.containsKey(patient)) {
                                             fis2muts = patientToFIsToMutations.get(patient);
+                                            geneStrings = patientToGeneStrings.get(patient);
                                         } else {
                                             fis2muts = new HashMap<>();
+                                            geneStrings = new HashSet<>();
                                         }
                                         Set<Mutation> muts;
                                         if (fis2muts.containsKey(fi)) {
@@ -229,7 +238,10 @@ public class MechismoOutputLoader {
                                         }
                                         muts.add(mutation);
                                         fis2muts.put(fi, muts);
+                                        geneStrings.add(fi.getGenes().get(0).toString());
+                                        geneStrings.add(fi.getGenes().get(1).toString());
                                         patientToFIsToMutations.put(patient, fis2muts);
+                                        patientToGeneStrings.put(patient,geneStrings);
                                         fis.add(fi);
                                     }
                                 }

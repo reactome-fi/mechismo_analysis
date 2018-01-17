@@ -4,21 +4,6 @@
  */
 package org.reactome.r3;
 
-import java.io.FileReader;
-import java.io.IOException;
-import java.io.Reader;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVRecord;
 import org.gk.model.GKInstance;
@@ -30,6 +15,15 @@ import org.junit.Test;
 import org.reactome.r3.graph.GraphAnalyzer;
 import org.reactome.r3.graph.NetworkBuilderForGeneSet;
 import org.reactome.r3.util.Configuration;
+
+import java.io.FileReader;
+import java.io.IOException;
+import java.io.Reader;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * This test class is used to generate a network of reactions. Reaction1 and Reaction2 will be linked
@@ -153,7 +147,7 @@ public class ReactionMapGenerator {
     /**
      * Use this method to connect all reactions together. Extract reactions may be
      * used to connect all reactions together.
-     * @param reationIds
+     * @param reactionIds
      * @throws IOException
      */
     public void generateSubNetworkForAll(Set<String> reactionIds,
@@ -182,21 +176,30 @@ public class ReactionMapGenerator {
      * @throws IOException
      */
     public Set<String> loadSimpleNetwork() throws IOException {
-        try (Stream<String> stream = Files.lines(Paths.get(REACTION_NETWORK_NAME))){
+       return loadSimpleNetwork(REACTION_NETWORK_NAME," ", 2);
+    }
+
+    /**
+     * Load the network without directions.
+     * @return
+     * @throws IOException
+     */
+    public Set<String> loadSimpleNetwork(String filePath, String delim, int pairIdx) throws IOException {
+        try (Stream<String> stream = Files.lines(Paths.get(filePath))){
             Set<String> pairs = stream.map(line -> {
-                String[] tokens = line.split(" ");
+                String[] tokens = line.split(delim);
                 // Do a sort
-                int compare = tokens[0].compareTo(tokens[2]);
+                int compare = tokens[0].compareTo(tokens[pairIdx]);
                 if (compare < 0)
-                    return tokens[0] + "\t" + tokens[2];
-                else 
-                    return tokens[2] + "\t" + tokens[0];
+                    return tokens[0] + "\t" + tokens[pairIdx];
+                else
+                    return tokens[pairIdx] + "\t" + tokens[0];
             })
                     .collect(Collectors.toSet());
             return pairs;
         }
     }
-    
+
     @Test
     public void analyzeGraphCompoennts() throws Exception {
         Set<String> network = loadSimpleNetwork();

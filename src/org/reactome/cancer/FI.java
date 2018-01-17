@@ -41,4 +41,11 @@ public final class FI implements Comparable<FI>{
                 genes.get(0).getHgncName(),
                 genes.get(1).getHgncName());
     }
+
+    public String toString(String delim){
+        return String.format("%s%s%s",
+                genes.get(0).getHgncName(),
+                delim,
+                genes.get(1).getHgncName());
+    }
 }
