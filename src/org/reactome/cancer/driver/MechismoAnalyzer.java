@@ -1457,7 +1457,7 @@ public class MechismoAnalyzer {
         System.out.println("Calculating shortest paths between patient pairs...");
         List<Patient> patientList = new ArrayList<>(reactomeMechismoDataMap.getPatients());
         FileUtility fileUtility0 = new FileUtility();
-        String outFilePath0 = outputDir + "patientPairAvgShortestPathLengths.csv";
+        String outFilePath0 = outputDir + tcgaCancerType + "_PatientPairDistances.csv";
         try {
             fileUtility0.setOutput(outFilePath0);
             fileUtility0.printLine("Patient 1," +
@@ -1571,7 +1571,7 @@ public class MechismoAnalyzer {
             pvalueFDRMap.put(pvaluesSorted.get(i), fdrs.get(i));
         }
         FileUtility fileUtility = new FileUtility();
-        String outFilePath = outputDir + "fiInterfaceCooccurrence.csv";
+        String outFilePath = outputDir + tcgaCancerType + "_InterfaceCooccurrence.csv";
         try {
             fileUtility.setOutput(outFilePath);
             fileUtility.printLine("FI Pair," +
