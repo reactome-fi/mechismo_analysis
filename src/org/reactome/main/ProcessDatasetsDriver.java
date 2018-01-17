@@ -188,7 +188,7 @@ public class ProcessDatasetsDriver {
                         cancerDriverReactomeAnalyzer,
                         "/home/burkhart/Software/Ogmios/datasets/Mechismo/TCGA_mech_output.tsv",
                         null,
-                        "SKCM",
+                        "PAAD",
                         0.0d,
                         1.0d,
                         "/home/burkhart/Software/Ogmios/datasets/FIsInGene_031516_with_annotations.txt",
