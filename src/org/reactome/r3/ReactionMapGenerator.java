@@ -201,7 +201,7 @@ public class ReactionMapGenerator {
     }
 
     @Test
-    public void analyzeGraphCompoennts() throws Exception {
+    public void analyzeGraphComponents() throws Exception {
         Set<String> network = loadSimpleNetwork();
         GraphAnalyzer graphAnalyzer = new GraphAnalyzer();
         List<Set<String>> components = graphAnalyzer.calculateGraphComponents(network);

@@ -48,4 +48,12 @@ public final class FI implements Comparable<FI>{
                 delim,
                 genes.get(1).getHgncName());
     }
+
+    public static String convertGeneNamePairToFIName(String delim, String geneName1, String geneName2){
+        List<String> fiGenes = new ArrayList<>();
+        fiGenes.add(geneName1.trim().toUpperCase());
+        fiGenes.add(geneName2.trim().toUpperCase());
+        Collections.sort(fiGenes);
+        return String.join(delim,fiGenes);
+    }
 }

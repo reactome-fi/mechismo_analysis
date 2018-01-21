@@ -1416,6 +1416,91 @@ public class MechismoAnalyzer {
         resourceMonitor.EndMethodTimer();
     }
 
+    private Map<String, Set<String>> transformNetworkToLineGraph(Map<String, Set<String>> network) {
+        Map<String, Set<String>> lineGraph = new HashMap<>();
+
+        for (String commonGene : network.keySet()) {
+            Set<String> partnerGenes = network.get(commonGene);
+            Set<String> fis = new HashSet<>();
+            for (String partnerGene : partnerGenes) {
+                fis.add(FI.convertGeneNamePairToFIName("\t", commonGene, partnerGene));
+            }
+            for (String fi : fis) {
+                Set<String> partnerFIs = new HashSet<>(fis);
+                partnerFIs.remove(fi);
+                Set<String> existingPartners;
+                if (lineGraph.containsKey(fi)) {
+                    existingPartners = lineGraph.get(fi);
+                } else {
+                    existingPartners = new HashSet<>();
+                }
+                partnerFIs.addAll(existingPartners);
+                lineGraph.put(fi, partnerFIs);
+            }
+        }
+
+        return lineGraph;
+    }
+
+    public Set<String> parseSignificantFIs(String tcgaCancerType, String significantFIsFilePath) {
+        Set<String> significantFIs = new HashSet<>();
+        FileUtility fileUtility = new FileUtility();
+        try {
+            fileUtility.setInput(significantFIsFilePath);
+            String line;
+            String[] tokens;
+            while ((line = fileUtility.readLine()) != null) {
+                tokens = line.split("\t");
+                if(tokens[0].trim().toUpperCase().equals(tcgaCancerType.trim().toUpperCase())) {
+                    String geneName1 = tokens[1];
+                    String geneName2 = tokens[2];
+                    Set<String> fis;
+                    significantFIs.add(FI.convertGeneNamePairToFIName("\t", geneName1, geneName2));
+                }
+            }
+            fileUtility.close();
+        } catch (IOException ioe) {
+            logger.error(String.format("Couldn't use %s, %s: %s",
+                    significantFIsFilePath,
+                    ioe.getMessage(),
+                    Arrays.toString(ioe.getStackTrace())));
+        }
+        return significantFIs;
+    }
+
+    public Set<String> findLargestComponent(Map<String,Set<String>> vtxToConnectedVtxs){
+        Set<String> vtxsInLargestComponent = new HashSet<>();
+        Graph<String,DefaultEdge> pseudograph = new Pseudograph(DefaultEdge.class);
+
+        int count = 0;
+        for(String vtx : vtxToConnectedVtxs.keySet()){
+            if(!pseudograph.containsVertex(vtx)){
+                pseudograph.addVertex(vtx);
+            }
+            for(String connectedVtx : vtxToConnectedVtxs.get(vtx)){
+                if(!pseudograph.containsVertex(connectedVtx)){
+                    pseudograph.addVertex(connectedVtx);
+                }
+                if(!pseudograph.containsEdge(vtx,connectedVtx)){
+                    pseudograph.addEdge(vtx,connectedVtx);
+                }
+            }
+            count++;
+            if(count % 1000 == 0){
+                System.out.println(String.format("Searched %d of %d vertices...",count,vtxToConnectedVtxs.keySet().size()));
+            }
+        }
+
+        ConnectivityInspector connectivityInspector = new ConnectivityInspector(pseudograph);
+        List<Set<String>> components = connectivityInspector.connectedSets();
+        for(Set<String> component : components){
+            if(component.size() > vtxsInLargestComponent.size()){
+                vtxsInLargestComponent = new HashSet<>(component);
+            }
+        }
+        return vtxsInLargestComponent;
+    }
+
     public void analyzeInterfaceCooccurrence(CancerDriverReactomeAnalyzer cancerDriverReactomeAnalyzer,
                                              String mechismoOutputFilePath,
                                              String mechismoFIFilterFilePath,
@@ -1424,6 +1509,7 @@ public class MechismoAnalyzer {
                                              double eThresh,
                                              String fiNetworkFilePath,
                                              String reactomeReactionNetworkFilePath,
+                                             String significantMechismoFIsFilePath,
                                              String outputDir) throws Exception {
         System.out.println("Loading reactome data...");
         ReactomeReactionGraphLoader reactomeReactionGraphLoader =
@@ -1447,12 +1533,17 @@ public class MechismoAnalyzer {
 
         System.out.println("Generating FI network...");
         Set<String> fiNetwork =
-                new ReactionMapGenerator().loadSimpleNetwork(fiNetworkFilePath,"\t",1);
-
+                new ReactionMapGenerator().loadSimpleNetwork(fiNetworkFilePath, "\t", 1);
         BreadthFirstSearch breadthFirstSearch = new BreadthFirstSearch();
+        Map<String, Set<String>> fiToFisSharingGeneMap = transformNetworkToLineGraph(
+                breadthFirstSearch.generateIdToPartnersMap(fiNetwork));
 
-        Map<String, Set<String>> idToPartnersMap =
-                breadthFirstSearch.generateIdToPartnersMap(fiNetwork);
+        //System.out.println("Finding largest component of line graph...");
+        //Set<String> fisInLargestComponent = findLargestComponent(fiToFisSharingGeneMap);
+
+        System.out.println(String.format("Parsing significant FIs for cancertype: %s",
+                tcgaCancerType));
+        Set<String> significantFIsForCancerType = parseSignificantFIs(tcgaCancerType, significantMechismoFIsFilePath);
 
         System.out.println("Calculating shortest paths between patient pairs...");
         List<Patient> patientList = new ArrayList<>(reactomeMechismoDataMap.getPatients());
@@ -1462,27 +1553,39 @@ public class MechismoAnalyzer {
             fileUtility0.setOutput(outFilePath0);
             fileUtility0.printLine("Patient 1," +
                     "Patient 2," +
-                    "Min Shortest Path," +
-                    "Average Distance");
+                    "Min Shortest FI Path," +
+                    "Average FI Distance");
             for (int i = 0; i < patientList.size() - 1; i++) {
                 for (int j = i + 1; j < patientList.size(); j++) {
                     Patient patient1 = patientList.get(i);
                     Patient patient2 = patientList.get(j);
-                    Set<String> p1Genes = reactomeMechismoDataMap.getGeneStrings(patient1);
-                    Set<String> p2Genes = reactomeMechismoDataMap.getGeneStrings(patient2);
-                    p1Genes.retainAll(idToPartnersMap.keySet());
-                    p2Genes.retainAll(idToPartnersMap.keySet());
-                    double minShortestPath =
-                            breadthFirstSearch.calculateMinShortestPath(p1Genes, p2Genes, idToPartnersMap);
-                    double avgDistance =
-                            breadthFirstSearch.calculateAverageDistance(p1Genes, p2Genes, idToPartnersMap);
+                    Set<String> p1FIs = reactomeMechismoDataMap.getFIStrings(patient1);
+                    Set<String> p2FIs = reactomeMechismoDataMap.getFIStrings(patient2);
+                    //p1FIs.retainAll(fisInLargestComponent);
+                    p1FIs.retainAll(significantFIsForCancerType);
+                    //p2FIs.retainAll(fisInLargestComponent);
+                    p2FIs.retainAll(significantFIsForCancerType);
 
-                    //write to file
-                    fileUtility0.printLine(String.format("%s,%s,%.3f,%.3f",
-                            patient1,
-                            patient2,
-                            minShortestPath,
-                            avgDistance));
+                    if(p1FIs != null && p2FIs != null && fiToFisSharingGeneMap != null) {
+                        try {
+                            double minShortestPath =
+                                    breadthFirstSearch.calculateMinShortestPath(p1FIs, p2FIs, fiToFisSharingGeneMap);
+                            double avgDistance =
+                                    breadthFirstSearch.calculateAverageDistance(p1FIs, p2FIs, fiToFisSharingGeneMap);
+
+                            //findLargestComponent() takes too long.. doing this instead
+                            if (minShortestPath > 0 && avgDistance > 0) {
+                                //write to file
+                                fileUtility0.printLine(String.format("%s,%s,%.3f,%.3f",
+                                        patient1,
+                                        patient2,
+                                        minShortestPath,
+                                        avgDistance));
+                            }
+                        }catch(NullPointerException npe){
+                            //do nothing, sometimes thrown by breadthFirstSearch for unknown reason
+                        }
+                    }
                 }
                 System.out.println(String.format("Processed %d of %d patient pair distances...",
                         (i + 1) * patientList.size() - ((i + 1) * (i + 1)) / 2,
