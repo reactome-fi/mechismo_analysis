@@ -12,6 +12,7 @@ src/*/*.zip
 *.orig
 *.local
 *.remote
+*.attach_pid*
 /classes/
 /datasets/
 /results/

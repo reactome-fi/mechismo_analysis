@@ -1535,6 +1535,7 @@ public class MechismoAnalyzer {
         Set<String> fiNetwork =
                 new ReactionMapGenerator().loadSimpleNetwork(fiNetworkFilePath, "\t", 1);
         BreadthFirstSearch breadthFirstSearch = new BreadthFirstSearch();
+        OptimizedBFS optimizedBFS = new OptimizedBFS();
         Map<String, Set<String>> fiToFisSharingGeneMap = transformNetworkToLineGraph(
                 breadthFirstSearch.generateIdToPartnersMap(fiNetwork));
 
@@ -1566,12 +1567,12 @@ public class MechismoAnalyzer {
                     //p2FIs.retainAll(fisInLargestComponent);
                     p2FIs.retainAll(significantFIsForCancerType);
 
-                    if(p1FIs != null && p2FIs != null && fiToFisSharingGeneMap != null) {
+                    if(fiToFisSharingGeneMap != null) {
                         try {
                             double minShortestPath =
-                                    breadthFirstSearch.calculateMinShortestPath(p1FIs, p2FIs, fiToFisSharingGeneMap);
+                                    optimizedBFS.calculateMinShortestPath(p1FIs, p2FIs, fiToFisSharingGeneMap);
                             double avgDistance =
-                                    breadthFirstSearch.calculateAverageDistance(p1FIs, p2FIs, fiToFisSharingGeneMap);
+                                    optimizedBFS.calculateAverageDistance(p1FIs, p2FIs, fiToFisSharingGeneMap);
 
                             //findLargestComponent() takes too long.. doing this instead
                             if (minShortestPath > 0 && avgDistance > 0) {
