@@ -1451,7 +1451,7 @@ public class MechismoAnalyzer {
             String[] tokens;
             while ((line = fileUtility.readLine()) != null) {
                 tokens = line.split("\t");
-                if(tokens[0].trim().toUpperCase().equals(tcgaCancerType.trim().toUpperCase())) {
+                if (tokens[0].trim().toUpperCase().equals(tcgaCancerType.trim().toUpperCase())) {
                     String geneName1 = tokens[1];
                     String geneName2 = tokens[2];
                     Set<String> fis;
@@ -1468,37 +1468,158 @@ public class MechismoAnalyzer {
         return significantFIs;
     }
 
-    public Set<String> findLargestComponent(Map<String,Set<String>> vtxToConnectedVtxs){
+    public Set<String> findLargestComponent(Map<String, Set<String>> vtxToConnectedVtxs) {
         Set<String> vtxsInLargestComponent = new HashSet<>();
-        Graph<String,DefaultEdge> pseudograph = new Pseudograph(DefaultEdge.class);
+        Graph<String, DefaultEdge> pseudograph = new Pseudograph(DefaultEdge.class);
 
         int count = 0;
-        for(String vtx : vtxToConnectedVtxs.keySet()){
-            if(!pseudograph.containsVertex(vtx)){
+        for (String vtx : vtxToConnectedVtxs.keySet()) {
+            if (!pseudograph.containsVertex(vtx)) {
                 pseudograph.addVertex(vtx);
             }
-            for(String connectedVtx : vtxToConnectedVtxs.get(vtx)){
-                if(!pseudograph.containsVertex(connectedVtx)){
+            for (String connectedVtx : vtxToConnectedVtxs.get(vtx)) {
+                if (!pseudograph.containsVertex(connectedVtx)) {
                     pseudograph.addVertex(connectedVtx);
                 }
-                if(!pseudograph.containsEdge(vtx,connectedVtx)){
-                    pseudograph.addEdge(vtx,connectedVtx);
+                if (!pseudograph.containsEdge(vtx, connectedVtx)) {
+                    pseudograph.addEdge(vtx, connectedVtx);
                 }
             }
             count++;
-            if(count % 1000 == 0){
-                System.out.println(String.format("Searched %d of %d vertices...",count,vtxToConnectedVtxs.keySet().size()));
+            if (count % 1000 == 0) {
+                System.out.println(String.format("Searched %d of %d vertices...", count, vtxToConnectedVtxs.keySet().size()));
             }
         }
 
         ConnectivityInspector connectivityInspector = new ConnectivityInspector(pseudograph);
         List<Set<String>> components = connectivityInspector.connectedSets();
-        for(Set<String> component : components){
-            if(component.size() > vtxsInLargestComponent.size()){
+        for (Set<String> component : components) {
+            if (component.size() > vtxsInLargestComponent.size()) {
                 vtxsInLargestComponent = new HashSet<>(component);
             }
         }
         return vtxsInLargestComponent;
+    }
+
+    private boolean stringsMostlyMatch(String s1, String s2) {
+        return s1.trim().toUpperCase().equals(s2.trim().toUpperCase());
+    }
+
+    private Map<String, Set<String>> loadPatientToFIs(String srcFileName,
+                                                      String tcgaCancerType,
+                                                      double fdrCutoff) throws IOException {
+
+        int cancerTypeIdx = 0;
+        int gene1Idx = 1;
+        int gene2Idx = 2;
+        int fdrIdx = 11;
+        int patientSetIdx = 15;
+
+        Map<String, Set<String>> patientToReactions = new HashMap<>();
+        try (Stream<String> stream = Files.lines(Paths.get(srcFileName))) {
+            stream
+                    .map(line -> line.split("\t"))
+                    .filter(tokens -> stringsMostlyMatch(tokens[cancerTypeIdx], tcgaCancerType)) // Filter to cancer type
+                    .filter(tokens -> !tokens[gene2Idx].contains("[")) // exclude non-transcribed chemicals
+                    .filter(tokens -> Double.parseDouble(tokens[fdrIdx]) < fdrCutoff) // Less than the predefined fdr cutoff
+                    .forEach(tokens -> {
+                        String fiName = FI.convertGeneNamePairToFIName("\t",
+                                tokens[gene1Idx],
+                                tokens[gene2Idx]);
+                        int index1 = tokens[patientSetIdx].indexOf("\'");
+                        int index2 = tokens[patientSetIdx].lastIndexOf("\'");
+                        String tmp = tokens[patientSetIdx].substring(index1, index2 + 1);
+                        String[] patients = tmp.split(", ");
+                        Arrays.asList(patients).forEach(patient -> {
+                            // Need to remove single quotes
+                            patient = patient.substring(1, patient.length() - 1);
+                            patientToReactions.compute(patient, (key, set) -> {
+                                if (set == null)
+                                    set = new HashSet<>();
+                                set.add(fiName);
+                                return set;
+                            });
+                        });
+                    });
+        }
+        return patientToReactions;
+    }
+
+    private void generatePairwiseFINetworkDistance(Map<String, Set<String>> patientToFIs,
+                                                   Map<String, Set<String>> fiNetwork,
+                                                   String outputFileName) throws IOException {
+        // Calculate pair-wise average distances between two cancer types
+        ReactionMapGenerator mapGenerator = new ReactionMapGenerator();
+        BreadthFirstSearch bfs = new BreadthFirstSearch();
+
+        // Need a little bit cleanup
+        patientToFIs.forEach((cancer, reactions) -> reactions.retainAll(fiNetwork.keySet()));
+        filterSamplesWithoutReactions(patientToFIs);
+        List<String> patients = patientToFIs.keySet().stream().sorted(Comparator.naturalOrder()).collect(Collectors.toList());
+
+        // Generate output
+        StringBuilder builder = new StringBuilder();
+        builder.append("Cancer");
+        patients.forEach(cancer -> builder.append("\t").append(cancer));
+        fu.setOutput(outputFileName);
+        fu.printLine(builder.toString());
+        builder.setLength(0);
+
+        // Use a helper object
+        MechismoBFSHelper helper = new MechismoBFSHelper();
+        Map<String, Integer> pairToDist = helper.calculateShortestPath(patientToFIs,
+                fiNetwork,
+                bfs);
+        for (int i = 0; i < patients.size(); i++) {
+            String patient1 = patients.get(i);
+            builder.append(patient1);
+            Set<String> set1 = patientToFIs.get(patient1);
+            for (int j = 0; j < patients.size(); j++) {
+                String patient2 = patients.get(j);
+                builder.append("\t");
+                if (i == j)
+                    builder.append(0.0d);
+                else {
+                    Set<String> set2 = patientToFIs.get(patient2);
+                    double dist = helper.calculateMinShortestPath(set1, set2, pairToDist);
+                    builder.append(dist);
+                }
+            }
+            fu.printLine(builder.toString());
+            builder.setLength(0);
+        }
+        fu.close();
+    }
+
+    public void calculateSampleDistancesOnFINetwork(String tcgaCancerType,
+                                                    String fiNetworkFilePath,
+                                                    String significantMechismoFIsFilePath,
+                                                    double fdrCutoff,
+                                                    String outputDir) throws IOException {
+
+        Map<String, Set<String>> patientToFIs = loadPatientToFIs(
+                significantMechismoFIsFilePath,
+                tcgaCancerType,
+                fdrCutoff);
+
+        // A quick quality check
+        patientToFIs.forEach((patient, set) -> System.out.println(patient + "\t" + set.size()));
+
+        //this is a general method that should work for FI sets too
+        filterSamplesWithoutReactions(patientToFIs);
+
+        Set<String> geneNetwork =
+                new ReactionMapGenerator().loadNetwork(fiNetworkFilePath, "\t", 1);
+
+        Map<String, Set<String>> fiToFisSharingGeneMap = transformNetworkToLineGraph(
+                new BreadthFirstSearch().generateIdToPartnersMap(geneNetwork));
+
+        generatePairwiseFINetworkDistance(
+                patientToFIs,
+                fiToFisSharingGeneMap,
+                String.format("%s/MechismoSamplePairwiseFINetworkDist_%s.tsv",
+                        outputDir,
+                        tcgaCancerType));
     }
 
     public void analyzeInterfaceCooccurrence(CancerDriverReactomeAnalyzer cancerDriverReactomeAnalyzer,
@@ -1533,7 +1654,7 @@ public class MechismoAnalyzer {
 
         System.out.println("Generating FI network...");
         Set<String> fiNetwork =
-                new ReactionMapGenerator().loadSimpleNetwork(fiNetworkFilePath, "\t", 1);
+                new ReactionMapGenerator().loadNetwork(fiNetworkFilePath, "\t", 1);
         BreadthFirstSearch breadthFirstSearch = new BreadthFirstSearch();
         OptimizedBFS optimizedBFS = new OptimizedBFS();
         Map<String, Set<String>> fiToFisSharingGeneMap = transformNetworkToLineGraph(
@@ -1567,7 +1688,7 @@ public class MechismoAnalyzer {
                     //p2FIs.retainAll(fisInLargestComponent);
                     p2FIs.retainAll(significantFIsForCancerType);
 
-                    if(fiToFisSharingGeneMap != null) {
+                    if (fiToFisSharingGeneMap != null) {
                         try {
                             double minShortestPath =
                                     optimizedBFS.calculateMinShortestPath(p1FIs, p2FIs, fiToFisSharingGeneMap);
@@ -1583,7 +1704,7 @@ public class MechismoAnalyzer {
                                         minShortestPath,
                                         avgDistance));
                             }
-                        }catch(NullPointerException npe){
+                        } catch (NullPointerException npe) {
                             //do nothing, sometimes thrown by breadthFirstSearch for unknown reason
                         }
                     }

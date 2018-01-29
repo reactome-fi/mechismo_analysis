@@ -160,7 +160,7 @@ public class ProcessDatasetsDriver {
                         2
                 };
 
-                for(int i = 0; i < cancerTypes.length; i++) {
+                for (int i = 0; i < cancerTypes.length; i++) {
                     new MechismoAnalyzer().mapReactomeReactions(
                             cancerDriverReactomeAnalyzer,
                             "/home/burkhart/Software/Ogmios/datasets/Mechismo/TCGA_mech_output.tsv",
@@ -183,17 +183,12 @@ public class ProcessDatasetsDriver {
                             onePcts[i]
                     );
                 }
-            }else if(Integer.parseInt(ex) == 6){
-                new MechismoAnalyzer().analyzeInterfaceCooccurrence(
-                        cancerDriverReactomeAnalyzer,
-                        "/home/burkhart/Software/Ogmios/datasets/Mechismo/TCGA_mech_output.tsv",
-                        null,
+            } else if (Integer.parseInt(ex) == 6) {
+                new MechismoAnalyzer().calculateSampleDistancesOnFINetwork(
                         "PAAD",
-                        0.0d,
-                        1.0d,
                         "/home/burkhart/Software/Ogmios/datasets/FIsInGene_031516_with_annotations.txt",
-                        "/home/burkhart/Software/Ogmios/datasets/ReactionNetwork_070517.txt",
                         "/home/burkhart/Software/Ogmios/datasets/Mechismo/tcga_mechismo_stat_cancer_wise_significant.tsv",
+                        0.01d,
                         "/home/burkhart/Software/Ogmios/results/Mechismo/"
                 );
             } else {

@@ -176,7 +176,7 @@ public class ReactionMapGenerator {
      * @throws IOException
      */
     public Set<String> loadSimpleNetwork() throws IOException {
-       return loadSimpleNetwork(REACTION_NETWORK_NAME," ", 2);
+       return loadNetwork(REACTION_NETWORK_NAME," ", 2);
     }
 
     /**
@@ -184,7 +184,7 @@ public class ReactionMapGenerator {
      * @return
      * @throws IOException
      */
-    public Set<String> loadSimpleNetwork(String filePath, String delim, int pairIdx) throws IOException {
+    public Set<String> loadNetwork(String filePath, String delim, int pairIdx) throws IOException {
         try (Stream<String> stream = Files.lines(Paths.get(filePath))){
             Set<String> pairs = stream.map(line -> {
                 String[] tokens = line.split(delim);
