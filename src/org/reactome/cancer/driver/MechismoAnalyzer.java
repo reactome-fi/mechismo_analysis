@@ -1656,7 +1656,6 @@ public class MechismoAnalyzer {
         Set<String> fiNetwork =
                 new ReactionMapGenerator().loadNetwork(fiNetworkFilePath, "\t", 1);
         BreadthFirstSearch breadthFirstSearch = new BreadthFirstSearch();
-        OptimizedBFS optimizedBFS = new OptimizedBFS();
         Map<String, Set<String>> fiToFisSharingGeneMap = transformNetworkToLineGraph(
                 breadthFirstSearch.generateIdToPartnersMap(fiNetwork));
 
@@ -1691,9 +1690,9 @@ public class MechismoAnalyzer {
                     if (fiToFisSharingGeneMap != null) {
                         try {
                             double minShortestPath =
-                                    optimizedBFS.calculateMinShortestPath(p1FIs, p2FIs, fiToFisSharingGeneMap);
+                                    breadthFirstSearch.calculateMinShortestPath(p1FIs, p2FIs, fiToFisSharingGeneMap);
                             double avgDistance =
-                                    optimizedBFS.calculateAverageDistance(p1FIs, p2FIs, fiToFisSharingGeneMap);
+                                    breadthFirstSearch.calculateAverageDistance(p1FIs, p2FIs, fiToFisSharingGeneMap);
 
                             //findLargestComponent() takes too long.. doing this instead
                             if (minShortestPath > 0 && avgDistance > 0) {

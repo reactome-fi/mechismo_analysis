@@ -185,7 +185,7 @@ public class ProcessDatasetsDriver {
                 }
             } else if (Integer.parseInt(ex) == 6) {
                 new MechismoAnalyzer().calculateSampleDistancesOnFINetwork(
-                        "PAAD",
+                        "COAD",
                         "/home/burkhart/Software/Ogmios/datasets/FIsInGene_031516_with_annotations.txt",
                         "/home/burkhart/Software/Ogmios/datasets/Mechismo/tcga_mechismo_stat_cancer_wise_significant.tsv",
                         0.01d,

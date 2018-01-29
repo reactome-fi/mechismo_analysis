@@ -141,8 +141,8 @@ public class MechismoBFSHelper {
     }
 
     public Map<String, Integer> calculateShortestFIPath(Map<String, Set<String>> patientToFIs,
-                                                      Map<String, Set<String>> fiToPartners,
-                                                      BreadthFirstSearch bfs) {
+                                                        Map<String, Set<String>> fiToPartners,
+                                                        BreadthFirstSearch bfs) {
         Set<String> allFIs = patientToFIs.values()
                 .stream()
                 .flatMap(fis -> fis.stream())
