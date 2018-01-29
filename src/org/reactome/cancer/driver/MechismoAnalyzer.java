@@ -1567,7 +1567,7 @@ public class MechismoAnalyzer {
 
         // Use a helper object
         MechismoBFSHelper helper = new MechismoBFSHelper();
-        Map<String, Integer> pairToDist = helper.calculateShortestPath(patientToFIs,
+        Map<String, Integer> pairToDist = helper.calculateShortestFIPath(patientToFIs,
                 fiNetwork,
                 bfs);
         for (int i = 0; i < patients.size(); i++) {
@@ -1581,7 +1581,7 @@ public class MechismoAnalyzer {
                     builder.append(0.0d);
                 else {
                     Set<String> set2 = patientToFIs.get(patient2);
-                    double dist = helper.calculateMinShortestPath(set1, set2, pairToDist);
+                    double dist = helper.calculateMinShortestFIPath(set1, set2, pairToDist);
                     builder.append(dist);
                 }
             }
