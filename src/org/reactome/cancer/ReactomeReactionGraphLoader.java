@@ -19,8 +19,8 @@ public class ReactomeReactionGraphLoader {
     private Set<Long> reactionSet = null;
     private Set<Long> sigReactionSet = null;
 
-    public ReactomeReactionGraphLoader(String reactomeReactionNetworkFilePath){
-        this(reactomeReactionNetworkFilePath,null,null);
+    public ReactomeReactionGraphLoader(String reactomeReactionNetworkFilePath) {
+        this(reactomeReactionNetworkFilePath, null, null);
     }
 
     public ReactomeReactionGraphLoader(String reactomeReactionNetworkFilePath,
@@ -32,7 +32,7 @@ public class ReactomeReactionGraphLoader {
     }
 
     private void ParseMechismoSamples2SigReactionsFile() {
-        if(this.mechismoSamples2SigReactionsFilePath != null) {
+        if (this.mechismoSamples2SigReactionsFilePath != null) {
             FileUtility fileUtility = new FileUtility();
             this.sigReactionSet = new HashSet<>();
             try {
@@ -72,7 +72,7 @@ public class ReactomeReactionGraphLoader {
                 Long rxn2DbId = Long.parseLong(tokens[rxn2DbIdIdx]);
                 includeRxns = false;
 
-                if(this.rxnFilter != null) {
+                if (this.rxnFilter != null) {
                     if (rxnFilter.equals("Yes") &&
                             (this.sigReactionSet.contains(rxn1DbId) &&
                                     this.sigReactionSet.contains(rxn2DbId))) {
@@ -84,7 +84,7 @@ public class ReactomeReactionGraphLoader {
                     } else if (rxnFilter.equals("No")) {
                         includeRxns = true;
                     }
-                }else{
+                } else {
                     includeRxns = true;
                 }
 
