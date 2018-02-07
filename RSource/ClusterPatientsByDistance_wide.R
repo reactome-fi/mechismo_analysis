@@ -4,11 +4,12 @@ library(magrittr)
 library(dplyr)
 
 # global vars
-CANCER_CODE <- "PAAD" #"COAD"
+K=4
+CANCER_CODE <- "PAAD"
 #DATA_DIR <- "/home/burkhart/Software/Ogmios/results/Mechismo/"
 DATA_DIR <- "/Users/joshuaburkhart/SoftwareProjects/Ogmios/results/Mechismo/"
 CLIN_DIR <- "/Users/joshuaburkhart/SoftwareProjects/Ogmios/datasets/FirehoseClinical/"
-OUT_DIR <- DATA_DIR
+FIG_DIR <- paste(DATA_DIR,"Figs/",sep="")
 DIST_FILE <- paste(DATA_DIR,
                    "MechismoSamplePairwiseFINetworkDist_",
                   CANCER_CODE,
@@ -34,20 +35,23 @@ h_clustering <- dist(dist_df) %>%
   hclust(method="ward.D")
 
 # plot
+svg(filename=paste(FIG_DIR,CANCER_CODE,"_hclust.svg",sep=""),
+    width=8,
+    height=8,
+    pointsize=10)
 plot(h_clustering,
      main=paste(CANCER_CODE," Patient FI Distances",sep=""),
      ylab = "Patients",
      xlab = "FI Distances")
+dev.off()
 
-# extract top two clusters
-# right cluster is '1'
-# left cluster is '2' 
-top_two_groups <- cutree(h_clustering,
-                         k=4)
+# extract top K clusters
+top_groups <- cutree(h_clustering,
+                         k=K)
 
-# extract common patient barcode substring from top_two_groups
+# extract common patient barcode substring from top_groups
 # transform like "TCGA-AY-4070-01" -> "TCGA-AY-4070"
-names(top_two_groups) <- names(top_two_groups) %>%
+names(top_groups) <- names(top_groups) %>%
     stringr::str_extract("TCGA-[0-9A-Z]{2}-[0-9A-Z]{4}")
 
 ###############################
@@ -75,9 +79,9 @@ clin_df <- clin_df %>%
                 days_to_death,
                 vital_status) %>%
   dplyr::filter(tcga_participant_barcode %in%
-                  names(top_two_groups))
+                  names(top_groups))
 
-top_two_groups <- top_two_groups[clin_df$tcga_participant_barcode]
+top_groups <- top_groups[clin_df$tcga_participant_barcode]
 
 # calculate duration
 surv_df <- clin_df %>%
@@ -107,9 +111,14 @@ wald.pvals <- coxph_summary$waldtest[3]
 score.pvals <- coxph_summary$sctest[3]
 
 # calculate survival
-surv.fit <- survival::survfit(coxph_surv ~ top_two_groups)
+surv.fit <- survival::survfit(coxph_surv ~ top_groups)
 
+# plot
 par(mfrow = c(1, 1))
+svg(filename=paste(FIG_DIR,CANCER_CODE,"_top_",K,"_survival.svg",sep=""),
+    width=8,
+    height=8,
+    pointsize=10)
 plot(
   surv.fit,
   col = 3:6,
@@ -117,12 +126,13 @@ plot(
   lwd = 2,
   xlab = "Survival Time (Days)",
   ylab = "Ratio",
-  main = paste("Top Two ",
+  main = paste("Top ",
+               K,
+               " ",
                CANCER_CODE,
                " Patient Clusters",
                sep = "")
 )
-
 legend(
   "topright",
   legend=names(surv.fit$strata),
@@ -131,12 +141,11 @@ legend(
   lwd = 2,
   horiz=FALSE,
   bty='n')
-
-surv.diff <- survival::survdiff(coxph_surv ~ top_two_groups)
-chisq.pval <- pchisq(surv.diff$chisq, 1, lower.tail = FALSE)
+surv.diff <- survival::survdiff(coxph_surv ~ top_groups)
+chisq.pval <- pchisq(surv.diff$chisq, 3, lower.tail = FALSE)
 mtext(paste("Chi squared p = ",
             round(chisq.pval, digits = 6),
             sep = ""),
       side = 3)
-
 print(surv.diff)
+dev.off()
