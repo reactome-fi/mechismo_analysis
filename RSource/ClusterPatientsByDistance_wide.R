@@ -4,15 +4,19 @@ library(magrittr)
 library(dplyr)
 
 # global vars
+CANCER_CODE <- "PAAD" #"COAD"
 #DATA_DIR <- "/home/burkhart/Software/Ogmios/results/Mechismo/"
 DATA_DIR <- "/Users/joshuaburkhart/SoftwareProjects/Ogmios/results/Mechismo/"
 CLIN_DIR <- "/Users/joshuaburkhart/SoftwareProjects/Ogmios/datasets/FirehoseClinical/"
 OUT_DIR <- DATA_DIR
 DIST_FILE <- paste(DATA_DIR,
-                   "MechismoSamplePairwiseFINetworkDist_COAD.tsv",
+                   "MechismoSamplePairwiseFINetworkDist_",
+                  CANCER_CODE,
+                  ".tsv",
                    sep="")
 CLIN_FILE <- paste(CLIN_DIR,
-                   "COAD-TP.samplefeatures.txt",
+                   CANCER_CODE,
+                   "-TP.samplefeatures.txt",
                    sep="")
 
 ######################
@@ -31,7 +35,7 @@ h_clustering <- dist(dist_df) %>%
 
 # plot
 plot(h_clustering,
-     main="COAD Patient FI Distances",
+     main=paste(CANCER_CODE," Patient FI Distances",sep=""),
      ylab = "Patients",
      xlab = "FI Distances")
 
@@ -39,7 +43,7 @@ plot(h_clustering,
 # right cluster is '1'
 # left cluster is '2' 
 top_two_groups <- cutree(h_clustering,
-                         k=2)
+                         k=4)
 
 # extract common patient barcode substring from top_two_groups
 # transform like "TCGA-AY-4070-01" -> "TCGA-AY-4070"
@@ -72,6 +76,8 @@ clin_df <- clin_df %>%
                 vital_status) %>%
   dplyr::filter(tcga_participant_barcode %in%
                   names(top_two_groups))
+
+top_two_groups <- top_two_groups[clin_df$tcga_participant_barcode]
 
 # calculate duration
 surv_df <- clin_df %>%
@@ -111,7 +117,9 @@ plot(
   lwd = 2,
   xlab = "Survival Time (Days)",
   ylab = "Ratio",
-  main = paste("Top Two COAD Patient Clusters",
+  main = paste("Top Two ",
+               CANCER_CODE,
+               " Patient Clusters",
                sep = "")
 )
 
