@@ -36,6 +36,7 @@ public class MechismoOutputLoader {
     private String mechismoFIFilterFilePath;
 
     private Set<FI> fis;
+    private Map<String,Patient> patientIDToPatient;
     private Map<Patient, Set<FI>> patientsToFIs;
     private Map<FI, Set<Patient>> fisToPatients;
     private Map<Patient, Map<FI, Set<Mutation>>> patientToFIsToMutations;
@@ -71,7 +72,14 @@ public class MechismoOutputLoader {
     }
 
     public Set<FI> getFIs(Patient patient){
-        return this.patientToFIsToMutations.get(patient).keySet();
+        try {
+            Map<FI, Set<Mutation>> fiMutationMap = this.patientToFIsToMutations.get(patient);
+            Set<FI> fiSet = fiMutationMap.keySet();
+            return fiSet;
+        }catch(NullPointerException npe){
+            int debug = 1;
+        }
+        return null;
     }
 
     public Set<String> getGeneStrings(Patient patient){
@@ -92,6 +100,10 @@ public class MechismoOutputLoader {
 
     public Set<Patient> getPatients(){
        return this.patientsToFIs.keySet();
+    }
+
+    public Map<String,Patient> getPatientIDToPatient(){
+        return this.patientIDToPatient;
     }
 
     public Boolean hasMutations(Patient patient){
@@ -143,6 +155,7 @@ public class MechismoOutputLoader {
         this.patientToFIsToMutations = new HashMap<>();
         this.patientToGeneStrings = new HashMap<>();
         this.patientToFIStrings = new HashMap<>();
+        this.patientIDToPatient = new HashMap<>();
         FileUtility fileUtility = new FileUtility();
         try {
             fileUtility.setInput(mechismoOuputFilePath);
@@ -206,7 +219,12 @@ public class MechismoOutputLoader {
                                         Patient patient = new Patient(
                                                 patientData[1].trim().toUpperCase(),
                                                 patientData[0].trim().toUpperCase());
-
+                                        try {
+                                            patientIDToPatient.put(patientData[1].trim().toUpperCase(),
+                                                    patient);
+                                        }catch(NullPointerException npe){
+                                            int debug = 1;
+                                        }
                                         Set<FI> sampleFIs;
                                         if (patientsToFIs.containsKey(patient)) {
                                             sampleFIs = patientsToFIs.get(patient);

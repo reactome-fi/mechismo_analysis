@@ -31,7 +31,7 @@ dist_df <- read.csv(DIST_FILE,
                     row.names = 1)
 
 # cluster
-h_clustering <- dist(dist_df) %>%
+h_clustering <- dist(dist_df,method = "binary") %>%
   hclust(method="ward.D")
 
 # plot

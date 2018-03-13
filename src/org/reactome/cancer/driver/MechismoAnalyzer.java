@@ -1442,6 +1442,37 @@ public class MechismoAnalyzer {
         return lineGraph;
     }
 
+    public Set<FI> parseSignificantFIs(String tcgaCancerType, String significantFIsFilePath, MySQLAdaptor dba) throws Exception {
+        Map<String,String> geneToUniprotMap = new ReactomeAnalyzer().getGeneToUniprotMap(dba);
+        Set<FI> significantFIs = new HashSet<>();
+        FileUtility fileUtility = new FileUtility();
+        try {
+            fileUtility.setInput(significantFIsFilePath);
+            String line;
+            String[] tokens;
+            while ((line = fileUtility.readLine()) != null) {
+                tokens = line.split("\t");
+                if (tokens[0].trim().toUpperCase().equals(tcgaCancerType.trim().toUpperCase())) {
+                    try {
+                        Gene gene1 = new Gene(tokens[1], geneToUniprotMap.get(tokens[1]));
+                        Gene gene2 = new Gene(tokens[2], geneToUniprotMap.get(tokens[2]));
+                        significantFIs.add(new FI(gene1,gene2));
+                    }catch(NullPointerException npe){
+                        int debug = 1;
+                        //ignore for now.. these are protein-chemical interactions
+                    }
+                }
+            }
+            fileUtility.close();
+        } catch (IOException ioe) {
+            logger.error(String.format("Couldn't use %s, %s: %s",
+                    significantFIsFilePath,
+                    ioe.getMessage(),
+                    Arrays.toString(ioe.getStackTrace())));
+        }
+        return significantFIs;
+    }
+
     public Set<String> parseSignificantFIs(String tcgaCancerType, String significantFIsFilePath) {
         Set<String> significantFIs = new HashSet<>();
         FileUtility fileUtility = new FileUtility();
@@ -1501,7 +1532,12 @@ public class MechismoAnalyzer {
         return vtxsInLargestComponent;
     }
 
-    private boolean stringsMostlyMatch(String s1, String s2) {
+    private boolean stringsMostlyMatch(String s1, String s2, boolean emptyAlwaysMatches) {
+        if(emptyAlwaysMatches){
+            if(s1.isEmpty() || s2.isEmpty()){
+                return true;
+            }
+        }
         return s1.trim().toUpperCase().equals(s2.trim().toUpperCase());
     }
 
@@ -1519,7 +1555,7 @@ public class MechismoAnalyzer {
         try (Stream<String> stream = Files.lines(Paths.get(srcFileName))) {
             stream
                     .map(line -> line.split("\t"))
-                    .filter(tokens -> stringsMostlyMatch(tokens[cancerTypeIdx], tcgaCancerType)) // Filter to cancer type
+                    .filter(tokens -> stringsMostlyMatch(tokens[cancerTypeIdx], tcgaCancerType, true)) // Filter to cancer type
                     .filter(tokens -> !tokens[gene2Idx].contains("[")) // exclude non-transcribed chemicals
                     .filter(tokens -> Double.parseDouble(tokens[fdrIdx]) < fdrCutoff) // Less than the predefined fdr cutoff
                     .forEach(tokens -> {
@@ -1619,7 +1655,124 @@ public class MechismoAnalyzer {
                 fiToFisSharingGeneMap,
                 String.format("%s/MechismoSamplePairwiseFINetworkDist_%s.tsv",
                         outputDir,
-                        tcgaCancerType));
+                        tcgaCancerType.isEmpty()
+                                ? "Pancancer"
+                                : tcgaCancerType));
+    }
+
+    private Set<Patient> parsePatientsFromClusterFile(String patientClusterFileName, ReactomeMechismoDataMap dataMap) throws IOException {
+        Set<Patient> patients = new HashSet<>();
+        FileUtility fileUtility0 = new FileUtility();
+        fileUtility0.setInput(patientClusterFileName);
+        String line;
+        while((line = fileUtility0.readLine()) != null){
+            Patient patient = dataMap.getPatientBarcodeToPatientMap(line.trim().toUpperCase());
+            if(patient != null) {
+                patients.add(patient);
+            }else{
+                int debug = 1;
+                System.out.println(String.format("Can't find patient '%s'",line));
+            }
+        }
+        fileUtility0.close();
+        return patients;
+    }
+
+    private Map<Gene,Integer> generateGenePatientCountMap(Set<Patient> patients,
+                                                          Set<FI> significantFIs,
+                                                          ReactomeMechismoDataMap dataMap){
+        Map<Gene,Integer> genePatientCountMap = new HashMap<>();
+        for(Patient patient : patients){
+            if(patient == null){
+                int debug = 1;
+            }
+            Set<FI> patientSigFIs = dataMap.getFIs(patient);
+            patientSigFIs.retainAll(significantFIs);
+            for(FI fi : patientSigFIs){
+                Set<Gene> geneSet = new HashSet(fi.getGenes());
+                for(Gene gene : geneSet){
+                    Integer count = 1;
+                    if(genePatientCountMap.containsKey(gene)){
+                        count = 1 + genePatientCountMap.get(gene);
+                    }
+                    genePatientCountMap.put(gene,count);
+                }
+            }
+        }
+        return genePatientCountMap;
+    }
+
+    private void writeMapToFile(Map<Gene,Integer> geneSampleCountMap, String filePath) throws IOException {
+        FileUtility fileUtility = new FileUtility();
+        fileUtility.setOutput(filePath);
+        fileUtility.printLine("Gene\tSampleNumber");
+        for(Gene gene : geneSampleCountMap.keySet()){
+            fileUtility.printLine(String.format("%s\t%d",
+                    gene.getHgncName(),
+                    geneSampleCountMap.get(gene)));
+        }
+        fileUtility.close();
+    }
+
+    public void getFIsForPatientClusters(CancerDriverReactomeAnalyzer cancerDriverReactomeAnalyzer,
+                                         String mechismoOutputFilePath,
+                                         String mechismoFIFilterFilePath,
+                                         String tcgaCancerType,
+                                         double mechScoreLowerBoundInclusive,
+                                         double eThresh,
+                                         String fiNetworkFilePath,
+                                         String reactomeReactionNetworkFilePath,
+                                         String significantMechismoFIsFilePath) throws Exception{
+        System.out.println("Loading reactome data...");
+        ReactomeReactionGraphLoader reactomeReactionGraphLoader =
+                new ReactomeReactionGraphLoader(
+                        reactomeReactionNetworkFilePath);
+
+        System.out.println("Loading mechismo data...");
+        MechismoOutputLoader mechismoOutputLoader =
+                new MechismoOutputLoader(mechismoOutputFilePath,
+                        mechismoFIFilterFilePath,
+                        tcgaCancerType,
+                        mechScoreLowerBoundInclusive,
+                        eThresh);
+
+        System.out.println("Mapping reactome & mechismo data...");
+        ReactomeMechismoDataMap reactomeMechismoDataMap =
+                new ReactomeMechismoDataMap(
+                        cancerDriverReactomeAnalyzer,
+                        mechismoOutputLoader,
+                        reactomeReactionGraphLoader);
+
+        System.out.println("Generating FI network...");
+        Set<String> fiNetwork =
+                new ReactionMapGenerator().loadNetwork(fiNetworkFilePath, "\t", 1);
+        BreadthFirstSearch breadthFirstSearch = new BreadthFirstSearch();
+        Map<String, Set<String>> fiToFisSharingGeneMap = transformNetworkToLineGraph(
+                breadthFirstSearch.generateIdToPartnersMap(fiNetwork));
+
+        //System.out.println("Finding largest component of line graph...");
+        //Set<String> fisInLargestComponent = findLargestComponent(fiToFisSharingGeneMap);
+
+        System.out.println(String.format("Parsing significant FIs for cancertype: %s",
+                tcgaCancerType));
+        Set<FI> significantFIsForCancerType = parseSignificantFIs(tcgaCancerType,
+                significantMechismoFIsFilePath,
+                cancerDriverReactomeAnalyzer.getDBA());
+
+        Set<Patient> cluster1Patients = parsePatientsFromClusterFile("/home/burkhart/COADREAD_cluster1_samples.txt",
+                reactomeMechismoDataMap);
+        Set<Patient> cluster2Patients = parsePatientsFromClusterFile("/home/burkhart/COADREAD_cluster2_samples.txt",
+                reactomeMechismoDataMap);
+
+        Map<Gene,Integer> cluster1Gene2PatientCount = generateGenePatientCountMap(cluster1Patients,
+                significantFIsForCancerType,
+                reactomeMechismoDataMap);
+        Map<Gene,Integer> cluster2Gene2PatientCount = generateGenePatientCountMap(cluster2Patients,
+                significantFIsForCancerType,
+                reactomeMechismoDataMap);
+
+        writeMapToFile(cluster1Gene2PatientCount, "/home/burkhart/COADREAD_cluster1_geneSampleCounts.txt");
+        writeMapToFile(cluster2Gene2PatientCount, "/home/burkhart/COADREAD_cluster2_geneSampleCounts.txt");
     }
 
     public void analyzeInterfaceCooccurrence(CancerDriverReactomeAnalyzer cancerDriverReactomeAnalyzer,

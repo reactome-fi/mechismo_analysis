@@ -184,13 +184,49 @@ public class ProcessDatasetsDriver {
                     );
                 }
             } else if (Integer.parseInt(ex) == 6) {
-                new MechismoAnalyzer().calculateSampleDistancesOnFINetwork(
+                String[] cancerTypes = new String[]{
+                        "BRCA",
+                        "KI",
+                        "GBM",
+                        "OV",
+                        "LUAD",
+                        "UCEC",
+                        "KIRC",
+                        "HNSC",
+                        "LGG",
+                        "THCA",
+                        "LUSC",
+                        "PRAD",
+                        "STAD",
+                        "LIHC",
+                        "BLCA",
+                        "SKCM",
+                        "CESC",
+                        "KIRP",
+                        "SARC",
+                        "LAML",
                         "COAD",
+                        "PAAD"
+                };
+                //for(String cancerType : cancerTypes) {
+                    new MechismoAnalyzer().calculateSampleDistancesOnFINetwork(
+                            "COADREAD",//cancerType,
+                            "/home/burkhart/Software/Ogmios/datasets/FIsInGene_031516_with_annotations.txt",
+                            "/home/burkhart/Software/Ogmios/datasets/Mechismo/tcga_mechismo_stat_cancer_wise_significant.tsv",
+                            0.01d,
+                            "/home/burkhart/Software/Ogmios/results/Mechismo/"
+                    );
+                //}
+            } else if(Integer.parseInt(ex) == 7) {
+                new MechismoAnalyzer().getFIsForPatientClusters(cancerDriverReactomeAnalyzer,
+                        "/home/burkhart/Software/Ogmios/datasets/Mechismo/TCGA_mech_output.tsv",
+                        null,
+                        "COADREAD",
+                        0.0,
+                        1.0,
                         "/home/burkhart/Software/Ogmios/datasets/FIsInGene_031516_with_annotations.txt",
-                        "/home/burkhart/Software/Ogmios/datasets/Mechismo/tcga_mechismo_stat_cancer_wise_significant.tsv",
-                        0.01d,
-                        "/home/burkhart/Software/Ogmios/results/Mechismo/"
-                );
+                        "/home/burkhart/Software/Ogmios/datasets/ReactionNetwork_070517.txt",
+                        "/home/burkhart/Software/Ogmios/datasets/Mechismo/tcga_mechismo_stat_cancer_wise_significant.tsv");
             } else {
                 System.out.println("An error occurred.");
             }

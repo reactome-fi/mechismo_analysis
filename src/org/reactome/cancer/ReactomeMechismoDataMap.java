@@ -103,6 +103,8 @@ public class ReactomeMechismoDataMap {
         return this.mechismoOutputLoader.getPatients();
     }
 
+    public Patient getPatientBarcodeToPatientMap(String patientID){return this.mechismoOutputLoader.getPatientIDToPatient().get(patientID);}
+
     public Reaction getReaction(Long reactionID) {
         return this.reactionIDToReaction.get(reactionID);
     }
