@@ -210,7 +210,7 @@ public class ProcessDatasetsDriver {
                 };
                 //for(String cancerType : cancerTypes) {
                     new MechismoAnalyzer().calculateSampleDistancesOnFINetwork(
-                            "COADREAD",//cancerType,
+                            "UCEC",//cancerType,
                             "/home/burkhart/Software/Ogmios/datasets/FIsInGene_031516_with_annotations.txt",
                             "/home/burkhart/Software/Ogmios/datasets/Mechismo/tcga_mechismo_stat_cancer_wise_significant.tsv",
                             0.01d,
