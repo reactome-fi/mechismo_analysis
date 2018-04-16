@@ -52,6 +52,7 @@ public class ProcessDatasetsDriver {
                 "Compare Known Drivers 4\n" +
                 "Map Mechismo Reactome Reactions 5\n" +
                 "Analyze Mechismo Interface Co-occurrence 6\n" +
+                "Calculate FI Patient Distance Matrix 7\n"+
                 "Cancel <enter>\n");
         Scanner scanner = new Scanner(System.in);
         String ex = scanner.nextLine();
@@ -221,7 +222,7 @@ public class ProcessDatasetsDriver {
                 new MechismoAnalyzer().getFIsForPatientClusters(cancerDriverReactomeAnalyzer,
                         "/home/burkhart/Software/Ogmios/datasets/Mechismo/TCGA_mech_output.tsv",
                         null,
-                        "COADREAD",
+                        "UCEC",
                         0.0,
                         1.0,
                         "/home/burkhart/Software/Ogmios/datasets/FIsInGene_031516_with_annotations.txt",

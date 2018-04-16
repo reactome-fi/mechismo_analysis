@@ -1435,16 +1435,45 @@ public class MechismoAnalyzer {
                     existingPartners = new HashSet<>();
                 }
                 partnerFIs.addAll(existingPartners);
-                lineGraph.put(fi, partnerFIs);
+                lineGraph.put(fi, existingPartners);
             }
         }
 
         return lineGraph;
     }
 
-    public Set<FI> parseSignificantFIs(String tcgaCancerType, String significantFIsFilePath, MySQLAdaptor dba) throws Exception {
+    private Map<String, Map<String,Set<String>>> transformNetworkToLineGraphNamedEdges(Map<String, Set<String>> network) {
+        Map<String, Map<String,Set<String>>> lineGraph = new HashMap<>();
+
+        for (String commonGene : network.keySet()) {
+            Set<String> partnerGenes = network.get(commonGene);
+            Set<String> fis = new HashSet<>();
+            for (String partnerGene : partnerGenes) {
+                fis.add(FI.convertGeneNamePairToFIName("\t", commonGene, partnerGene));
+            }
+            for (String fi : fis) {
+                Set<String> partnerFIs = new HashSet<>(fis);
+                partnerFIs.remove(fi);
+                Map<String,Set<String>> existingPartners;
+                if (lineGraph.containsKey(fi)) {
+                    existingPartners = lineGraph.get(fi);
+                } else {
+                    existingPartners = new HashMap<>();
+                }
+                if(existingPartners.containsKey(commonGene)) {
+                    partnerFIs.addAll(existingPartners.get(commonGene));
+                }
+                existingPartners.put(commonGene,partnerFIs);
+                lineGraph.put(fi, existingPartners);
+            }
+        }
+
+        return lineGraph;
+    }
+
+    public Map<FI,Double> parseSignificantFIs(String tcgaCancerType, String significantFIsFilePath, MySQLAdaptor dba) throws Exception {
         Map<String,String> geneToUniprotMap = new ReactomeAnalyzer().getGeneToUniprotMap(dba);
-        Set<FI> significantFIs = new HashSet<>();
+        Map<FI,Double> significantFIsToFDR = new HashMap<>();
         FileUtility fileUtility = new FileUtility();
         try {
             fileUtility.setInput(significantFIsFilePath);
@@ -1456,7 +1485,8 @@ public class MechismoAnalyzer {
                     try {
                         Gene gene1 = new Gene(tokens[1], geneToUniprotMap.get(tokens[1]));
                         Gene gene2 = new Gene(tokens[2], geneToUniprotMap.get(tokens[2]));
-                        significantFIs.add(new FI(gene1,gene2));
+                        Double fdr = new Double(tokens[11]);
+                        significantFIsToFDR.put(new FI(gene1,gene2),fdr);
                     }catch(NullPointerException npe){
                         int debug = 1;
                         //ignore for now.. these are protein-chemical interactions
@@ -1470,7 +1500,7 @@ public class MechismoAnalyzer {
                     ioe.getMessage(),
                     Arrays.toString(ioe.getStackTrace())));
         }
-        return significantFIs;
+        return significantFIsToFDR;
     }
 
     public Set<String> parseSignificantFIs(String tcgaCancerType, String significantFIsFilePath) {
@@ -1679,7 +1709,7 @@ public class MechismoAnalyzer {
     }
 
     private Map<Gene,Integer> generateGenePatientCountMap(Set<Patient> patients,
-                                                          Set<FI> significantFIs,
+                                                          Map<FI,Double> significantFIsToFDR,
                                                           ReactomeMechismoDataMap dataMap){
         Map<Gene,Integer> genePatientCountMap = new HashMap<>();
         for(Patient patient : patients){
@@ -1687,7 +1717,7 @@ public class MechismoAnalyzer {
                 int debug = 1;
             }
             Set<FI> patientSigFIs = dataMap.getFIs(patient);
-            patientSigFIs.retainAll(significantFIs);
+            patientSigFIs.retainAll(significantFIsToFDR.keySet());
             for(FI fi : patientSigFIs){
                 Set<Gene> geneSet = new HashSet(fi.getGenes());
                 for(Gene gene : geneSet){
@@ -1696,6 +1726,30 @@ public class MechismoAnalyzer {
                         count = 1 + genePatientCountMap.get(gene);
                     }
                     genePatientCountMap.put(gene,count);
+                }
+            }
+        }
+        return genePatientCountMap;
+    }
+
+    private Map<String,Integer> generateGeneStringPatientCountMap(Set<Patient> patients,
+                                                          Map<FI,Double> significantFIsToFDR,
+                                                          ReactomeMechismoDataMap dataMap){
+        Map<String,Integer> genePatientCountMap = new HashMap<>();
+        for(Patient patient : patients){
+            if(patient == null){
+                int debug = 1;
+            }
+            Set<FI> patientSigFIs = dataMap.getFIs(patient);
+            patientSigFIs.retainAll(significantFIsToFDR.keySet());
+            for(FI fi : patientSigFIs){
+                Set<Gene> geneSet = new HashSet(fi.getGenes());
+                for(Gene gene : geneSet){
+                    Integer count = 1;
+                    if(genePatientCountMap.containsKey(gene)){
+                        count = 1 + genePatientCountMap.get(gene);
+                    }
+                    genePatientCountMap.put(gene.getHgncName(),count);
                 }
             }
         }
@@ -1747,7 +1801,7 @@ public class MechismoAnalyzer {
         Set<String> fiNetwork =
                 new ReactionMapGenerator().loadNetwork(fiNetworkFilePath, "\t", 1);
         BreadthFirstSearch breadthFirstSearch = new BreadthFirstSearch();
-        Map<String, Set<String>> fiToFisSharingGeneMap = transformNetworkToLineGraph(
+        Map<String, Map<String,Set<String>>> fiToFisSharingGeneMap = transformNetworkToLineGraphNamedEdges(
                 breadthFirstSearch.generateIdToPartnersMap(fiNetwork));
 
         //System.out.println("Finding largest component of line graph...");
@@ -1755,13 +1809,13 @@ public class MechismoAnalyzer {
 
         System.out.println(String.format("Parsing significant FIs for cancertype: %s",
                 tcgaCancerType));
-        Set<FI> significantFIsForCancerType = parseSignificantFIs(tcgaCancerType,
+        Map<FI,Double> significantFIsForCancerType = parseSignificantFIs(tcgaCancerType,
                 significantMechismoFIsFilePath,
                 cancerDriverReactomeAnalyzer.getDBA());
 
-        Set<Patient> cluster1Patients = parsePatientsFromClusterFile("/home/burkhart/COADREAD_cluster1_samples.txt",
+        Set<Patient> cluster1Patients = parsePatientsFromClusterFile("/home/burkhart/UCEC_cluster1_samples.txt",
                 reactomeMechismoDataMap);
-        Set<Patient> cluster2Patients = parsePatientsFromClusterFile("/home/burkhart/COADREAD_cluster2_samples.txt",
+        Set<Patient> cluster2Patients = parsePatientsFromClusterFile("/home/burkhart/UCEC_cluster2_samples.txt",
                 reactomeMechismoDataMap);
 
         Map<Gene,Integer> cluster1Gene2PatientCount = generateGenePatientCountMap(cluster1Patients,
@@ -1771,8 +1825,42 @@ public class MechismoAnalyzer {
                 significantFIsForCancerType,
                 reactomeMechismoDataMap);
 
-        writeMapToFile(cluster1Gene2PatientCount, "/home/burkhart/COADREAD_cluster1_geneSampleCounts.txt");
-        writeMapToFile(cluster2Gene2PatientCount, "/home/burkhart/COADREAD_cluster2_geneSampleCounts.txt");
+        writeMapToFile(cluster1Gene2PatientCount, "/home/burkhart/UCEC_cluster1_geneSampleCounts.txt");
+        writeMapToFile(cluster2Gene2PatientCount, "/home/burkhart/UCEC_cluster2_geneSampleCounts.txt");
+
+        Map<String,Integer> cluster1GeneString2PatientCount = generateGeneStringPatientCountMap(cluster1Patients,
+                significantFIsForCancerType,
+                reactomeMechismoDataMap);
+        Map<String,Integer> cluster2GeneString2PatientCount = generateGeneStringPatientCountMap(cluster2Patients,
+                significantFIsForCancerType,
+                reactomeMechismoDataMap);
+
+        FileUtility sif_fileUtility = new FileUtility();
+        FileUtility tbl_fileUtility = new FileUtility();
+        sif_fileUtility.setOutput("/home/burkhart/UCEC_fis.sif");
+        tbl_fileUtility.setOutput("/home/burkhart/UCEC_fis.tbl");
+
+        for(String fi : fiToFisSharingGeneMap.keySet()){
+            for(String gene : fiToFisSharingGeneMap.get(fi).keySet()){
+                if(cluster1GeneString2PatientCount.containsKey(gene) &&
+                        cluster1GeneString2PatientCount.get(gene) > 0) {
+                    for (String fi2 : fiToFisSharingGeneMap.get(fi).get(gene)) {
+                        sif_fileUtility.printLine(String.format("%s\t-\t%s", fi, fi2));
+                        tbl_fileUtility.printLine("Cluster1");
+                    }
+                }
+
+                if(cluster2GeneString2PatientCount.containsKey(gene) &&
+                        cluster2GeneString2PatientCount.get(gene) > 0) {
+                    for (String fi2 : fiToFisSharingGeneMap.get(fi).get(gene)) {
+                        sif_fileUtility.printLine(String.format("%s\t-\t%s", fi, fi2));
+                        tbl_fileUtility.printLine("Cluster2");
+                    }
+                }
+            }
+        }
+        sif_fileUtility.close();
+        tbl_fileUtility.close();
     }
 
     public void analyzeInterfaceCooccurrence(CancerDriverReactomeAnalyzer cancerDriverReactomeAnalyzer,
