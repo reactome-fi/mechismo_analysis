@@ -1449,7 +1449,7 @@ public class MechismoAnalyzer {
             Set<String> partnerGenes = network.get(commonGene);
             Set<String> fis = new HashSet<>();
             for (String partnerGene : partnerGenes) {
-                fis.add(FI.convertGeneNamePairToFIName("\t", commonGene, partnerGene));
+                fis.add(FI.convertGeneNamePairToFIName("-", commonGene, partnerGene));
             }
             for (String fi : fis) {
                 Set<String> partnerFIs = new HashSet<>(fis);
@@ -1746,8 +1746,8 @@ public class MechismoAnalyzer {
                 Set<Gene> geneSet = new HashSet(fi.getGenes());
                 for(Gene gene : geneSet){
                     Integer count = 1;
-                    if(genePatientCountMap.containsKey(gene)){
-                        count = 1 + genePatientCountMap.get(gene);
+                    if(genePatientCountMap.containsKey(gene.getHgncName())){
+                        count = 1 + genePatientCountMap.get(gene.getHgncName());
                     }
                     genePatientCountMap.put(gene.getHgncName(),count);
                 }
@@ -1835,28 +1835,37 @@ public class MechismoAnalyzer {
                 significantFIsForCancerType,
                 reactomeMechismoDataMap);
 
+        Map<String,Double> significantFIStringssForCancerType = new HashMap<>();
+        for(FI fi : significantFIsForCancerType.keySet()){
+            String fiString = fi.toString("-");
+            significantFIStringssForCancerType.put(fiString,significantFIsForCancerType.get(fi));
+        }
+
         FileUtility sif_fileUtility = new FileUtility();
         FileUtility tbl_fileUtility = new FileUtility();
         sif_fileUtility.setOutput("/home/burkhart/UCEC_fis.sif");
         tbl_fileUtility.setOutput("/home/burkhart/UCEC_fis.tbl");
+        tbl_fileUtility.printLine(String.format("%s\t%s","cluster","name"));
 
         for(String fi : fiToFisSharingGeneMap.keySet()){
-            for(String gene : fiToFisSharingGeneMap.get(fi).keySet()){
-                if(cluster1GeneString2PatientCount.containsKey(gene) &&
-                        cluster1GeneString2PatientCount.get(gene) > 0) {
-                    for (String fi2 : fiToFisSharingGeneMap.get(fi).get(gene)) {
-                        sif_fileUtility.printLine(String.format("%s\t-\t%s", fi, fi2));
-                        tbl_fileUtility.printLine("Cluster1");
+                for (String gene : fiToFisSharingGeneMap.get(fi).keySet()) {
+                    if (cluster1GeneString2PatientCount.containsKey(gene) &&
+                            cluster1GeneString2PatientCount.get(gene) > 30) {
+                        for (String fi2 : fiToFisSharingGeneMap.get(fi).get(gene)) {
+                            sif_fileUtility.printLine(String.format("%s\t-\t%s", fi, fi2));
+                            tbl_fileUtility.printLine(String.format("%s\t%s","Cluster1",fi));
+                            tbl_fileUtility.printLine(String.format("%s\t%s","Cluster1",fi2));
+                        }
                     }
-                }
 
-                if(cluster2GeneString2PatientCount.containsKey(gene) &&
-                        cluster2GeneString2PatientCount.get(gene) > 0) {
-                    for (String fi2 : fiToFisSharingGeneMap.get(fi).get(gene)) {
-                        sif_fileUtility.printLine(String.format("%s\t-\t%s", fi, fi2));
-                        tbl_fileUtility.printLine("Cluster2");
+                    if (cluster2GeneString2PatientCount.containsKey(gene) &&
+                            cluster2GeneString2PatientCount.get(gene) > 30) {
+                        for (String fi2 : fiToFisSharingGeneMap.get(fi).get(gene)) {
+                            sif_fileUtility.printLine(String.format("%s\t-\t%s", fi, fi2));
+                            tbl_fileUtility.printLine(String.format("%s\t%s","Cluster2",fi));
+                            tbl_fileUtility.printLine(String.format("%s\t%s","Cluster2",fi2));
+                        }
                     }
-                }
             }
         }
         sif_fileUtility.close();
