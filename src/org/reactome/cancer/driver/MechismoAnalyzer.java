@@ -1847,23 +1847,55 @@ public class MechismoAnalyzer {
         tbl_fileUtility.setOutput("/home/burkhart/UCEC_fis.tbl");
         tbl_fileUtility.printLine(String.format("%s\t%s","cluster","name"));
 
+        Set<String> fiEdgeSet = new HashSet<>();
+        Set<String> c1NodeSet = new HashSet<>();
+        Set<String> c2NodeSet = new HashSet<>();
+
         for(String fi : fiToFisSharingGeneMap.keySet()){
                 for (String gene : fiToFisSharingGeneMap.get(fi).keySet()) {
                     if (cluster1GeneString2PatientCount.containsKey(gene) &&
                             cluster1GeneString2PatientCount.get(gene) > 30) {
                         for (String fi2 : fiToFisSharingGeneMap.get(fi).get(gene)) {
-                            sif_fileUtility.printLine(String.format("%s\t-\t%s", fi, fi2));
-                            tbl_fileUtility.printLine(String.format("%s\t%s","Cluster1",fi));
-                            tbl_fileUtility.printLine(String.format("%s\t%s","Cluster1",fi2));
+                            String edgeLineFwd = String.format("%s\t-\t%s", fi, fi2);
+                            String edgeLineRev = String.format("%s\t-\t%s", fi2, fi);
+                            if(!fiEdgeSet.contains(edgeLineFwd) && !fiEdgeSet.contains(edgeLineRev)) {
+                                sif_fileUtility.printLine(edgeLineFwd);
+                                fiEdgeSet.add(edgeLineFwd);
+                                fiEdgeSet.add(edgeLineRev);
+                            }
+                            String c1fi1 = String.format("%s\t%s","Cluster1",fi);
+                            if(!c1NodeSet.contains(c1fi1)) {
+                                tbl_fileUtility.printLine(c1fi1);
+                                c1NodeSet.add(c1fi1);
+                            }
+                            String c1fi2 = String.format("%s\t%s","Cluster1",fi2);
+                            if(!c1NodeSet.contains(c1fi2)) {
+                                tbl_fileUtility.printLine(c1fi2);
+                                c1NodeSet.add(c1fi2);
+                            }
                         }
                     }
 
                     if (cluster2GeneString2PatientCount.containsKey(gene) &&
                             cluster2GeneString2PatientCount.get(gene) > 30) {
                         for (String fi2 : fiToFisSharingGeneMap.get(fi).get(gene)) {
-                            sif_fileUtility.printLine(String.format("%s\t-\t%s", fi, fi2));
-                            tbl_fileUtility.printLine(String.format("%s\t%s","Cluster2",fi));
-                            tbl_fileUtility.printLine(String.format("%s\t%s","Cluster2",fi2));
+                            String edgeLineFwd = String.format("%s\t-\t%s", fi, fi2);
+                            String edgeLineRev = String.format("%s\t-\t%s", fi2, fi);
+                            if(!fiEdgeSet.contains(edgeLineFwd) && !fiEdgeSet.contains(edgeLineRev)) {
+                                sif_fileUtility.printLine(edgeLineFwd);
+                                fiEdgeSet.add(edgeLineFwd);
+                                fiEdgeSet.add(edgeLineRev);
+                            }
+                            String c2fi1 = String.format("%s\t%s","Cluster2",fi);
+                            if(!c2NodeSet.contains(c2fi1)) {
+                                tbl_fileUtility.printLine(c2fi1);
+                                c2NodeSet.add(c2fi1);
+                            }
+                            String c2fi2 = String.format("%s\t%s","Cluster2",fi2);
+                            if(!c2NodeSet.contains(c2fi2)) {
+                                tbl_fileUtility.printLine(c2fi2);
+                                c2NodeSet.add(c2fi2);
+                            }
                         }
                     }
             }
