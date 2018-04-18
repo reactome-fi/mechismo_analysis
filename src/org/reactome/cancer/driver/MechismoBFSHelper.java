@@ -100,68 +100,69 @@ public class MechismoBFSHelper {
         return pairToDist;
     }
 
-    public double calculateMinShortestFIPath(Set<String> patient1FISet,
-                                           Set<String> patient2FISet,
-                                           Map<String, Integer> pairToDist) {
-        int total = 0;
-        int count = 0;
-        // From set1 to set2
-        for (String fi1 : patient1FISet) {
+    public double calculateAvgShortestFIPath(Set<String> patient1FISet,
+                                             Set<String> patient2FISet,
+                                             Map<String, Integer> fiPairToDist) {
+        int sumOfShortestPathDistances = 0;
+        int numOfShortestPathDistances = 0;
+        // From patient1 to patient2
+        for (String patient1FI : patient1FISet) {
             // Find the shortest path
-            int shortest = Integer.MAX_VALUE;
-            for (String fi2 : patient2FISet) {
-                String pair = trimCapsAlphaSort("\t",fi1,fi2);
-                Integer dist = pairToDist.get(pair);
-                if (dist == null) {
-                    throw new IllegalStateException(pair + " doesn't have a distance!");
+            int shortestPathDist = Integer.MAX_VALUE;
+            for (String patient2FI : patient2FISet) {
+                String fiPair = trimCapsAlphaSort("\t",patient1FI,patient2FI);
+                Integer fiDist = fiPairToDist.get(fiPair);
+                if (fiDist == null) {
+                    throw new IllegalStateException(fiPair + " doesn't have a distance!");
                 }
-                if (dist < shortest)
-                    shortest = dist;
+                if (fiDist < shortestPathDist)
+                    shortestPathDist = fiDist;
             }
-            total += shortest;
-            count ++;
+            sumOfShortestPathDistances += shortestPathDist;
+            numOfShortestPathDistances ++;
         }
-        // From set2 to set1
-        for (String fi2 : patient2FISet) {
+        // From patient2 to patient1
+        for (String patient2FI : patient2FISet) {
             // Find the shortest path
-            int shortest = Integer.MAX_VALUE;
-            for (String fi1 : patient1FISet) {
-                String pair = trimCapsAlphaSort("\t",fi1,fi2);
-                Integer dist = pairToDist.get(pair);
-                if (dist == null) {
-                    throw new IllegalStateException(pair + " doesn't have a distance!");
+            int shortestPathDist = Integer.MAX_VALUE;
+            for (String patient1FI : patient1FISet) {
+                String fiPair = trimCapsAlphaSort("\t",patient1FI,patient2FI);
+                Integer fiDist = fiPairToDist.get(fiPair);
+                if (fiDist == null) {
+                    throw new IllegalStateException(fiPair + " doesn't have a distance!");
                 }
-                if (dist < shortest)
-                    shortest = dist;
+                if (fiDist < shortestPathDist)
+                    shortestPathDist = fiDist;
             }
-            total += shortest;
-            count ++;
+            sumOfShortestPathDistances += shortestPathDist;
+            numOfShortestPathDistances ++;
         }
-        return (double) total / count;
+        return (double) sumOfShortestPathDistances / numOfShortestPathDistances;
     }
 
-    public Map<String, Integer> calculateShortestFIPath(Map<String, Set<String>> patientToFIs,
-                                                        Map<String, Set<String>> fiToPartners,
+    public Map<String, Integer> calculateShortestFIPath(Map<String, Set<String>> patientToSigFIsForCancerType,
+                                                        Map<String, Set<String>> fiToFIsSharingGene,
                                                         BreadthFirstSearch bfs) {
-        Set<String> allFIs = patientToFIs.values()
+        Set<String> allSigFIsForCancerType = patientToSigFIsForCancerType.values()
                 .stream()
                 .flatMap(fis -> fis.stream())
                 .collect(Collectors.toSet());
-        List<String> allFIList = new ArrayList<>(allFIs);
-        allFIList.sort(Comparator.naturalOrder());
+        List<String> allSigFIsForCancerTypeList = new ArrayList<>(allSigFIsForCancerType);
+        allSigFIsForCancerTypeList.sort(Comparator.naturalOrder());
 
-        Map<String, Integer> pairToDist = new HashMap<>();
-        for (int i = 0; i < allFIList.size(); i++) {
-            String fi1 = allFIList.get(i);
-            Map<String, Integer> fiToDist = bfs.getDistances(fi1,
-                    allFIList.subList(i, allFIList.size()), // Don't exclude itself since we need this value too
-                    fiToPartners);
-            List<String> fiToDistKeysetList = new ArrayList<>(fiToDist.keySet());
-            fiToDistKeysetList.sort(Comparator.naturalOrder());
-            for (String fi2 : fiToDistKeysetList)
-                pairToDist.put(trimCapsAlphaSort("\t",fi1,fi2), fiToDist.get(fi2));
+        Map<String, Integer> fiPairToDist = new HashMap<>();
+        for (int i = 0; i < allSigFIsForCancerTypeList.size(); i++) {
+            String fi1 = allSigFIsForCancerTypeList.get(i);
+            Map<String, Integer> fiToDistanceFromFI1 = bfs.getDistances(fi1,
+                    allSigFIsForCancerTypeList.subList(i,
+                            allSigFIsForCancerTypeList.size()), // Don't exclude itself since we need this value too
+                    fiToFIsSharingGene);
+            List<String> fisWithDistancesToFI1 = new ArrayList<>(fiToDistanceFromFI1.keySet());
+            fisWithDistancesToFI1.sort(Comparator.naturalOrder());
+            for (String fi2 : fisWithDistancesToFI1)
+                fiPairToDist.put(trimCapsAlphaSort("\t",fi1,fi2), fiToDistanceFromFI1.get(fi2));
         }
-        return pairToDist;
+        return fiPairToDist;
     }
 
     private String trimCapsAlphaSort(String delim, String s1, String s2){

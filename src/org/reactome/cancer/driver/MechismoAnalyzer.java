@@ -1611,43 +1611,49 @@ public class MechismoAnalyzer {
         return patientToReactions;
     }
 
-    private void generatePairwiseFINetworkDistance(Map<String, Set<String>> patientToFIs,
-                                                   Map<String, Set<String>> fiNetwork,
+    private void generatePairwiseFINetworkDistance(Map<String, Set<String>> patientToSigFIsForCancerType,
+                                                   Map<String, Set<String>> fiToFisSharingGene,
                                                    String outputFileName) throws IOException {
         // Calculate pair-wise average distances between two cancer types
         ReactionMapGenerator mapGenerator = new ReactionMapGenerator();
         BreadthFirstSearch bfs = new BreadthFirstSearch();
 
         // Need a little bit cleanup
-        patientToFIs.forEach((cancer, reactions) -> reactions.retainAll(fiNetwork.keySet()));
-        filterSamplesWithoutReactions(patientToFIs);
-        List<String> patients = patientToFIs.keySet().stream().sorted(Comparator.naturalOrder()).collect(Collectors.toList());
+        // ensure patient FIs are in FI network
+        patientToSigFIsForCancerType.forEach((patient, sigFIsForCancerType) ->  sigFIsForCancerType.retainAll(fiToFisSharingGene.keySet()));
+        filterSamplesWithoutReactions(patientToSigFIsForCancerType);
+        List<String> patients = patientToSigFIsForCancerType.keySet().stream().sorted(Comparator.naturalOrder()).collect(Collectors.toList());
 
         // Generate output
         StringBuilder builder = new StringBuilder();
         builder.append("Cancer");
-        patients.forEach(cancer -> builder.append("\t").append(cancer));
+        patients.forEach(patient -> builder.append("\t").append(patient));
         fu.setOutput(outputFileName);
         fu.printLine(builder.toString());
         builder.setLength(0);
 
         // Use a helper object
-        MechismoBFSHelper helper = new MechismoBFSHelper();
-        Map<String, Integer> pairToDist = helper.calculateShortestFIPath(patientToFIs,
-                fiNetwork,
+        MechismoBFSHelper bfsHelper = new MechismoBFSHelper();
+        //what distance is this?
+        Map<String, Integer> fiPairToDist = bfsHelper.calculateShortestFIPath(patientToSigFIsForCancerType,
+                fiToFisSharingGene,
                 bfs);
         for (int i = 0; i < patients.size(); i++) {
             String patient1 = patients.get(i);
             builder.append(patient1);
-            Set<String> set1 = patientToFIs.get(patient1);
+            Set<String> patient1SigFIsForCancerType = patientToSigFIsForCancerType.get(patient1);
             for (int j = 0; j < patients.size(); j++) {
                 String patient2 = patients.get(j);
                 builder.append("\t");
                 if (i == j)
                     builder.append(0.0d);
                 else {
-                    Set<String> set2 = patientToFIs.get(patient2);
-                    double dist = helper.calculateMinShortestFIPath(set1, set2, pairToDist);
+                    Set<String> patient2SigFIsForCancerType = patientToSigFIsForCancerType.get(patient2);
+                    //what distance is this?
+                    double dist = bfsHelper.calculateAvgShortestFIPath(
+                            patient1SigFIsForCancerType,
+                            patient2SigFIsForCancerType,
+                            fiPairToDist);
                     builder.append(dist);
                 }
             }
