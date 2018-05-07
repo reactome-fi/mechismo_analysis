@@ -1,10 +1,15 @@
 package org.reactome.cancer.driver;
 
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+
 import org.reactome.fi.util.InteractionUtilities;
 import org.reactome.r3.graph.BreadthFirstSearch;
-
-import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * This helper class is used to perform BFS related stuff for mechismo data.
@@ -98,79 +103,6 @@ public class MechismoBFSHelper {
                 pairToDist.put(rxt1 + "\t" + rxt2, rxtToDist.get(rxt2));
         }
         return pairToDist;
-    }
-
-    public double calculateAvgShortestFIPath(Set<String> patient1FISet,
-                                             Set<String> patient2FISet,
-                                             Map<String, Integer> fiPairToDist) {
-        int sumOfShortestPathDistances = 0;
-        int numOfShortestPathDistances = 0;
-        // From patient1 to patient2
-        for (String patient1FI : patient1FISet) {
-            // Find the shortest path
-            int shortestPathDist = Integer.MAX_VALUE;
-            for (String patient2FI : patient2FISet) {
-                String fiPair = trimCapsAlphaSort("\t",patient1FI,patient2FI);
-                Integer fiDist = fiPairToDist.get(fiPair);
-                if (fiDist == null) {
-                    throw new IllegalStateException(fiPair + " doesn't have a distance!");
-                }
-                if (fiDist < shortestPathDist)
-                    shortestPathDist = fiDist;
-            }
-            sumOfShortestPathDistances += shortestPathDist;
-            numOfShortestPathDistances ++;
-        }
-        // From patient2 to patient1
-        for (String patient2FI : patient2FISet) {
-            // Find the shortest path
-            int shortestPathDist = Integer.MAX_VALUE;
-            for (String patient1FI : patient1FISet) {
-                String fiPair = trimCapsAlphaSort("\t",patient1FI,patient2FI);
-                Integer fiDist = fiPairToDist.get(fiPair);
-                if (fiDist == null) {
-                    throw new IllegalStateException(fiPair + " doesn't have a distance!");
-                }
-                if (fiDist < shortestPathDist)
-                    shortestPathDist = fiDist;
-            }
-            sumOfShortestPathDistances += shortestPathDist;
-            numOfShortestPathDistances ++;
-        }
-        return (double) sumOfShortestPathDistances / numOfShortestPathDistances;
-    }
-
-    public Map<String, Integer> calculateShortestFIPath(Map<String, Set<String>> patientToSigFIsForCancerType,
-                                                        Map<String, Set<String>> fiToFIsSharingGene,
-                                                        BreadthFirstSearch bfs) {
-        Set<String> allSigFIsForCancerType = patientToSigFIsForCancerType.values()
-                .stream()
-                .flatMap(fis -> fis.stream())
-                .collect(Collectors.toSet());
-        List<String> allSigFIsForCancerTypeList = new ArrayList<>(allSigFIsForCancerType);
-        allSigFIsForCancerTypeList.sort(Comparator.naturalOrder());
-
-        Map<String, Integer> fiPairToDist = new HashMap<>();
-        for (int i = 0; i < allSigFIsForCancerTypeList.size(); i++) {
-            String fi1 = allSigFIsForCancerTypeList.get(i);
-            Map<String, Integer> fiToDistanceFromFI1 = bfs.getDistances(fi1,
-                    allSigFIsForCancerTypeList.subList(i,
-                            allSigFIsForCancerTypeList.size()), // Don't exclude itself since we need this value too
-                    fiToFIsSharingGene);
-            List<String> fisWithDistancesToFI1 = new ArrayList<>(fiToDistanceFromFI1.keySet());
-            fisWithDistancesToFI1.sort(Comparator.naturalOrder());
-            for (String fi2 : fisWithDistancesToFI1)
-                fiPairToDist.put(trimCapsAlphaSort("\t",fi1,fi2), fiToDistanceFromFI1.get(fi2));
-        }
-        return fiPairToDist;
-    }
-
-    private String trimCapsAlphaSort(String delim, String s1, String s2){
-        List<String> stringList = new ArrayList<>();
-        stringList.add(s1.trim().toUpperCase());
-        stringList.add(s2.trim().toUpperCase());
-        Collections.sort(stringList);
-        return String.join(delim,stringList);
     }
 
 }

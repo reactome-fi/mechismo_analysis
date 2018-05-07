@@ -1,6 +1,0 @@
-ogmios.cancerTypes=BRCA,GBM,OV,LUAD,UCEC,KIRC,HNSC,LGG,THCA,LUSC,PRAD,STAD,LIHC,BLCA,SKCM,CESC,KIRP,SARC,LAML,COAD,
-ogmios.significantMechismoFIsFile=/home/burkhart/Software/Ogmios/datasets/Mechismo/tcga_mechismo_stat_cancer_wise_significant.tsv
-ogmios.reactomeReactionNetworkFile=/home/burkhart/Software/Ogmios/datasets/ReactionNetwork_070517.txt
-ogmios.fiNetworkFile=/home/burkhart/Software/Ogmios/datasets/FIsInGene_031516_with_annotations.txt
-ogmios.mechismoOutputFile=/home/burkhart/Software/Ogmios/datasets/Mechismo/TCGA_mech_output.tsv
-ogmios.outputDir=/home/burkhart/Software/Ogmios/results/Mechismo

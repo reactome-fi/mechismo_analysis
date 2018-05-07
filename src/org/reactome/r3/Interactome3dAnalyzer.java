@@ -4,15 +4,29 @@
  */
 package org.reactome.r3;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+
 import org.apache.log4j.Logger;
-import org.biojava.nbio.alignment.Alignments;
-import org.biojava.nbio.alignment.SimpleGapPenalty;
-import org.biojava.nbio.core.alignment.matrices.SubstitutionMatrixHelper;
-import org.biojava.nbio.core.alignment.template.SubstitutionMatrix;
-import org.biojava.nbio.core.exceptions.CompoundNotFoundException;
-import org.biojava.nbio.core.sequence.ProteinSequence;
-import org.biojava.nbio.core.sequence.compound.AminoAcidCompound;
-import org.biojava.nbio.structure.*;
+import org.biojava.nbio.structure.Chain;
+import org.biojava.nbio.structure.Group;
+import org.biojava.nbio.structure.Structure;
+import org.biojava.nbio.structure.StructureException;
+import org.biojava.nbio.structure.StructureIO;
+import org.biojava.nbio.structure.StructureTools;
 import org.biojava.nbio.structure.align.util.AtomCache;
 import org.biojava.nbio.structure.contact.AtomContactSet;
 import org.biojava.nbio.structure.contact.GroupContact;
@@ -24,14 +38,6 @@ import org.reactome.r3.ProteinSequenceHandler.Sequence;
 import org.reactome.r3.util.FileUtility;
 import org.reactome.r3.util.InteractionUtilities;
 import org.reactome.structure.model.PDBUniProtMatch;
-
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.URL;
-import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * This class is used to handle interaction structure data downloaded from interactome3d.
@@ -248,21 +254,14 @@ public class Interactome3dAnalyzer {
         for (File file : interactionPDBFiles) {
             // Do a simple parsing
             String fi = extractFIFromFileName(file);
-            String[] proteins = fi.split("\t");
-            assert proteins.length == 2;
-            if(!proteins[0].equals("EXP") && !proteins[0].equals("MDL") &&
-                    !proteins[1].equals("EXP") && !proteins[1].equals("MDL")) {
-                if (ppiToPDB.containsKey(fi))
-                    // TODO: simple parsing isn't good enough
-                    // we end up with a bunch of "MDL" and "EXP" entries that
-                    // shouldn't exist... should only contain uniprot ID's
-                    // we'll fix this later with a regex like FIOncoNet
-                    //throw new IllegalStateException("Duplicated PDB for " + fi);
-                    logger.warn(String.format("ppiToPDB already contains %s", fi));
-                ppiToPDB.put(fi, file);
-            }else{
-                //skip single-protein EXP and MDL structures
-            }
+            if (ppiToPDB.containsKey(fi))
+                // TODO: simple parsing isn't good enough
+                // we end up with a bunch of "MDL" and "EXP" entries that
+                // shouldn't exist... should only contain uniprot ID's
+                // we'll fix this later with a regex like FIOncoNet
+                //throw new IllegalStateException("Duplicated PDB for " + fi);
+                logger.warn(String.format("ppiToPDB already contains %s", fi));
+            ppiToPDB.put(fi, file);
         }
         return ppiToPDB;
     }
@@ -455,37 +454,30 @@ public class Interactome3dAnalyzer {
                                                                    INTERFACE_THRESHOLD,
                                                                    false);
         GroupContactSet groupSet = new GroupContactSet(contacts);
-        Map<Chain, Set<Integer>> chainToCoordinates = new HashMap<>();
-        Map<Chain, List<Integer>> rtn = new HashMap<>();
-        if(groupSet.size() > 0) {
-            for (GroupContact contact : groupSet) {
-                Pair<Group> pair = contact.getPair();
-                Set<Integer> coordinates = chainToCoordinates.get(pair.getFirst().getChain());
-                if (coordinates == null) {
-                    coordinates = new HashSet<>();
-                    chainToCoordinates.put(pair.getFirst().getChain(),
-                            coordinates);
-                }
-                coordinates.add(pair.getFirst().getResidueNumber().getSeqNum());
-                coordinates = chainToCoordinates.get(pair.getSecond().getChain());
-                if (coordinates == null) {
-                    coordinates = new HashSet<>();
-                    chainToCoordinates.put(pair.getSecond().getChain(),
-                            coordinates);
-                }
-                coordinates.add(pair.getSecond().getResidueNumber().getSeqNum());
+        Map<Chain, Set<Integer>> chainToCoordinates = new HashMap<Chain, Set<Integer>>();
+        for (GroupContact contact : groupSet) {
+            Pair<Group> pair = contact.getPair();
+            Set<Integer> coordinates = chainToCoordinates.get(pair.getFirst().getChain());
+            if (coordinates == null) {
+                coordinates = new HashSet<Integer>();
+                chainToCoordinates.put(pair.getFirst().getChain(),
+                                       coordinates);
             }
-            for (Chain chain : chainToCoordinates.keySet()) {
-                Set<Integer> set = chainToCoordinates.get(chain);
-                List<Integer> list = new ArrayList<>(set);
-                Collections.sort(list);
-                rtn.put(chain, list);
+            coordinates.add(pair.getFirst().getResidueNumber().getSeqNum());
+            coordinates = chainToCoordinates.get(pair.getSecond().getChain());
+            if (coordinates == null) {
+                coordinates = new HashSet<Integer>();
+                chainToCoordinates.put(pair.getSecond().getChain(),
+                                       coordinates);
             }
-        }else{
-            logger.info(String.format("Detected structure without %.2fA interface.",
-                    INTERFACE_THRESHOLD));
-            rtn.put(chainA,new ArrayList<>());
-            rtn.put(chainB,new ArrayList<>());
+            coordinates.add(pair.getSecond().getResidueNumber().getSeqNum());
+        }
+        Map<Chain, List<Integer>> rtn = new HashMap<Chain, List<Integer>>();
+        for (Chain chain : chainToCoordinates.keySet()) {
+            Set<Integer> set = chainToCoordinates.get(chain);
+            List<Integer> list = new ArrayList<Integer>(set);
+            Collections.sort(list);
+            rtn.put(chain, list);
         }
         return rtn;
     }
@@ -495,9 +487,7 @@ public class Interactome3dAnalyzer {
         // PDBs downloaded from Interactome3D.
         Chain chainA = structure.getChainByPDB("A");
         Chain chainB = structure.getChainByPDB("B");
-        if(chainA == null || chainB == null){
-            throw new NullPointerException();
-        }
+        
         return extractContacts(chainA, chainB);
     }
     
@@ -615,22 +605,22 @@ public class Interactome3dAnalyzer {
         return chainToMatch;
     }
 
-    private double calculateGlobalAlignmentScore(String s1, String s2) throws CompoundNotFoundException {
-        List<ProteinSequence> psl = new ArrayList<>();
-        psl.add(new ProteinSequence(s1));
-        psl.add(new ProteinSequence(s2));
-        SubstitutionMatrix<AminoAcidCompound> matrix = SubstitutionMatrixHelper.getBlosum62();
-        double[] pair =
-                Alignments.getAllPairsScores(
-                        psl,
-                        Alignments.PairwiseSequenceScorerType.GLOBAL,
-                        new SimpleGapPenalty(),
-                        matrix);
-        for(int i = 0; i < pair.length; i++) {
-            System.out.println(String.format("%s vs %s: %f", s1, s2, pair[i]));
-        }
-        return -1.0;
-    }
+//    private double calculateGlobalAlignmentScore(String s1, String s2) throws CompoundNotFoundException {
+//        List<ProteinSequence> psl = new ArrayList<>();
+//        psl.add(new ProteinSequence(s1));
+//        psl.add(new ProteinSequence(s2));
+//        SubstitutionMatrix<AminoAcidCompound> matrix = SubstitutionMatrixHelper.getBlosum62();
+//        double[] pair =
+//                Alignments.getAllPairsScores(
+//                        psl,
+//                        Alignments.PairwiseSequenceScorerType.GLOBAL,
+//                        new SimpleGapPenalty(),
+//                        matrix);
+//        for(int i = 0; i < pair.length; i++) {
+//            System.out.println(String.format("%s vs %s: %f", s1, s2, pair[i]));
+//        }
+//        return -1.0;
+//    }
 
     private class InteractionPDBScore implements Comparable<InteractionPDBScore> {
         

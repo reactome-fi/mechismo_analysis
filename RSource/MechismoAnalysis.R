@@ -124,9 +124,9 @@ calculate.sample.dist <- function(file.name, cancer) {
 
 
 # Plot the cancer types
-#result.dir <- "/Users/wug/git/Ogmios/results"
-#sample.to.reaction.file <- paste(result.dir, "MechismoSamplesToReactions_103017.txt", sep = "/")
-#reaction.dist <- calculate.sample.dist(sample.to.reaction.file, "UCEC")
+result.dir <- "/Users/wug/git/Ogmios/results"
+sample.to.reaction.file <- paste(result.dir, "MechismoSamplesToReactions_103017.txt", sep = "/")
+reaction.dist <- calculate.sample.dist(sample.to.reaction.file, "UCEC")
 # print(summary(dist))
 
 # tcga.dist.file <- paste(result.dir, "TCGACancerPairWiseReactionNetworkDist_092617.txt", sep="/")
@@ -153,16 +153,12 @@ calculate.sample.dist <- function(file.name, cancer) {
 # clin.file <- "/Users/wug/datasets/TCGA/clinical/LGG/LGG-TP.samplefeatures.txt"
 
 cancer = "TCGA UCEC"
-#tcga.sample.dist.file <- paste(result.dir,
-#                               "MechismoSamplePairWiseReactionNetworkDist_UCEC_103117.txt",
-#                               sep = "/")
-tcga.sample.dist.file <- "/home/burkhart/Software/Ogmios/results/Mechismo/MechismoSamplePairwiseFINetworkDist_UCEC.tsv"
-#clin.file <- "/Users/wug/datasets/TCGA/clinical/UCEC/UCEC-TP.samplefeatures.txt"
-clin.file <- "/home/burkhart/Software/Ogmios/datasets/FirehoseClinical/UCEC-TP.samplefeatures.txt"
+tcga.sample.dist.file <- paste(result.dir,
+                               "MechismoSamplePairWiseReactionNetworkDist_UCEC_103117.txt",
+                               sep = "/")
+clin.file <- "/Users/wug/datasets/TCGA/clinical/UCEC/UCEC-TP.samplefeatures.txt"
 
 sample.clusters <- plot.tcga.cancer(tcga.sample.dist.file, cancer)
-lapply(names(sample.clusters[[1]]), write, "~/UCEC_cluster1_samples.txt", append=TRUE, ncolumns=1000)
-lapply(names(sample.clusters[[2]]), write, "~/UCEC_cluster2_samples.txt", append=TRUE, ncolumns=1000)
 print(sample.clusters)
 sample.names <- read.delim(tcga.sample.dist.file, header = TRUE, sep = "\t", check.names = FALSE)[, 1]
 sample.names <- as.character(sample.names)
