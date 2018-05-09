@@ -28,10 +28,7 @@ import org.reactome.r3.util.InteractionUtilities;
 import org.reactome.r3.util.MathUtilities;
 import org.reactome.r3.util.R3Constants;
 
-import weka.classifiers.AbstractClassifier;
-import weka.classifiers.Classifier;
 import weka.classifiers.Evaluation;
-import weka.classifiers.evaluation.output.prediction.AbstractOutput;
 import weka.core.Attribute;
 import weka.core.DenseInstance;
 import weka.core.Instance;

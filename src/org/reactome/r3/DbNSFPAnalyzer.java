@@ -15,8 +15,6 @@ import java.util.Map;
 import org.junit.Test;
 import org.reactome.r3.util.FileUtility;
 
-import com.sun.jndi.ldap.ext.StartTlsResponseImpl;
-
 /**
  * This class is used to handle data process related to dbNSFP.
  * @author gwu

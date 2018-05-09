@@ -11,7 +11,6 @@ import org.apache.commons.math.MathException;
 import org.apache.commons.math.distribution.ChiSquaredDistribution;
 import org.apache.commons.math.distribution.ChiSquaredDistributionImpl;
 import org.apache.commons.math.stat.correlation.PearsonsCorrelation;
-import org.reactome.r3.util.MathUtilities;
 
 /**
  * This method is used to combine p-values from a list of t-test based on an extend Fisher's method

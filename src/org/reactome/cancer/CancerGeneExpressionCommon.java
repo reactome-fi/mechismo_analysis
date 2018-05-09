@@ -17,7 +17,6 @@ import java.util.Set;
 
 import org.apache.commons.math.stat.descriptive.DescriptiveStatistics;
 import org.reactome.r3.util.FileUtility;
-import org.reactome.r3.util.InteractionUtilities;
 import org.reactome.r3.util.MathUtilities;
 import org.reactome.r3.util.R3Constants;
 

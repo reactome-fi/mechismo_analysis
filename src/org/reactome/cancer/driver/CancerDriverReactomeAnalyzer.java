@@ -4,6 +4,21 @@
  */
 package org.reactome.cancer.driver;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
 import org.apache.commons.math.stat.correlation.PearsonsCorrelation;
 import org.gk.model.GKInstance;
 import org.gk.model.InstanceUtilities;
@@ -18,14 +33,11 @@ import org.reactome.annotate.PathwayBasedAnnotator;
 import org.reactome.data.ReactomeAnalyzer;
 import org.reactome.r3.ReactionMapGenerator;
 import org.reactome.r3.graph.GraphAnalyzer;
-import org.reactome.r3.util.*;
-
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.util.*;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
+import org.reactome.r3.util.Configuration;
+import org.reactome.r3.util.FileUtility;
+import org.reactome.r3.util.FisherExact;
+import org.reactome.r3.util.InteractionUtilities;
+import org.reactome.r3.util.MathUtilities;
 
 /**
  * Analyze cancer drivers distribution in Reactome.

@@ -4,11 +4,16 @@
  */
 package org.reactome.r3.util;
 
-import cern.jet.random.Binomial;
-import cern.jet.random.ChiSquare;
-import cern.jet.random.Normal;
-import cern.jet.random.engine.DRand;
-import cern.jet.random.engine.RandomEngine;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
 import org.apache.commons.math.MathException;
 import org.apache.commons.math.distribution.HypergeometricDistribution;
 import org.apache.commons.math.distribution.HypergeometricDistributionImpl;
@@ -26,7 +31,11 @@ import org.apache.commons.math3.stat.descriptive.SummaryStatistics;
 import org.junit.Assert;
 import org.junit.Test;
 
-import java.util.*;
+import cern.jet.random.Binomial;
+import cern.jet.random.ChiSquare;
+import cern.jet.random.Normal;
+import cern.jet.random.engine.DRand;
+import cern.jet.random.engine.RandomEngine;
 
 public class MathUtilities {
 

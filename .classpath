@@ -16,5 +16,6 @@
 	<classpathentry kind="lib" path="lib/reactome/fiNetworkBuild.jar"/>
 	<classpathentry kind="lib" path="lib/reactome/caBigR3.jar"/>
 	<classpathentry kind="lib" path="lib/reactome/caBigR3Web.jar"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/mechismows"/>
 	<classpathentry kind="output" path="target/classes"/>
 </classpath>
