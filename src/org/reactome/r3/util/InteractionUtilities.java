@@ -18,8 +18,6 @@ import org.apache.commons.math3.random.JDKRandomGenerator;
 import org.apache.commons.math3.random.RandomDataGenerator;
 import org.apache.commons.math3.random.RandomGenerator;
 import org.gk.model.GKInstance;
-import org.reactome.funcInt.Interaction;
-import org.reactome.funcInt.Protein;
 
 /**
  * A utility class for common interaction related parsing.
@@ -231,17 +229,6 @@ public class InteractionUtilities {
             }
         }
         return rtn;
-    }
-    
-    public static Set<String> grepIDsFromFuncInt(List<Interaction> interactions) {
-        Set<String> ids = new HashSet<String>();
-        for (Interaction i : interactions) {
-            Protein first = i.getFirstProtein();
-            Protein second = i.getSecondProtein();
-            ids.add(first.getPrimaryAccession());
-            ids.add(second.getPrimaryAccession());
-        }
-        return ids;
     }
     
     // This method may be moved to other places

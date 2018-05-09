@@ -122,6 +122,17 @@ calculate.sample.dist <- function(file.name, cancer) {
     rtn
 }
 
+output.clusters <- function(clusters, names) {
+    cat(paste("Total clusters:", length(clusters), "\n", sep = " "))
+    for (i in 1 : length(clusters)) {
+        cluster <- clusters[[i]]
+        cat(paste("Cluster", i, ":", length(cluster), "\n", sep=" "))
+        for (j in 1 : length(cluster)) {
+            cat(paste(names[cluster[j]], "\t", sep=""))
+        }
+        cat("\n")
+    }
+}
 
 # Plot the cancer types
 result.dir <- "/Users/wug/git/Ogmios/results"
@@ -136,30 +147,62 @@ reaction.dist <- calculate.sample.dist(sample.to.reaction.file, "UCEC")
 # Plot for individual samples
 # cancer = "TCGA PAAD"
 # tcga.sample.dist.file <- paste(result.dir,
-#                               "MechismoSamplePairWiseReactionNetworkDist_PAAD_103117.txt",
+#                               "MechismoSamplePairWiseReactionNetworkDist_PAAD_111617.txt",
 #                                sep = "/")
 # clin.file <- "/Users/wug/datasets/TCGA/clinical/PAAD/PAAD-TP.samplefeatures.txt"
 
-# cancer = "TCGA SKCM"
-# tcga.sample.dist.file <- paste(result.dir,
-#                                "MechismoSamplePairWiseReactionNetworkDist_SKCM_103117.txt",
-#                                sep = "/")
-# clin.file <- "/Users/wug/datasets/TCGA/clinical/SKCM/SKCM-TM.samplefeatures.txt"
+cancer = "TCGA SKCM"
+tcga.sample.dist.file <- paste(result.dir,
+                               "MechismoSamplePairWiseReactionNetworkDist_SKCM_112817.txt",
+                               sep = "/")
+clin.file <- "/Users/wug/datasets/TCGA/clinical/SKCM/SKCM-TM.samplefeatures.txt"
 
-# cancer = "TCGA LGG"
-# tcga.sample.dist.file <- paste(result.dir,
-#                                "MechismoSamplePairWiseReactionNetworkDist_LGG_103117.txt",
-#                                sep = "/")
-# clin.file <- "/Users/wug/datasets/TCGA/clinical/LGG/LGG-TP.samplefeatures.txt"
+cancer = "TCGA LGG"
+tcga.sample.dist.file <- paste(result.dir,
+                               "MechismoSamplePairWiseReactionNetworkDist_LGG_111617.txt",
+                               sep = "/")
+clin.file <- "/Users/wug/datasets/TCGA/clinical/LGG/LGG-TP.samplefeatures.txt"
 
 cancer = "TCGA UCEC"
 tcga.sample.dist.file <- paste(result.dir,
-                               "MechismoSamplePairWiseReactionNetworkDist_UCEC_103117.txt",
+                               "MechismoSamplePairWiseReactionNetworkDist_UCEC_111317.txt",
                                sep = "/")
 clin.file <- "/Users/wug/datasets/TCGA/clinical/UCEC/UCEC-TP.samplefeatures.txt"
+# 
+# cancer = "TCGA COADREAD"
+# tcga.sample.dist.file <- paste(result.dir,
+#                                "MechismoSamplePairWiseReactionNetworkDist_COADREAD_112817.txt",
+#                                sep = "/")
+# clin.file <- "/Users/wug/datasets/TCGA/clinical/COADREAD/COADREAD-TP.samplefeatures.txt"
+# 
+# cancer = "TCGA THCA"
+# tcga.sample.dist.file <- paste(result.dir,
+#                                "MechismoSamplePairWiseReactionNetworkDist_THCA_111617.txt",
+#                                sep = "/")
+# clin.file <- "/Users/wug/datasets/TCGA/clinical/THCA/THCA-TP.samplefeatures.txt"
+# 
+# cancer = "TCGA STAD"
+# tcga.sample.dist.file <- paste(result.dir,
+#                                "MechismoSamplePairWiseReactionNetworkDist_STAD_111617.txt",
+#                                sep = "/")
+# clin.file <- "/Users/wug/datasets/TCGA/clinical/STAD/STAD-TP.samplefeatures.txt"
+# 
+# cancer = "TCGA LUAD"
+# tcga.sample.dist.file <- paste(result.dir,
+#                                "MechismoSamplePairWiseReactionNetworkDist_LUAD_111617.txt",
+#                                sep = "/")
+# clin.file <- "/Users/wug/datasets/TCGA/clinical/LUAD/LUAD-TP.samplefeatures.txt"
+# 
+cancer = "TCGA HNSC"
+tcga.sample.dist.file <- paste(result.dir,
+                               "MechismoSamplePairWiseReactionNetworkDist_HNSC_111617.txt",
+                               sep = "/")
+clin.file <- "/Users/wug/datasets/TCGA/clinical/HNSC/HNSC-TP.samplefeatures.txt"
 
 sample.clusters <- plot.tcga.cancer(tcga.sample.dist.file, cancer)
-print(sample.clusters)
+# print(sample.clusters)
 sample.names <- read.delim(tcga.sample.dist.file, header = TRUE, sep = "\t", check.names = FALSE)[, 1]
 sample.names <- as.character(sample.names)
-run.survival.analysis(clin.file, sample.clusters, sample.names, cancer, exclude.no.clustered.samples = TRUE)
+output.clusters(sample.clusters, sample.names)
+cat("\n") # Give it an extra line
+run.survival.analysis(clin.file, sample.clusters, sample.names, cancer, exclude.no.clustered.samples = T)

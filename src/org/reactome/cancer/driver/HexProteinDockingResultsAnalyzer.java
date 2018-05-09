@@ -21,7 +21,6 @@ import org.biojava.nbio.structure.Structure;
 import org.biojava.nbio.structure.StructureException;
 import org.biojava.nbio.structure.StructureIO;
 import org.biojava.nbio.structure.StructureImpl;
-import org.biojava.nbio.structure.gui.BiojavaJmol;
 import org.biojava.nbio.structure.io.FileConvert;
 import org.junit.Test;
 import org.reactome.r3.Interactome3dAnalyzer;
@@ -124,16 +123,16 @@ public class HexProteinDockingResultsAnalyzer {
         }
         fu.close();
         
-        BiojavaJmol jmolPane = new BiojavaJmol();
-        jmolPane.setStructure(maxiumContactStructure);
-        saveStructure(maxiumContactStructure, fileName, "2000");
+//        BiojavaJmol jmolPane = new BiojavaJmol();
+//        jmolPane.setStructure(maxiumContactStructure);
+//        saveStructure(maxiumContactStructure, fileName, "2000");
     }
     
     
     
     private void viewStructure(Structure complex) {
-        BiojavaJmol jmolPane = new BiojavaJmol();
-        jmolPane.setStructure(complex);
+//        BiojavaJmol jmolPane = new BiojavaJmol();
+//        jmolPane.setStructure(complex);
     }
     
     private void saveStructure(Structure complex,

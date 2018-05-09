@@ -678,54 +678,55 @@ public class CancerDriverInstancesGenerator {
             super(data);
         }
         
-        /**
-         * Basically this is copied from the original implementation by commenting out the first line:
-         * data = new Instances(data) to avoid copy, so that our implementation can be used.
-         */
-        @Override
-        public void crossValidateModel(Classifier classifier, 
-                                       Instances data,
-                                       int numFolds, 
-                                       Random random, 
-                                       Object... forPredictionsPrinting) throws Exception {
-            // Make a copy of the data we can reorder
-            if (data instanceof NetworkMutableInstances) {
-                Map<String, Set<String>> geneToPartners = ((NetworkMutableInstances)data).getGeneToPartners();
-                // Make a new copy
-                data = new NetworkMutableInstances(data);
-                ((NetworkMutableInstances)data).setGeneToPartners(geneToPartners);
-            }
-            else
-                data = new Instances(data);
-            data.randomize(random);
-            if (data.classAttribute().isNominal()) {
-                data.stratify(numFolds);
-            }
-            
-            // We assume that the first element is a
-            // weka.classifiers.evaluation.output.prediction.AbstractOutput object
-            AbstractOutput classificationOutput = null;
-            if (forPredictionsPrinting.length > 0) {
-                // print the header first
-                classificationOutput = (AbstractOutput) forPredictionsPrinting[0];
-                classificationOutput.setHeader(data);
-                classificationOutput.printHeader();
-            }
-            
-            // Do the folds
-            for (int i = 0; i < numFolds; i++) {
-                Instances train = data.trainCV(numFolds, i, random);
-                setPriors(train);
-                Classifier copiedClassifier = AbstractClassifier.makeCopy(classifier);
-                copiedClassifier.buildClassifier(train);
-                Instances test = data.testCV(numFolds, i);
-                evaluateModel(copiedClassifier, test, forPredictionsPrinting);
-            }
-            m_NumFolds = numFolds;
-            
-            if (classificationOutput != null)
-                classificationOutput.printFooter();
-        }
+        // Note on May 8, 2018: To be updated. This following implementation cannot work for WEKA 3.8.2!
+//        /**
+//         * Basically this is copied from the original implementation by commenting out the first line:
+//         * data = new Instances(data) to avoid copy, so that our implementation can be used.
+//         */
+//        @Override
+//        public void crossValidateModel(Classifier classifier, 
+//                                       Instances data,
+//                                       int numFolds, 
+//                                       Random random, 
+//                                       Object... forPredictionsPrinting) throws Exception {
+//            // Make a copy of the data we can reorder
+//            if (data instanceof NetworkMutableInstances) {
+//                Map<String, Set<String>> geneToPartners = ((NetworkMutableInstances)data).getGeneToPartners();
+//                // Make a new copy
+//                data = new NetworkMutableInstances(data);
+//                ((NetworkMutableInstances)data).setGeneToPartners(geneToPartners);
+//            }
+//            else
+//                data = new Instances(data);
+//            data.randomize(random);
+//            if (data.classAttribute().isNominal()) {
+//                data.stratify(numFolds);
+//            }
+//            
+//            // We assume that the first element is a
+//            // weka.classifiers.evaluation.output.prediction.AbstractOutput object
+//            AbstractOutput classificationOutput = null;
+//            if (forPredictionsPrinting.length > 0) {
+//                // print the header first
+//                classificationOutput = (AbstractOutput) forPredictionsPrinting[0];
+//                classificationOutput.setHeader(data);
+//                classificationOutput.printHeader();
+//            }
+//            
+//            // Do the folds
+//            for (int i = 0; i < numFolds; i++) {
+//                Instances train = data.trainCV(numFolds, i, random);
+//                setPriors(train);
+//                Classifier copiedClassifier = AbstractClassifier.makeCopy(classifier);
+//                copiedClassifier.buildClassifier(train);
+//                Instances test = data.testCV(numFolds, i);
+//                evaluateModel(copiedClassifier, test, forPredictionsPrinting);
+//            }
+//            m_NumFolds = numFolds;
+//            
+//            if (classificationOutput != null)
+//                classificationOutput.printFooter();
+//        }
     }
     
     static enum NetworkFeature {

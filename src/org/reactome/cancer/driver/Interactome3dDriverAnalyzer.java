@@ -4,28 +4,56 @@
  */
 package org.reactome.cancer.driver;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.FilenameFilter;
+import java.io.IOException;
+import java.nio.file.FileVisitResult;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+
 import org.apache.log4j.Logger;
-import org.biojava.nbio.structure.*;
+import org.biojava.nbio.structure.Chain;
+import org.biojava.nbio.structure.Group;
+import org.biojava.nbio.structure.GroupType;
+import org.biojava.nbio.structure.Structure;
+import org.biojava.nbio.structure.StructureException;
+import org.biojava.nbio.structure.StructureIO;
 import org.biojava.nbio.structure.align.util.AtomCache;
 import org.gk.model.GKInstance;
 import org.gk.persistence.MySQLAdaptor;
 import org.gk.util.StringUtils;
 import org.junit.Test;
 import org.reactome.cancer.MAFFileLoader;
-import org.reactome.px.util.InteractionUtilities;
-import org.reactome.r3.*;
+import org.reactome.r3.CosmicAnalyzer;
+import org.reactome.r3.Interactome3dAnalyzer;
+import org.reactome.r3.ProteinSequenceHandler;
 import org.reactome.r3.ProteinSequenceHandler.Sequence;
+import org.reactome.r3.ReactomeAnalyzer;
+import org.reactome.r3.UniProtAnalyzer;
 import org.reactome.r3.util.FileUtility;
+import org.reactome.r3.util.InteractionUtilities;
 import org.reactome.r3.util.MathUtilities;
 import org.reactome.structure.model.PDBUniProtMatch;
 import org.reactome.structure.model.ProteinMutation;
-
-import java.io.*;
-import java.nio.file.*;
-import java.nio.file.attribute.BasicFileAttributes;
-import java.util.*;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 /**
  * This class is used to handle protein 3D structures based on PDB using biojava APIs.

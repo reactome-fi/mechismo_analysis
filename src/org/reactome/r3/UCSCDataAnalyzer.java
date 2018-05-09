@@ -24,10 +24,9 @@ import org.reactome.genome.RefSeqInfo;
 import org.reactome.genome.Segment;
 import org.reactome.genome.Transcript;
 import org.reactome.r3.util.FileUtility;
-import org.reactome.r3.util.InteractionUtilities;
 import org.reactome.r3.util.R3Constants;
 
-import weka.core.Utils;
+//import weka.core.Utils;
 
 public class UCSCDataAnalyzer {
     
@@ -70,22 +69,6 @@ public class UCSCDataAnalyzer {
         allScore.putAll(hubScores);
         allScore.putAll(nonHubScores);
         return allScore;
-    }
-    
-    private void calculateCorrelationCoefficient(Map<String, Double> proteinToScore,
-                                                 Map<String, Integer> proteinToDegree) {
-        double[] scores = new double[proteinToScore.size()];
-        double[] degrees = new double[proteinToScore.size()];
-        int index = 0;
-        for (String protein : proteinToScore.keySet()) {
-            Double score = proteinToScore.get(protein);
-            Integer degree = proteinToDegree.get(protein);
-            scores[index] = score;
-            degrees[index] = degree;
-            index ++;
-        }
-        double cc = Utils.correlation(scores, degrees, scores.length);
-        System.out.println("Correlation coefficient: " + cc);
     }
     
     private void summarize(Map<String, Double> nodeToScore) {
