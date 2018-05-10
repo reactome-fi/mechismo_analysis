@@ -36,6 +36,9 @@ public class MechismoOutputAnalyzer {
     private String pciContactFile = dirName + "human_pci_contact_hits.tsv";
     private FileUtility fu = new FileUtility();
     
+    public MechismoOutputAnalyzer() {
+    }
+    
     @Test
     public void analyzeDistribution() throws IOException {
         // Get scores involved known cancer genes only

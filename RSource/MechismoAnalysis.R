@@ -134,8 +134,51 @@ output.clusters <- function(clusters, names) {
     }
 }
 
+analyze.mechiso.fi <- function(file, use.reactome.only = FALSE) {
+    mechismo.fi <- read.delim(file, sep = "\t", header = T)
+    # filter to use Reactome FI only
+    # if (use.reactome.only) {
+    #     which <- 
+    # }
+    # Caclualte pair-wise correlation
+    names <- c('SignificantCancers', 'RankScore', 'PanCancer_PScore')
+    par(mfrow = c(2, 2));
+    for (i in 1 : (length(names) - 1)) {
+        for (j in (i + 1) : length(names)) {
+            print(paste(names[i], "~", names[j], sep = " "))
+            cor.result <- cor.test(mechismo.fi[, names[i]], mechismo.fi[, names[j]])
+            print(cor.result)
+            plot(mechismo.fi[, names[i]], mechismo.fi[, names[j]],
+                 xlab = names[i],
+                 ylab = names[j])
+        }
+    }
+    # Try to merge three dimentional information into 2D using categories
+    total.fis <- dim(mechismo.fi)[1]
+    disc.sig.cancer <- rep(0, total.fis)
+    for (i in 1 : total.fis) {
+        counter <- mechismo.fi[i, 'SignificantCancers']
+        if (counter > 5) {
+            disc.sig.cancer[i] <- 6
+        }else {
+            disc.sig.cancer[i] <- counter
+        }
+    }
+    print("Counters of SignificantCancers:")
+    print(with(mechismo.fi, table(SignificantCancers)))
+    print("Counters after discretizing SignificantCancers:")
+    print(table(disc.sig.cancer))
+    with(mechismo.fi, plot(RankScore, PanCancer_PScore, pch = disc.sig.cancer))
+    disc.sig.cancer.sort <- sort(unique(disc.sig.cancer))
+    legend('bottomright', c('0','1','2','3','4','5','>6'), pch = disc.sig.cancer.sort)
+}
+
 # Plot the cancer types
 result.dir <- "/Users/wug/git/Ogmios/results"
+mechismo.fi.file <- "FI_Cancer_FDR_Filtered_051018.txt";
+analyze.mechiso.fi(paste(result.dir, mechismo.fi.file, sep = "/"))
+stop("Done!")
+
 sample.to.reaction.file <- paste(result.dir, "MechismoSamplesToReactions_103017.txt", sep = "/")
 reaction.dist <- calculate.sample.dist(sample.to.reaction.file, "UCEC")
 # print(summary(dist))

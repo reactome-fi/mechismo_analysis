@@ -492,7 +492,13 @@ public class CancerDriverAnalyzer {
         }
     }
     
-    Set<String> getDriverGenes(String cancerType) throws IOException {
+    /**
+     * Get known cancer driver genes.
+     * @param cancerType
+     * @return
+     * @throws IOException
+     */
+    public Set<String> getDriverGenes(String cancerType) throws IOException {
         FICancerDriverPredictor helper = new FICancerDriverPredictor();
         Set<String> allDriverGenes = new HashSet<String>();
         if (cancerType == null) {
