@@ -174,4 +174,7 @@ results_df2 <- results_df %>%
                 EREG.mRNAsi.t.test.bonferroni = p.adjust(EREG.mRNAsi.t.test,method="bonferroni"),
                 EREG.mRNAsi.wilcox.bonferroni = p.adjust(EREG.mRNAsi.wilcox,method="bonferroni"))
 
-write.table(results_df2,"MechismoInterfacewiseStemness.csv")
+write.table(results_df2,
+            "PancancerInterfacewiseStemness.tsv",
+            row.names = FALSE,
+            sep = "\t")
