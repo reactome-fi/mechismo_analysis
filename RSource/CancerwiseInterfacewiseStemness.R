@@ -7,6 +7,7 @@ library(stringr)
 MECH_INTERFACES <- "/Users/joshuaburkhart/Downloads/tcga_mechismo_stat_cancer_wise_significant.tsv"
 DNA_METH_STEMNS <- "/Users/joshuaburkhart/Downloads/StemnessScores_DNAmeth.csv"
 RNA_EXPR_STEMNS <- "/Users/joshuaburkhart/Downloads/StemnessScores_RNAexp.csv"
+REACTOME_FIS <- "/Users/joshuaburkhart/Downloads/FIsInGene_071718_with_annotations.txt"
 
 #load data
 mech_interfaces_df <- read.delim(MECH_INTERFACES,
@@ -18,6 +19,8 @@ dna_meth_stemns_df <- read.delim(DNA_METH_STEMNS,
 rna_expr_stemns_df <- read.delim(RNA_EXPR_STEMNS,
                                  stringsAsFactors = FALSE,
                                  sep = ',')
+reactome_fis_df <- read.delim(REACTOME_FIS,
+                              stringsAsFactors = FALSE)
 
 #wrangle
 interface_cancer_types <- mech_interfaces_df[,1] %>%
@@ -44,8 +47,14 @@ rna_expr_stemns_df2 <- rna_expr_stemns_df %>%
 stemness_df <- dna_meth_stemns_df2 %>%
   dplyr::full_join(rna_expr_stemns_df2)
 
+reactome_fis_df2 <- reactome_fis_df %>%
+  dplyr::mutate(fwd_fi = paste(Gene1,"-",Gene2,sep=""),
+                rev_fi = paste(Gene2,"-",Gene1,sep="")) %>%
+  dplyr::select(fwd_fi,rev_fi)
+
 results_df3 <- data.frame(Cancer.Type = character(),
                           Interface = character(),
+													In.Reactome = logical(),
                           num_interface_samples = integer(),
                           mDNAsi.t.test = numeric(),
                           mDNAsi.wilcox = numeric(),
@@ -60,18 +69,18 @@ results_df3 <- data.frame(Cancer.Type = character(),
                           EREG.mRNAsi.t.test = numeric(),
                           EREG.mRNAsi.wilcox = numeric(),
                           interface_samples = character(),
-                          mDNAsi.t.test.bonferroni = numeric(),
-                          mDNAsi.wilcox.bonferroni = numeric(),
-                          EREG.mDNAsi.t.test.bonferroni = numeric(),
-                          EREG.mDNAsi.wilcox.bonferroni = numeric(),
-                          DMPsi.t.test.bonferroni = numeric(),
-                          DMPsi.wilcox.bonferroni = numeric(),
-                          ENHsi.t.test.bonferroni = numeric(),
-                          ENHsi.wilcox.bonferroni = numeric(),
-                          mRNAsi.t.test.bonferroni = numeric(),
-                          mRNAsi.wilcox.bonferroni = numeric(),
-                          EREG.mRNAsi.t.test.bonferroni = numeric(),
-                          EREG.mRNAsi.wilcox.bonferroni = numeric())
+                          mDNAsi.t.test.BH = numeric(),
+                          mDNAsi.wilcox.BH = numeric(),
+                          EREG.mDNAsi.t.test.BH = numeric(),
+                          EREG.mDNAsi.wilcox.BH = numeric(),
+                          DMPsi.t.test.BH = numeric(),
+                          DMPsi.wilcox.BH = numeric(),
+                          ENHsi.t.test.BH = numeric(),
+                          ENHsi.wilcox.BH = numeric(),
+                          mRNAsi.t.test.BH = numeric(),
+                          mRNAsi.wilcox.BH = numeric(),
+                          EREG.mRNAsi.t.test.BH = numeric(),
+                          EREG.mRNAsi.wilcox.BH = numeric())
 
 #calculate results
 for(j in 1:length(interface_cancer_types)){
@@ -79,6 +88,7 @@ for(j in 1:length(interface_cancer_types)){
   #results df
   results_df <- data.frame(Cancer.Type = character(),
                            Interface = character(),
+													 In.Reactome = logical(),
                            num_interface_samples = integer(),
                            mDNAsi.t.test = numeric(),
                            mDNAsi.wilcox = numeric(),
@@ -169,6 +179,8 @@ for(j in 1:length(interface_cancer_types)){
       {
         result_df <- data.frame(Cancer.Type = cancer_type,
                                 Interface = interface,
+																In.Reactome = (interface %in% reactome_fis_df2$fwd_fi |
+                                           interface %in% reactome_fis_df2$rev_fi),
                                 num_interface_samples = length(interface_samples),
                                 mDNAsi.t.test = t.test(mDNAsi_mut$mDNAsi,
                                                        mDNAsi_wt$mDNAsi)$p.value,
@@ -207,18 +219,18 @@ for(j in 1:length(interface_cancer_types)){
   
   #adjust p-values
   results_df2 <- results_df %>%
-    dplyr::mutate(mDNAsi.t.test.bonferroni = p.adjust(mDNAsi.t.test,method="bonferroni"),
-                  mDNAsi.wilcox.bonferroni = p.adjust(mDNAsi.wilcox,method="bonferroni"),
-                  EREG.mDNAsi.t.test.bonferroni = p.adjust(EREG.mDNAsi.t.test,method="bonferroni"),
-                  EREG.mDNAsi.wilcox.bonferroni = p.adjust(EREG.mDNAsi.wilcox,method="bonferroni"),
-                  DMPsi.t.test.bonferroni = p.adjust(DMPsi.t.test,method="bonferroni"),
-                  DMPsi.wilcox.bonferroni = p.adjust(DMPsi.wilcox,method="bonferroni"),
-                  ENHsi.t.test.bonferroni = p.adjust(ENHsi.t.test,method="bonferroni"),
-                  ENHsi.wilcox.bonferroni = p.adjust(ENHsi.wilcox,method="bonferroni"),
-                  mRNAsi.t.test.bonferroni = p.adjust(mRNAsi.t.test,method="bonferroni"),
-                  mRNAsi.wilcox.bonferroni = p.adjust(mRNAsi.wilcox,method="bonferroni"),
-                  EREG.mRNAsi.t.test.bonferroni = p.adjust(EREG.mRNAsi.t.test,method="bonferroni"),
-                  EREG.mRNAsi.wilcox.bonferroni = p.adjust(EREG.mRNAsi.wilcox,method="bonferroni"))
+    dplyr::mutate(mDNAsi.t.test.BH = p.adjust(mDNAsi.t.test,method="BH"),
+                  mDNAsi.wilcox.BH = p.adjust(mDNAsi.wilcox,method="BH"),
+                  EREG.mDNAsi.t.test.BH = p.adjust(EREG.mDNAsi.t.test,method="BH"),
+                  EREG.mDNAsi.wilcox.BH = p.adjust(EREG.mDNAsi.wilcox,method="BH"),
+                  DMPsi.t.test.BH = p.adjust(DMPsi.t.test,method="BH"),
+                  DMPsi.wilcox.BH = p.adjust(DMPsi.wilcox,method="BH"),
+                  ENHsi.t.test.BH = p.adjust(ENHsi.t.test,method="BH"),
+                  ENHsi.wilcox.BH = p.adjust(ENHsi.wilcox,method="BH"),
+                  mRNAsi.t.test.BH = p.adjust(mRNAsi.t.test,method="BH"),
+                  mRNAsi.wilcox.BH = p.adjust(mRNAsi.wilcox,method="BH"),
+                  EREG.mRNAsi.t.test.BH = p.adjust(EREG.mRNAsi.t.test,method="BH"),
+                  EREG.mRNAsi.wilcox.BH = p.adjust(EREG.mRNAsi.wilcox,method="BH"))
   
   results_df3 <- results_df3 %>%
     rbind(results_df2) 
