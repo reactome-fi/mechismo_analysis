@@ -8,7 +8,7 @@ library(stringr)
 MECH_INTERFACES <- "/Users/joshuaburkhart/Downloads/tcga_mechismo_stat_pancancer_undirected_significant.tsv"
 DNA_METH_STEMNS <- "/Users/joshuaburkhart/Downloads/StemnessScores_DNAmeth.csv"
 RNA_EXPR_STEMNS <- "/Users/joshuaburkhart/Downloads/StemnessScores_RNAexp.csv"
-REACTOME_FIS <- "/Users/joshuaburkhart/Downloads/FIsInGene_071718_with_annotations.txt"
+REACTOME_FIS <- "/Users/joshuaburkhart/Downloads/ProteinFIsInReactions_073118.txt"
 CANCER_CENSUS <- "/Users/joshuaburkhart/Downloads/Census_allWed Aug 22 22_25_41 2018.tsv"
 
 #load data
@@ -52,6 +52,9 @@ reactome_fis_df2 <- reactome_fis_df %>%
   dplyr::mutate(fwd_fi = paste(Gene1,"-",Gene2,sep=""),
                 rev_fi = paste(Gene2,"-",Gene1,sep="")) %>%
   dplyr::select(fwd_fi,rev_fi)
+
+cancer_census_df <- cancer_census_df %>%
+  dplyr::mutate(Hallmark = ifelse(Hallmark == "Yes",TRUE,FALSE))
 
 #results df
 results_df <- data.frame(Interface = character(),
