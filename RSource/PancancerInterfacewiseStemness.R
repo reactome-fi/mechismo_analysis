@@ -1,10 +1,11 @@
 #libs
 library(dplyr)
 library(magrittr)
+library(ggplot2)
 library(stringr)
 
 #globs
-MECH_INTERFACES <- "/Users/joshuaburkhart/Downloads/tcga_mechismo_stat_pancancer_significant.tsv"
+MECH_INTERFACES <- "/Users/joshuaburkhart/Downloads/tcga_mechismo_stat_pancancer_undirected_significant.tsv"
 DNA_METH_STEMNS <- "/Users/joshuaburkhart/Downloads/StemnessScores_DNAmeth.csv"
 RNA_EXPR_STEMNS <- "/Users/joshuaburkhart/Downloads/StemnessScores_RNAexp.csv"
 REACTOME_FIS <- "/Users/joshuaburkhart/Downloads/FIsInGene_071718_with_annotations.txt"
@@ -226,3 +227,52 @@ write.table(results_df2,
             "PancancerInterfacewiseStemness.tsv",
             row.names = FALSE,
             sep = "\t")
+
+
+results_df2 %>%
+  ggplot2::ggplot(aes(mRNAsi.wilcox.BH,fill=In.Reactome,color=In.Reactome)) +
+  ggplot2::geom_density(alpha=0.1) +
+  ggplot2::scale_color_brewer(palette="Set1")
+
+ggsave("mRNA_wilcox_BH_density.png",width=10,height=10,dpi=600)
+
+results_df2 %>%
+  ggplot2::ggplot(aes(mDNAsi.wilcox.BH,fill=In.Reactome,color=In.Reactome)) +
+  ggplot2::geom_density(alpha=0.1) +
+  ggplot2::scale_color_brewer(palette="Set1")
+
+ggsave("mDNAsi_wilcox_BH_density.png",width=10,height=10,dpi=600)
+
+results_df2 %>%
+  ggplot2::ggplot(aes(x=-log10(mRNAsi.wilcox.BH),y=-log10(mDNAsi.wilcox.BH),color=In.Reactome,label=Interface)) +
+  ggplot2::geom_point() +
+  scale_color_brewer(palette="Set1")
+
+ggsave("interface_stemness_significance.png",width=10,height=10,dpi=600)
+  
+results_df2 %>%
+  ggplot2::ggplot(aes(x=-log10(mRNAsi.wilcox.BH),y=-log10(mDNAsi.wilcox.BH),color=In.Reactome,label=Interface)) +
+  ggplot2::geom_point()+
+  ggplot2::geom_text(aes(label=Interface),size=2.5,hjust=0,vjust=0)+
+  scale_color_brewer(palette="Set1")
+
+ggsave("interface_stemness_significance_labeled.png",width=10,height=10,dpi=600)
+
+results_df2 %>%
+  ggplot2::ggplot(aes(x=-log10(mRNAsi.wilcox.BH),y=-log10(mDNAsi.wilcox.BH),color=In.Reactome,label=Interface)) +
+  ggplot2::geom_point() +
+  scale_color_brewer(palette="Set1") +
+  xlim(0,15) +
+  ylim(0,15)
+
+ggsave("interface_stemness_significance_bounded.png",width=10,height=10,dpi=600)
+  
+results_df2 %>%
+  ggplot2::ggplot(aes(x=-log10(mRNAsi.wilcox.BH),y=-log10(mDNAsi.wilcox.BH),color=In.Reactome,label=Interface)) +
+  ggplot2::geom_point()+
+  ggplot2::geom_text(aes(label=Interface),size=2.5,hjust=0,vjust=0)+
+  scale_color_brewer(palette="Set1")+
+  xlim(0,15)+
+  ylim(0,15)
+
+ggsave("interface_stemness_significance_bounded_labeled.png",width=10,height=10,dpi=600)
