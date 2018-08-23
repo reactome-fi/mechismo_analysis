@@ -82,6 +82,7 @@ results_df <- data.frame(Interface = character(),
 
 #calculate results
 for(i in 1:nrow(mech_interfaces_df2)){
+  print(i)
   gene1 <- mech_interfaces_df2[i,1]
   gene2 <- mech_interfaces_df2[i,2]
   interface <- paste(gene1,
