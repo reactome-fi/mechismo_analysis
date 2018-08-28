@@ -10,6 +10,7 @@ DNA_METH_STEMNS <- "/Users/joshuaburkhart/Downloads/StemnessScores_DNAmeth.csv"
 RNA_EXPR_STEMNS <- "/Users/joshuaburkhart/Downloads/StemnessScores_RNAexp.csv"
 REACTOME_FIS <- "/Users/joshuaburkhart/Downloads/ProteinFIsInReactions_073118.txt"
 CANCER_CENSUS <- "/Users/joshuaburkhart/Downloads/Census_allWed Aug 22 22_25_41 2018.tsv"
+MECH_INPUT <- "/Users/joshuaburkhart/Downloads/TCGA_mech_input.tsv"
 
 #load data
 mech_interfaces_df <- read.delim(MECH_INTERFACES,
@@ -25,6 +26,8 @@ reactome_fis_df <- read.delim(REACTOME_FIS,
                               stringsAsFactors = FALSE)
 cancer_census_df <- read.delim(CANCER_CENSUS,
                                stringsAsFactors = FALSE)
+mech_input_df <- read.delim(MECH_INPUT,
+                            stringsAsFactors = FALSE)
 
 #wrangle
 mech_interfaces_df2 <- mech_interfaces_df %>%
@@ -55,6 +58,21 @@ reactome_fis_df2 <- reactome_fis_df %>%
 
 cancer_census_df <- cancer_census_df %>%
   dplyr::mutate(Hallmark = ifelse(Hallmark == "Yes",TRUE,FALSE))
+
+gene_samples_hash <- new.env()
+for(i in 1:nrow(mech_input_df)){
+  gene <- mech_input_df[i,"Gene.symbol"]
+  cur_samples <- gene_samples_hash[[gene]]
+  if(is.null(cur_samples)){
+    cur_samples <- c()
+  }
+  new_samples_string <- mech_input_df[i,"Sample.ID"]
+  new_samples <- stringr::str_extract_all(new_samples_string,
+              "TCGA-[0-9A-Z]{2}-[0-9A-Z]{4}-[0-9A-Z]{2}") %>%
+              unlist()
+  samples <- union(cur_samples,new_samples)
+  gene_samples_hash[[gene]] <- samples
+}
 
 #results df
 results_df <- data.frame(Interface = character(),
@@ -92,13 +110,18 @@ for(i in 1:nrow(mech_interfaces_df2)){
   interface_samples <- stringr::str_extract_all(mech_interfaces_df2[i,15],
                                                 "TCGA-[0-9A-Z]{2}-[0-9A-Z]{4}-[0-9A-Z]{2}") %>%
     unlist()
+  
+  gene_samples <- union(gene_samples_hash[[gene1]],gene_samples_hash[[gene2]])
+  
+  gene_no_interface_samples <- setdiff(gene_samples,interface_samples)
+  
   #mDNAsi distributions
   mDNAsi_mut <- stemness_df %>%
     dplyr::filter(TCGA.sample %in% interface_samples,
                   !is.na(mDNAsi)) %>%
     dplyr::select(mDNAsi)
   mDNAsi_wt <- stemness_df %>%
-    dplyr::filter(!TCGA.sample %in% interface_samples,
+    dplyr::filter(TCGA.sample %in% gene_no_interface_samples,
                   !is.na(mDNAsi)) %>%
     dplyr::select(mDNAsi)
   
@@ -108,7 +131,7 @@ for(i in 1:nrow(mech_interfaces_df2)){
                   !is.na(EREG.mDNAsi)) %>%
     dplyr::select(EREG.mDNAsi)
   EREG.mDNAsi_wt <- stemness_df %>%
-    dplyr::filter(!TCGA.sample %in% interface_samples,
+    dplyr::filter(TCGA.sample %in% gene_no_interface_samples,
                   !is.na(EREG.mDNAsi)) %>%
     dplyr::select(EREG.mDNAsi)
   
@@ -118,7 +141,7 @@ for(i in 1:nrow(mech_interfaces_df2)){
                   !is.na(DMPsi)) %>%
     dplyr::select(DMPsi)
   DMPsi_wt <- stemness_df %>%
-    dplyr::filter(!TCGA.sample %in% interface_samples,
+    dplyr::filter(TCGA.sample %in% gene_no_interface_samples,
                   !is.na(DMPsi)) %>%
     dplyr::select(DMPsi)
   
@@ -128,7 +151,7 @@ for(i in 1:nrow(mech_interfaces_df2)){
                   !is.na(ENHsi)) %>%
     dplyr::select(ENHsi)
   ENHsi_wt <- stemness_df %>%
-    dplyr::filter(!TCGA.sample %in% interface_samples,
+    dplyr::filter(TCGA.sample %in% gene_no_interface_samples,
                   !is.na(ENHsi)) %>%
     dplyr::select(ENHsi)
   
@@ -138,7 +161,7 @@ for(i in 1:nrow(mech_interfaces_df2)){
                   !is.na(mRNAsi)) %>%
     dplyr::select(mRNAsi)
   mRNAsi_wt <- stemness_df %>%
-    dplyr::filter(!TCGA.sample %in% interface_samples,
+    dplyr::filter(TCGA.sample %in% gene_no_interface_samples,
                   !is.na(mRNAsi)) %>%
     dplyr::select(mRNAsi)
   
@@ -148,7 +171,7 @@ for(i in 1:nrow(mech_interfaces_df2)){
                   !is.na(EREG.mRNAsi)) %>%
     dplyr::select(EREG.mRNAsi)
   EREG.mRNAsi_wt <- stemness_df %>%
-    dplyr::filter(!TCGA.sample %in% interface_samples,
+    dplyr::filter(TCGA.sample %in% gene_no_interface_samples,
                   !is.na(EREG.mRNAsi)) %>%
     dplyr::select(EREG.mRNAsi)
   
@@ -225,7 +248,8 @@ results_df2 <- results_df %>%
                 mRNAsi.t.test.BH = p.adjust(mRNAsi.t.test,method="BH"),
                 mRNAsi.wilcox.BH = p.adjust(mRNAsi.wilcox,method="BH"),
                 EREG.mRNAsi.t.test.BH = p.adjust(EREG.mRNAsi.t.test,method="BH"),
-                EREG.mRNAsi.wilcox.BH = p.adjust(EREG.mRNAsi.wilcox,method="BH"))
+                EREG.mRNAsi.wilcox.BH = p.adjust(EREG.mRNAsi.wilcox,method="BH")) %>%
+  dplyr::arrange(In.Reactome)
 
 results_df2 %>%
   dplyr::select(Interface,
@@ -243,8 +267,8 @@ results_df2 %>%
                 mRNAsi.wilcox.BH,
                 interface_samples) %>%
   write.table("PancancerInterfacewiseStemness.tsv",
-            row.names = FALSE,
-            sep = "\t")
+              row.names = FALSE,
+              sep = "\t")
 
 
 results_df2 %>%
@@ -267,7 +291,7 @@ results_df2 %>%
   scale_color_brewer(palette="Set1")
 
 ggsave("Pancancer_interface_stemness_significance.png",width=10,height=10,dpi=600)
-  
+
 results_df2 %>%
   ggplot2::ggplot(aes(x=-log10(mRNAsi.wilcox.BH),y=-log10(mDNAsi.wilcox.BH),color=In.Reactome,label=Interface)) +
   ggplot2::geom_point()+
@@ -280,17 +304,81 @@ results_df2 %>%
   ggplot2::ggplot(aes(x=-log10(mRNAsi.wilcox.BH),y=-log10(mDNAsi.wilcox.BH),color=In.Reactome,label=Interface)) +
   ggplot2::geom_point() +
   scale_color_brewer(palette="Set1") +
-  xlim(0,15) +
-  ylim(0,15)
+  xlim(0,5) +
+  ylim(0,5)
 
-ggsave("Pancancer_interface_stemness_significance_bounded.png",width=10,height=10,dpi=600)
-  
+ggsave("Pancancer_interface_stemness_significance_upr_bounded.png",width=10,height=10,dpi=600)
+
 results_df2 %>%
   ggplot2::ggplot(aes(x=-log10(mRNAsi.wilcox.BH),y=-log10(mDNAsi.wilcox.BH),color=In.Reactome,label=Interface)) +
   ggplot2::geom_point()+
   ggplot2::geom_text(aes(label=Interface),size=2.5,hjust=0,vjust=0)+
   scale_color_brewer(palette="Set1")+
-  xlim(0,15)+
-  ylim(0,15)
+  xlim(0,5)+
+  ylim(0,5)
 
-ggsave("Pancancer_interface_stemness_significance_bounded_labeled.png",width=10,height=10,dpi=600)
+ggsave("Pancancer_interface_stemness_significance_upr_bounded_labeled.png",width=10,height=10,dpi=600)
+
+results_df2 %>%
+  ggplot2::ggplot(aes(x=-log10(mRNAsi.wilcox.BH),y=-log10(mDNAsi.wilcox.BH),color=In.Reactome,label=Interface)) +
+  ggplot2::geom_point() +
+  scale_color_brewer(palette="Set1") +
+  xlim(2,NA) +
+  ylim(2,NA)
+
+ggsave("Pancancer_interface_stemness_significance_lwr_bounded.png",width=10,height=10,dpi=600)
+
+results_df2 %>%
+  ggplot2::ggplot(aes(x=-log10(mRNAsi.wilcox.BH),y=-log10(mDNAsi.wilcox.BH),color=In.Reactome,label=Interface)) +
+  ggplot2::geom_point()+
+  ggplot2::geom_text(aes(label=Interface),size=2.5,hjust=0,vjust=0)+
+  scale_color_brewer(palette="Set1")+
+  xlim(2,NA)+
+  ylim(2,NA)
+
+ggsave("Pancancer_interface_stemness_significance_lwr_bounded_labeled.png",width=10,height=10,dpi=600)
+
+results_df2 %>%
+  ggplot2::ggplot(aes(x=-log10(mRNAsi.wilcox.BH),y=-log10(mDNAsi.wilcox.BH),color=In.Reactome,label=Interface)) +
+  ggplot2::geom_point() +
+  scale_color_brewer(palette="Set1") +
+  xlim(2,NA)
+
+ggsave("Pancancer_interface_stemness_significance_mRNAsi_lwr_bounded.png",width=10,height=10,dpi=600)
+
+results_df2 %>%
+  ggplot2::ggplot(aes(x=-log10(mRNAsi.wilcox.BH),y=-log10(mDNAsi.wilcox.BH),color=In.Reactome,label=Interface)) +
+  ggplot2::geom_point()+
+  ggplot2::geom_text(aes(label=Interface),size=2.5,hjust=0,vjust=0)+
+  scale_color_brewer(palette="Set1")+
+  xlim(2,NA)
+
+ggsave("Pancancer_interface_stemness_significance_mRNAsi_lwr_bounded_labeled.png",width=10,height=10,dpi=600)
+
+results_df2 %>%
+  ggplot2::ggplot(aes(x=-log10(mRNAsi.wilcox.BH),y=-log10(mDNAsi.wilcox.BH),color=In.Reactome,label=Interface)) +
+  ggplot2::geom_point() +
+  scale_color_brewer(palette="Set1") +
+  ylim(2,NA)
+
+ggsave("Pancancer_interface_stemness_significance_mDNAsi_lwr_bounded.png",width=10,height=10,dpi=600)
+
+results_df2 %>%
+  ggplot2::ggplot(aes(x=-log10(mRNAsi.wilcox.BH),y=-log10(mDNAsi.wilcox.BH),color=In.Reactome,label=Interface)) +
+  ggplot2::geom_point()+
+  ggplot2::geom_text(aes(label=Interface),size=2.5,hjust=0,vjust=0)+
+  scale_color_brewer(palette="Set1")+
+  ylim(2,NA)
+
+ggsave("Pancancer_interface_stemness_significance_mDNAsi_lwr_bounded_labeled.png",width=10,height=10,dpi=600)
+
+goi <- "PTEN"
+
+results_df2 %>%
+  dplyr::filter(grepl(goi,Interface)) %>%
+  ggplot2::ggplot(aes(x=-log10(mRNAsi.wilcox.BH),y=-log10(mDNAsi.wilcox.BH),color=In.Reactome,label=Interface)) +
+  ggplot2::geom_point()+
+  ggplot2::geom_text(aes(label=Interface),size=2.5,hjust=0,vjust=0)+
+  scale_color_brewer(palette="Set1")
+
+ggsave(paste("Pancancer_",goi,"_interface_stemness_significance_labeled.png",sep=""),width=10,height=10,dpi=600)
