@@ -71,7 +71,8 @@ for(i in 1:nrow(mech_input_df)){
     unlist()
   cancer_types_mtx <- stringr::str_match_all(samples_string,
                                            "([A-Z]+):")
-  cancer_types <- cancer_types_mtx[[1]][,2]
+  cancer_types <- cancer_types_mtx[[1]][,2] %>%
+    unique()
   
   for(j in 1:length(cancer_types)){
     cancer_type <- cancer_types[j]
@@ -134,6 +135,9 @@ results_df3 <- data.frame(Cancer.Type = character(),
 #calculate results
 for(j in 1:length(interface_cancer_types)){
   print(paste(j," of ",length(interface_cancer_types),sep=""))
+  cancer_type <- interface_cancer_types[j]
+  mech_interfaces_df3 <- mech_interfaces_df2 %>%
+    dplyr::filter(V1 == cancer_type)
   
   #results df
   results_df <- data.frame(Cancer.Type = character(),
@@ -159,17 +163,15 @@ for(j in 1:length(interface_cancer_types)){
                            EREG.mRNAsi.t.test = numeric(),
                            EREG.mRNAsi.wilcox = numeric(),
                            interface_samples = character())
-  cancer_type <- interface_cancer_types[j]
-  mech_interfaces_df3 <- mech_interfaces_df2 %>%
-    dplyr::filter(V1 == cancer_type)
   
   for(i in 1:nrow(mech_interfaces_df3)){
-  gene1 <- mech_interfaces_df2[i,2]
-  gene2 <- mech_interfaces_df2[i,3]
+  gene1 <- mech_interfaces_df3[i,2]
+  gene2 <- mech_interfaces_df3[i,3]
     interface <- paste(gene1,
                        "-",
                        gene2,
                        sep="")
+    
     interface_samples <- stringr::str_extract_all(mech_interfaces_df3[i,16],
                                                   "TCGA-[0-9A-Z]{2}-[0-9A-Z]{4}-[0-9A-Z]{2}") %>%
       unlist()
@@ -420,7 +422,7 @@ results_df3 %>%
   ggplot2::ggplot(aes(x=-log10(mRNAsi.wilcox.BH),y=-log10(mDNAsi.wilcox.BH),color=In.Reactome,label=Interface)) +
   ggplot2::geom_point() +
   scale_color_brewer(palette="Set1") +
-  xlim(2,NA)
+  xlim(-log10(0.05),NA)
 
 ggsave("Cancerwise_interface_stemness_significance_mRNAsi_lwr_bounded.png",width=10,height=10,dpi=600)
   
@@ -429,7 +431,7 @@ results_df3 %>%
   ggplot2::geom_point()+
   ggplot2::geom_text(aes(label=Interface),size=2.5,hjust=0,vjust=0)+
   scale_color_brewer(palette="Set1")+
-  xlim(2,NA)
+  xlim(-log10(0.05),NA)
 
 ggsave("Cancerwise_interface_stemness_significance_mRNAsi_lwr_bounded_labeled.png",width=10,height=10,dpi=600)
 
@@ -437,7 +439,7 @@ results_df3 %>%
   ggplot2::ggplot(aes(x=-log10(mRNAsi.wilcox.BH),y=-log10(mDNAsi.wilcox.BH),color=In.Reactome,label=Interface)) +
   ggplot2::geom_point() +
   scale_color_brewer(palette="Set1") +
-  ylim(2,NA)
+  ylim(-log10(0.05),NA)
 
 ggsave("Cancerwise_interface_stemness_significance_mDNAsi_lwr_bounded.png",width=10,height=10,dpi=600)
   
@@ -446,18 +448,20 @@ results_df3 %>%
   ggplot2::geom_point()+
   ggplot2::geom_text(aes(label=Interface),size=2.5,hjust=0,vjust=0)+
   scale_color_brewer(palette="Set1")+
-  ylim(2,NA)
+  ylim(-log10(0.05),NA)
 
 ggsave("Cancerwise_interface_stemness_significance_mDNAsi_lwr_bounded_labeled.png",width=10,height=10,dpi=600)
 
-goi <- "BRAF"
+coi <- "LGG"
 
 results_df3 %>%
-  dplyr::filter(grepl(goi,Interface)) %>%
+  dplyr::filter(grepl(coi,Cancer.Type)) %>%
   dplyr::arrange(In.Reactome) %>%
-  ggplot2::ggplot(aes(x=-log10(mRNAsi.wilcox.BH),y=-log10(mDNAsi.wilcox.BH),color=In.Reactome,label=Interface)) +
+  ggplot2::ggplot(aes(x=-log10(mRNAsi.wilcox.BH),
+                      y=-log10(mDNAsi.wilcox.BH),
+                      color=In.Reactome,label=Interface)) +
   ggplot2::geom_point()+
-  ggplot2::geom_text(aes(label=Interface),size=2.5,hjust=0,vjust=0)+
+  ggplot2::geom_text(aes(label=Interface),size=2.5,hjust=.5,vjust=-.5)+
   scale_color_brewer(palette="Set1")
 
-ggsave(paste("Cancerwise_",goi,"_interface_stemness_significance_labeled.png",sep=""),width=10,height=10,dpi=600)
+ggsave(paste(coi,"_interface_stemness_significance_labeled.png",sep=""),width=10,height=10,dpi=600)
