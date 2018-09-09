@@ -150,11 +150,70 @@ for(i in 1:nrow(mech_interfaces_df2)){
   mRNAsi_no_interface <- stemness_df %>%
     dplyr::filter(!(TCGA.sample %in% interface_samples),
                   !is.na(mRNAsi)) %>%
-    dplyr::select(mDNAsi)
+    dplyr::select(mRNAsi)
   mRNAsi_no_gene <- stemness_df %>%
     dplyr::filter(!(TCGA.sample %in% gene_samples),
                   !is.na(mRNAsi)) %>%
-    dplyr::select(mDNAsi)
+    dplyr::select(mRNAsi)
+  
+  top_stemness_interfaces <- c(
+    "BRAF-MAP2K1",
+    "PLCB3-GNAQ",
+    "GNAQ-RGS2",
+    "PLCB1-GNAQ",
+    "GNA11-PLCB3",
+    "GNAQ-RGS21",
+    "GNAQ-RGS3",
+    "GNB1-GNAQ",
+    "GNAQ-PLCB2",
+    "RGS18-GNAQ",
+    "GNB2-GNAQ")
+  
+  if(interface %in% top_stemness_interfaces){
+    mDNAsi_distribution_df0 <- mDNAsi_interface %>%
+      as.data.frame() %>%
+      dplyr::mutate(mutation = paste("Within Interface (", nrow(mDNAsi_interface),")",sep=""))
+    
+    mDNAsi_distribution_df1 <- mDNAsi_gene_no_interface %>%
+      as.data.frame() %>%
+      dplyr::mutate(mutation = paste("Outside Interface (", nrow(mDNAsi_gene_no_interface),")",sep=""))
+    
+    mDNAsi_distribution_df2 <- mDNAsi_no_gene %>%
+      as.data.frame() %>%
+      dplyr::mutate(mutation = paste("No Mutation (", nrow(mDNAsi_no_gene), ")", sep=""))
+    
+    mDNAsi_distribution_df <- dplyr::bind_rows(mDNAsi_distribution_df0,
+                                        mDNAsi_distribution_df1,
+                                        mDNAsi_distribution_df2)
+    
+    mDNAsi_distribution_df %>%
+      ggplot(aes(x=mutation,y=mDNAsi)) +
+      geom_boxplot() +
+    
+    ggsave(paste(interface,"_","mDNAsi.png",sep=""),width=10,height=10,dpi=600)
+    
+    mRNAsi_distribution_df0 <- mRNAsi_interface %>%
+      as.data.frame() %>%
+      dplyr::mutate(mutation = paste("Within Interface (", nrow(mRNAsi_interface),")",sep=""))
+    
+    mRNAsi_distribution_df1 <- mRNAsi_gene_no_interface %>%
+      as.data.frame() %>%
+      dplyr::mutate(mutation = paste("Outside Interface (", nrow(mRNAsi_gene_no_interface),")",sep=""))
+    
+    mRNAsi_distribution_df2 <- mRNAsi_no_gene %>%
+      as.data.frame() %>%
+      dplyr::mutate(mutation = paste("No Mutation (", nrow(mRNAsi_no_gene), ")", sep=""))
+    
+    mRNAsi_distribution_df <- dplyr::bind_rows(mRNAsi_distribution_df0,
+                                        mRNAsi_distribution_df1,
+                                        mRNAsi_distribution_df2)
+    
+    mRNAsi_distribution_df %>%
+      ggplot(aes(x=mutation,y=mRNAsi)) +
+      geom_boxplot() +
+    
+    ggsave(paste(interface,"_","mRNAsi.png",sep=""),width=10,height=10,dpi=600)
+  }
   
   tryCatch(
     {
@@ -214,7 +273,7 @@ for(i in 1:nrow(mech_interfaces_df2)){
                                             mRNAsi_no_gene$mRNAsi)$p.value,
                               interface_samples =
                                 paste(interface_samples,
-                                                        collapse = ','))
+                                      collapse = ','))
       results_df <- results_df %>%
         rbind(result_df)
     },
@@ -248,22 +307,22 @@ results_df2 %>%
                 G1.Hallmark,
                 G2.Hallmark,
                 num_interface_samples,
-                         mDNAsi.interface_v_all.wilcox,
-                         mDNAsi.interface_v_all.wilcox.BH,
-                         mDNAsi.interface_v_gene_no_interface.wilcox,
-                         mDNAsi.interface_v_gene_no_interface.wilcox.BH,
-                         mDNAsi.gene_v_all.wilcox,
-                         mDNAsi.gene_v_all.wilcox.BH,
-                         mDNAsi.gene_no_interface_v_all.wilcox,
-                         mDNAsi.gene_no_interface_v_all.wilcox.BH,
-                         mRNAsi.interface_v_all.wilcox,
-                         mRNAsi.interface_v_all.wilcox.BH,
-                         mRNAsi.interface_v_gene_no_interface.wilcox,
-                         mRNAsi.interface_v_gene_no_interface.wilcox.BH,
-                         mRNAsi.gene_v_all.wilcox,
-                         mRNAsi.gene_v_all.wilcox.BH,
-                         mRNAsi.gene_no_interface_v_all.wilcox,
-                         mRNAsi.gene_no_interface_v_all.wilcox.BH,
+                mDNAsi.interface_v_all.wilcox,
+                mDNAsi.interface_v_all.wilcox.BH,
+                mDNAsi.interface_v_gene_no_interface.wilcox,
+                mDNAsi.interface_v_gene_no_interface.wilcox.BH,
+                mDNAsi.gene_v_all.wilcox,
+                mDNAsi.gene_v_all.wilcox.BH,
+                mDNAsi.gene_no_interface_v_all.wilcox,
+                mDNAsi.gene_no_interface_v_all.wilcox.BH,
+                mRNAsi.interface_v_all.wilcox,
+                mRNAsi.interface_v_all.wilcox.BH,
+                mRNAsi.interface_v_gene_no_interface.wilcox,
+                mRNAsi.interface_v_gene_no_interface.wilcox.BH,
+                mRNAsi.gene_v_all.wilcox,
+                mRNAsi.gene_v_all.wilcox.BH,
+                mRNAsi.gene_no_interface_v_all.wilcox,
+                mRNAsi.gene_no_interface_v_all.wilcox.BH,
                 interface_samples) %>%
   write.table("PancancerInterfacewiseStemness.tsv",
               row.names = FALSE,
