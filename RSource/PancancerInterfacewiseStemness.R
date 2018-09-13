@@ -2,6 +2,7 @@
 library(dplyr)
 library(magrittr)
 library(ggplot2)
+library(ggpubr)
 library(stringr)
 
 #globs
@@ -85,10 +86,12 @@ results_df <- data.frame(Interface = character(),
                          G1.Hallmark = logical(),
                          G2.Hallmark = logical(),
                          num_interface_samples = integer(),
+                         mDNAsi_interface_v_gene_no_interface_med_diff = numeric(),
                          mDNAsi.interface_v_all.wilcox = numeric(),
                          mDNAsi.interface_v_gene_no_interface.wilcox = numeric(),
                          mDNAsi.gene_v_all.wilcox = numeric(),
                          mDNAsi.gene_no_interface_v_all.wilcox = numeric(),
+                         mRNAsi_interface_v_gene_no_interface_med_diff = numeric(),
                          mRNAsi.interface_v_all.wilcox = numeric(),
                          mRNAsi.interface_v_gene_no_interface.wilcox = numeric(),
                          mRNAsi.gene_v_all.wilcox = numeric(),
@@ -156,20 +159,23 @@ for(i in 1:nrow(mech_interfaces_df2)){
                   !is.na(mRNAsi)) %>%
     dplyr::select(mRNAsi)
   
-  top_stemness_interfaces <- c(
-    "BRAF-MAP2K1",
-    "PLCB3-GNAQ",
-    "GNAQ-RGS2",
-    "PLCB1-GNAQ",
-    "GNA11-PLCB3",
-    "GNAQ-RGS21",
-    "GNAQ-RGS3",
-    "GNB1-GNAQ",
-    "GNAQ-PLCB2",
-    "RGS18-GNAQ",
-    "GNB2-GNAQ")
-  
-  if(interface %in% top_stemness_interfaces){
+  #  top_stemness_interfaces <- c(
+  #    "BRAF-MAP2K1",
+  #    "PLCB3-GNAQ",
+  #    "GNAQ-RGS2",
+  #    "PLCB1-GNAQ",
+  #    "GNA11-PLCB3",
+  #    "GNAQ-RGS21",
+  #    "GNAQ-RGS3",
+  #    "GNB1-GNAQ",
+  #    "GNAQ-PLCB2",
+  #    "RGS18-GNAQ",
+  #    "GNB2-GNAQ")
+  #  
+  #  if(interface %in% top_stemness_interfaces){
+  if((interface %in% reactome_fis_df2$fwd_fi |
+      interface %in% reactome_fis_df2$rev_fi) &
+     grepl("GNAQ",interface)){  
     mDNAsi_distribution_df0 <- mDNAsi_interface %>%
       as.data.frame() %>%
       dplyr::mutate(mutation = paste("Within Interface (", nrow(mDNAsi_interface),")",sep=""))
@@ -183,12 +189,25 @@ for(i in 1:nrow(mech_interfaces_df2)){
       dplyr::mutate(mutation = paste("No Mutation (", nrow(mDNAsi_no_gene), ")", sep=""))
     
     mDNAsi_distribution_df <- dplyr::bind_rows(mDNAsi_distribution_df0,
-                                        mDNAsi_distribution_df1,
-                                        mDNAsi_distribution_df2)
+                                               mDNAsi_distribution_df1,
+                                               mDNAsi_distribution_df2)
+    
+    ggpubr::compare_means(mDNAsi ~ mutation,data=mDNAsi_distribution_df)
+    
+    comparisons <- list(c(mDNAsi_distribution_df$mutation %>% unique() %>% .[1],
+                          mDNAsi_distribution_df$mutation %>% unique() %>% .[2]),
+                        c(mDNAsi_distribution_df$mutation %>% unique() %>% .[2],
+                          mDNAsi_distribution_df$mutation %>% unique() %>% .[3]),
+                        c(mDNAsi_distribution_df$mutation %>% unique() %>% .[1],
+                          mDNAsi_distribution_df$mutation %>% unique() %>% .[3]))
     
     mDNAsi_distribution_df %>%
-      ggplot(aes(x=mutation,y=mDNAsi)) +
+      ggplot(aes(x=mutation,y=mDNAsi,fill=mutation)) +
       geom_boxplot() +
+      ggpubr::stat_compare_means(comparisons = comparisons) +
+      xlab("Mutation") +
+      ylab("mDNAsi") +
+      ggtitle(interface)
     
     ggsave(paste(interface,"_","mDNAsi.png",sep=""),width=10,height=10,dpi=600)
     
@@ -205,12 +224,25 @@ for(i in 1:nrow(mech_interfaces_df2)){
       dplyr::mutate(mutation = paste("No Mutation (", nrow(mRNAsi_no_gene), ")", sep=""))
     
     mRNAsi_distribution_df <- dplyr::bind_rows(mRNAsi_distribution_df0,
-                                        mRNAsi_distribution_df1,
-                                        mRNAsi_distribution_df2)
+                                               mRNAsi_distribution_df1,
+                                               mRNAsi_distribution_df2)
+    
+    ggpubr::compare_means(mRNAsi ~ mutation,data=mRNAsi_distribution_df)
+    
+    comparisons <- list(c(mRNAsi_distribution_df$mutation %>% unique() %>% .[1],
+                          mRNAsi_distribution_df$mutation %>% unique() %>% .[2]),
+                        c(mRNAsi_distribution_df$mutation %>% unique() %>% .[2],
+                          mRNAsi_distribution_df$mutation %>% unique() %>% .[3]),
+                        c(mRNAsi_distribution_df$mutation %>% unique() %>% .[1],
+                          mRNAsi_distribution_df$mutation %>% unique() %>% .[3]))
     
     mRNAsi_distribution_df %>%
-      ggplot(aes(x=mutation,y=mRNAsi)) +
+      ggplot(aes(x=mutation,y=mRNAsi,fill=mutation)) +
       geom_boxplot() +
+      ggpubr::stat_compare_means(comparisons = comparisons) +
+      xlab("Mutation") +
+      ylab("mRNAsi") +
+      ggtitle(interface)
     
     ggsave(paste(interface,"_","mRNAsi.png",sep=""),width=10,height=10,dpi=600)
   }
@@ -247,6 +279,8 @@ for(i in 1:nrow(mech_interfaces_df2)){
                                                      as.logical(),
                                                    FALSE),
                               num_interface_samples = length(interface_samples),
+                              mDNAsi_interface_v_gene_no_interface_med_diff =
+                                median(mDNAsi_interface$mDNAsi) - median(mDNAsi_gene_no_interface$mDNAsi),
                               mDNAsi.interface_v_all.wilcox =
                                 wilcox.test(mDNAsi_interface$mDNAsi,
                                             mDNAsi_no_interface$mDNAsi)$p.value,
@@ -259,6 +293,8 @@ for(i in 1:nrow(mech_interfaces_df2)){
                               mDNAsi.gene_no_interface_v_all.wilcox =
                                 wilcox.test(mDNAsi_gene_no_interface$mDNAsi,
                                             mDNAsi_no_gene$mDNAsi)$p.value,
+                              mRNAsi_interface_v_gene_no_interface_med_diff =
+                                median(mRNAsi_interface$mRNAsi) - median(mRNAsi_gene_no_interface$mRNAsi),
                               mRNAsi.interface_v_all.wilcox =
                                 wilcox.test(mRNAsi_interface$mRNAsi,
                                             mRNAsi_no_interface$mRNAsi)$p.value,
@@ -309,22 +345,48 @@ results_df2 %>%
                 num_interface_samples,
                 mDNAsi.interface_v_all.wilcox,
                 mDNAsi.interface_v_all.wilcox.BH,
-                mDNAsi.interface_v_gene_no_interface.wilcox,
-                mDNAsi.interface_v_gene_no_interface.wilcox.BH,
-                mDNAsi.gene_v_all.wilcox,
-                mDNAsi.gene_v_all.wilcox.BH,
-                mDNAsi.gene_no_interface_v_all.wilcox,
-                mDNAsi.gene_no_interface_v_all.wilcox.BH,
                 mRNAsi.interface_v_all.wilcox,
                 mRNAsi.interface_v_all.wilcox.BH,
-                mRNAsi.interface_v_gene_no_interface.wilcox,
-                mRNAsi.interface_v_gene_no_interface.wilcox.BH,
-                mRNAsi.gene_v_all.wilcox,
-                mRNAsi.gene_v_all.wilcox.BH,
+                interface_samples) %>%
+  write.table("Pancancer_interface_v_all_Stemness.tsv",
+              row.names = FALSE,
+              sep = "\t")
+results_df2 %>%
+  dplyr::select(Interface,
+                In.Reactome,
+                G1.In.Cancer.Census,
+                G2.In.Cancer.Census,
+                G1.Tier,
+                G2.Tier,
+                G1.Hallmark,
+                G2.Hallmark,
+                num_interface_samples,
+                mDNAsi.gene_no_interface_v_all.wilcox,
+                mDNAsi.gene_no_interface_v_all.wilcox.BH,
                 mRNAsi.gene_no_interface_v_all.wilcox,
                 mRNAsi.gene_no_interface_v_all.wilcox.BH,
                 interface_samples) %>%
-  write.table("PancancerInterfacewiseStemness.tsv",
+  write.table("Pancancer_gene_no_interface_v_all_Stemness.tsv",
+              row.names = FALSE,
+              sep = "\t")
+results_df2 %>%
+  dplyr::select(Interface,
+                In.Reactome,
+                G1.In.Cancer.Census,
+                G2.In.Cancer.Census,
+                G1.Tier,
+                G2.Tier,
+                G1.Hallmark,
+                G2.Hallmark,
+                num_interface_samples,
+                mDNAsi_interface_v_gene_no_interface_med_diff,
+                mDNAsi.interface_v_gene_no_interface.wilcox,
+                mDNAsi.interface_v_gene_no_interface.wilcox.BH,
+                mRNAsi_interface_v_gene_no_interface_med_diff,
+                mRNAsi.interface_v_gene_no_interface.wilcox,
+                mRNAsi.interface_v_gene_no_interface.wilcox.BH,
+                interface_samples) %>%
+  write.table("Pancancer_interface_v_gene_no_interface_Stemness.tsv",
               row.names = FALSE,
               sep = "\t")
 
