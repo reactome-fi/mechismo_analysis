@@ -406,10 +406,18 @@ public class ReactomeAnalyzer {
      */
     @Test
     public void generateFIsForAllHumanReactions() throws Exception {
+//        MySQLAdaptor dba = new MySQLAdaptor("localhost",
+//                "reactome_59_plus_i",
+//                "root",
+//                "macmysql01");
+//        String output = "results/ProteinFIsInReactions_032017.txt";
+        // Updated on July 31, 2018
         MySQLAdaptor dba = new MySQLAdaptor("localhost",
-                "reactome_59_plus_i",
+                "reactome_63_plus_i",
                 "root",
                 "macmysql01");
+        String output = "results/ProteinFIsInReactions_073118.txt";
+        
         List<GKInstance> reactions = loadHumanReactions(dba);
         System.out.println("Total human reactions: " + reactions.size());
         Map<String, String> uniProtToGene = getUniProtToGeneMap(dba);
@@ -424,7 +432,6 @@ public class ReactomeAnalyzer {
         }
         System.out.println("Total FIs: " + fiToRxts.size());
 
-        String output = "results/ProteinFIsInReactions_032017.txt";
         FileUtility fu = new FileUtility();
         fu.setOutput(output);
         fu.printLine("UniProt1\tUniProt2\tGene1\tGene2\tReactionIds");

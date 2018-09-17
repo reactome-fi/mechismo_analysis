@@ -39,6 +39,57 @@ public class MechismoOutputAnalyzer {
     public MechismoOutputAnalyzer() {
     }
     
+    /**
+     * Look through all PPIs subject to mechismo analysis. Some of them
+     * may don't have any mutations and not reported in Francesco's results.
+     * @throws Exception
+     */
+    @Test
+    public void checkFIsSubjectToAnalysis() throws Exception {
+        try (Stream<String> stream = Files.lines(Paths.get(dirName, "TCGA", "073018", "m2b_contact_hits.tsv"))) {
+            Set<String> confidenceLevels = new HashSet<>();
+            Set<String> ppis = stream.skip(1)
+                              .map(line -> line.split("\t"))
+                              .filter(tokens -> tokens.length > 5)
+                              .filter(tokens -> tokens[1].equals("PPI")) // PPI only
+                              .filter(tokens -> !tokens[3].equals(tokens[5])) // Not self interaction
+//                              .filter(tokens -> tokens[14].equals("high")) // Filter to high only
+                              .map(tokens -> {
+                                  confidenceLevels.add(tokens[14]);
+                                  String protein1 = tokens[3];
+                                  int index = protein1.indexOf("-");
+                                  if (index > 0)
+                                      protein1 = protein1.substring(0, index); // Don't want to count isoforms now
+                                  String protein2 = tokens[5];
+                                  index = protein2.indexOf("-");
+                                  if (index > 0)
+                                      protein2 = protein2.substring(0, index);
+                                  return InteractionUtilities.generateFIFromGene(protein1, protein2);
+                              })
+                              .collect(Collectors.toSet());
+            System.out.println("Confidence levels: " + confidenceLevels);
+            System.out.println("Total ppis: " + ppis.size());
+//            int count = 0;
+//            for (String ppi : ppis) {
+//                System.out.println(ppi);
+//                count ++;
+//                if (count == 100)
+//                    break;
+//            }
+            
+            FINetworkAnalzyer fiAnalyzer = new FINetworkAnalzyer();
+            Set<String> fis = fiAnalyzer.loadReactionFIsInProteins();
+            System.out.println("Total Reactome FIs: " + fis.size());
+            
+            Set<String> sharedFIs = InteractionUtilities.getShared(fis, ppis);
+            System.out.println("Total shared: " + sharedFIs.size());
+            
+            // Output shared FIs
+            String outFileName = "results/ProteinFIsInReactions_073118_Mechismo.txt";
+            fiAnalyzer.filterReactionFIs(sharedFIs, outFileName);
+        }
+    }
+    
     @Test
     public void analyzeDistribution() throws IOException {
         // Get scores involved known cancer genes only

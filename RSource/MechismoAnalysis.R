@@ -173,9 +173,24 @@ analyze.mechiso.fi <- function(file, use.reactome.only = FALSE) {
     legend('bottomright', c('0','1','2','3','4','5','>6'), pch = disc.sig.cancer.sort)
 }
 
+plot.mechiso.fi <- function(file) {
+    results <- read.delim(file, sep="\t", header = T)
+    par(mfrow = c(2, 2))
+    main <- "Histogram of Significant Interactions"
+    hist(results$SignificantCancers, breaks = 20, main = main, xlab = "Significant Cancers")
+    hist(results$SignificantCancers, breaks = 20, main = main, ylim = c(1, 100), xlab = "Significant Cancers")
+    # Filter to Reactome FIs only
+    which <- results$InReactome == 1
+    reactome.results <- results[which, ]
+    main <- "Histogram of Significant Reactome FIs"
+    hist(reactome.results$SignificantCancers, main = main, breaks = 20, xlab = "Significant Cancers")
+    hist(reactome.results$SignificantCancers, main = main, breaks = 20, ylim = c(1, 100), xlab = "Significant Cancers")
+}
+
 # Plot the cancer types
 result.dir <- "/Users/wug/git/Ogmios/results"
-mechismo.fi.file <- "FI_Cancer_FDR_Filtered_051018.txt";
+# mechismo.fi.file <- "FI_Cancer_FDR_Filtered_051018.txt";
+mechismo.fi.file <- "FI_Cancer_FDR_Filtered_082118.txt";
 analyze.mechiso.fi(paste(result.dir, mechismo.fi.file, sep = "/"))
 stop("Done!")
 
