@@ -107,7 +107,8 @@ de_gene_ids <- colnames(rna_seq_df)
 num_interfaces <- nrow(mech_interfaces_df2)
 
 #calculate results
-results_df <- foreach(i=1:num_interfaces,.combine=rbind) %dopar% {
+results_df <- foreach(i=1:num_interfaces,.combine=rbind, .packages = "magrittr") %dopar% {
+#for(i in 1:num_interfaces){
   print(paste(i," of ",nrow(mech_interfaces_df2),sep=""))
   gene1 <- mech_interfaces_df2[i,1]
   gene2 <- mech_interfaces_df2[i,2]
@@ -118,18 +119,20 @@ results_df <- foreach(i=1:num_interfaces,.combine=rbind) %dopar% {
   
   if(interface %in% reactome_fis_df2$fwd_fi |
      interface %in% reactome_fis_df2$rev_fi){
-    print(".")
-  }else{
     interface_samples <- stringr::str_extract_all(mech_interfaces_df2[i,15],
                                                   "TCGA-[0-9A-Z]{2}-[0-9A-Z]{4}-[0-9A-Z]{2}") %>%
       unlist()
     interface_samples <- intersect(interface_samples,rownames(rna_seq_df))
+    interface_samples <- interface_samples[!is.na(interface_samples)]
     
-    gene_samples <- union(gene_samples_hash[[gene1]],gene_samples_hash[[gene2]])
-    gene_samples <- intersect(gene_samples,rownames(rna_seq_df))
+    no_interface_samples <- setdiff(rownames(rna_seq_df),interface_samples)
+    no_interface_samples <- no_interface_samples[!is.na(no_interface_samples)]
     
-    gene_no_interface_samples <- setdiff(gene_samples,interface_samples)
-    gene_no_interface_samples <- intersect(gene_no_interface_samples,rownames(rna_seq_df))
+    #gene_samples <- union(gene_samples_hash[[gene1]],gene_samples_hash[[gene2]])
+    #gene_samples <- intersect(gene_samples,rownames(rna_seq_df))
+    
+    #gene_no_interface_samples <- setdiff(gene_samples,interface_samples)
+    #gene_no_interface_samples <- intersect(gene_no_interface_samples,rownames(rna_seq_df))
     
     for(j in 1:ncol(rna_seq_df)){
       
@@ -210,51 +213,45 @@ results_df <- foreach(i=1:num_interfaces,.combine=rbind) %dopar% {
         }
       }
       
-      tryCatch(
-        {
-          results_df <- data.frame(Interface = interface,
-                                  DE.Gene = de_gene_ids[j],
-                                  DE.Gene.Wilcox.p = wilcox.test(rna_seq_df[interface_samples,j],
-                                                                 rna_seq_df[-interface_samples,j])$p,
-                                  In.Reactome = (interface %in% reactome_fis_df2$fwd_fi |
-                                                   interface %in% reactome_fis_df2$rev_fi),
-                                  G1.In.Cancer.Census = gene1 %in% cancer_census_df$Gene.Symbol,
-                                  G2.In.Cancer.Census = gene2 %in% cancer_census_df$Gene.Symbol,
-                                  G1.Tier = ifelse(gene1 %in% cancer_census_df$Gene.Symbol,
+      results_df <- data.frame(Interface = interface,
+      #result_df <- data.frame(Interface = interface,
+                              DE.Gene = de_gene_ids[j],
+                              DE.Gene.Wilcox.p = wilcox.test(rna_seq_df[interface_samples,j],
+                                                             rna_seq_df[no_interface_samples,j])$p.value,
+                              In.Reactome = (interface %in% reactome_fis_df2$fwd_fi |
+                                               interface %in% reactome_fis_df2$rev_fi),
+                              G1.In.Cancer.Census = gene1 %in% cancer_census_df$Gene.Symbol,
+                              G2.In.Cancer.Census = gene2 %in% cancer_census_df$Gene.Symbol,
+                              G1.Tier = ifelse(gene1 %in% cancer_census_df$Gene.Symbol,
+                                               cancer_census_df %>%
+                                                 dplyr::filter(Gene.Symbol == gene1) %>%
+                                                 dplyr::select(Tier) %>%
+                                                 as.numeric(),
+                                               0),
+                              G2.Tier = ifelse(gene2 %in% cancer_census_df$Gene.Symbol,
+                                               cancer_census_df %>%
+                                                 dplyr::filter(Gene.Symbol == gene2) %>%
+                                                 dplyr::select(Tier) %>%
+                                                 as.numeric(),
+                                               0),
+                              G1.Hallmark = ifelse(gene1 %in% cancer_census_df$Gene.Symbol,
                                                    cancer_census_df %>%
                                                      dplyr::filter(Gene.Symbol == gene1) %>%
-                                                     dplyr::select(Tier) %>%
-                                                     as.numeric(),
-                                                   0),
-                                  G2.Tier = ifelse(gene2 %in% cancer_census_df$Gene.Symbol,
+                                                     dplyr::select(Hallmark) %>%
+                                                     as.logical(),
+                                                   FALSE),
+                              G2.Hallmark = ifelse(gene2 %in% cancer_census_df$Gene.Symbol,
                                                    cancer_census_df %>%
                                                      dplyr::filter(Gene.Symbol == gene2) %>%
-                                                     dplyr::select(Tier) %>%
-                                                     as.numeric(),
-                                                   0),
-                                  G1.Hallmark = ifelse(gene1 %in% cancer_census_df$Gene.Symbol,
-                                                       cancer_census_df %>%
-                                                         dplyr::filter(Gene.Symbol == gene1) %>%
-                                                         dplyr::select(Hallmark) %>%
-                                                         as.logical(),
-                                                       FALSE),
-                                  G2.Hallmark = ifelse(gene2 %in% cancer_census_df$Gene.Symbol,
-                                                       cancer_census_df %>%
-                                                         dplyr::filter(Gene.Symbol == gene2) %>%
-                                                         dplyr::select(Hallmark) %>%
-                                                         as.logical(),
-                                                       FALSE),
-                                  N.Interface.Samples = length(interface_samples),
-                                  Interface.Samples =
-                                    paste(interface_samples,
-                                          collapse = ','))
-          #results_df <- results_df %>%
-          #  rbind(result_df)
-        },
-        error=function(cond){
-          print(error)
-        }
-      )
+                                                     dplyr::select(Hallmark) %>%
+                                                     as.logical(),
+                                                   FALSE),
+                              N.Interface.Samples = length(interface_samples),
+                              Interface.Samples =
+                                paste(interface_samples,
+                                      collapse = ','))
+      #results_df <- results_df %>%
+      #  rbind(result_df)
     }
   }
   results_df
