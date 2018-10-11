@@ -28,7 +28,7 @@
 srun Rscript InterfacewiseDEAnalyzer.R
 
 # combine results
-echo -e "Interface\tDE.Gene\tDE.Gene.Wilcox.p" > interfacewise_de.tsv
+echo -e "Interface\tDE.Gene\tDE.Gene.Wilcox.p\tNum.Interface.Samples\tNum.NoInterface.Samples\tInterface.NoInterface.Diff" > interfacewise_de.tsv
 cat slurm_proc_*_de.tsv >> interfacewise_de.tsv
 rm slurm_proc_*_de.tsv
 

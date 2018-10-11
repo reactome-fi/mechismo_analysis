@@ -7,7 +7,7 @@ library(genefilter)
 #globs
 #MECH_INTERFACES <- "/Users/joshuaburkhart/Downloads/tcga_mechismo_stat_pancancer_undirected_significant.tsv"
 MECH_INTERFACES <- "/Users/joshuaburkhart/Downloads/tcga_mechismo_stat_cancer_wise_undirected_significant.tsv"
-RNA_SEQ_DIR <- "/Users/joshuaburkhart/Downloads/stddata__2016_07_15/brca_rnaseq/"
+RNA_SEQ_DIR <- "/Users/joshuaburkhart/Downloads/stddata__2016_07_15/gbm_rnaseq/"
 REACTOME_FIS <- "/Users/joshuaburkhart/Downloads/ProteinFIsInReactions_073118.txt"
 CANCER_CENSUS <- "/Users/joshuaburkhart/Downloads/Census_allWed Aug 22 22_25_41 2018.tsv"
 MECH_INPUT <- "/Users/joshuaburkhart/Downloads/TCGA_mech_input.tsv"
@@ -47,9 +47,9 @@ if(!file.exists("mech_interfaces_df.rda")){
   mech_interfaces_df <- read.delim(MECH_INTERFACES,
                                    stringsAsFactors = FALSE,
                                    header = FALSE) %>%
-  ########################################
-  dplyr::filter(V1 == "BRCA") # REMOVE #
-  ########################################
+  ####################################
+  dplyr::filter(V1 == "GBM") # REMOVE #
+  ####################################
   save(mech_interfaces_df,file="mech_interfaces_df.rda")
 }
 

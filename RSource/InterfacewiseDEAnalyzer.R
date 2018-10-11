@@ -27,7 +27,10 @@ if (!is.na(SLURM_PROCID)) {
   results_df <- data.frame(
     Interface = character(),
     DE.Gene = character(),
-    DE.Gene.Wilcox.p = numeric()
+    DE.Gene.Wilcox.p = numeric(),
+    Num.Interface.Samples = numeric(),
+    Num.NoInterface.Samples = numeric(),
+    Interface.NoInterface.Diff = numeric()
   )
   
   de_gene_ids <- colnames(rna_seq_df)
@@ -59,19 +62,26 @@ if (!is.na(SLURM_PROCID)) {
         interface_samples <-
           interface_samples[!is.na(interface_samples)]
         
-        if (length(interface_samples > N_INTERFACE_SAMPLES_THRESH)) {
+        li <- length(interface_samples)
+        
+        if (li > N_INTERFACE_SAMPLES_THRESH) {
           no_interface_samples <- setdiff(rownames(rna_seq_df),
                                           interface_samples)
           no_interface_samples <-
             no_interface_samples[!is.na(no_interface_samples)]
           
-          if (length(no_interface_samples) > N_INTERFACE_SAMPLES_THRESH) {
+          lni <- length(no_interface_samples)
+        
+          if (lni > N_INTERFACE_SAMPLES_THRESH) {
             for (j in 1:ncol(rna_seq_df)) {
               result_df <- data.frame(
                 Interface = interface,
                 DE.Gene = de_gene_ids[j],
                 DE.Gene.Wilcox.p = wilcox.test(rna_seq_df[interface_samples, j],
-                                               rna_seq_df[no_interface_samples, j])$p.value
+                                               rna_seq_df[no_interface_samples, j])$p.value,
+                Num.Interface.Samples = li,
+                Num.NoInterface.Samples = lni,
+                Interface.NoInterface.Diff = li - lni
               )
               results_df <- results_df %>%
                 rbind(result_df)
@@ -87,7 +97,10 @@ if (!is.na(SLURM_PROCID)) {
   results_df %>%
     dplyr::select(Interface,
                   DE.Gene,
-                  DE.Gene.Wilcox.p) %>%
+                  DE.Gene.Wilcox.p,
+                  Num.Interface.Samples,
+                  Num.NoInterface.Samples,
+                  Interface.NoInterface.Diff) %>%
     write.table(
       paste("slurm_proc_",
             SLURM_PROCID,
