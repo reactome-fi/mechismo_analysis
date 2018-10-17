@@ -13,12 +13,12 @@ SLURM_JOB_NUM_NODES <- as.numeric(Sys.getenv("SLURM_NTASKS"))
 LUSTRE_DIR <- "/home/exacloud/lustre1/WongLab/tmp"
 
 if (!is.na(SLURM_PROCID)) {
-  load("data/rna_seq_df.rda")
-  load("data/mech_interfaces_df.rda")
-  load("data/reactome_fis_df.rda")
-  load("data/cancer_census_df.rda")
-  load("data/mech_input_df.rda")
-  load("data/gene_samples_hash.rda")
+  load("data/prna_seq_df.rda")
+  load("data/pmech_interfaces_df.rda")
+  load("data/preactome_fis_df.rda")
+  load("data/pcancer_census_df.rda")
+  load("data/pmech_input_df.rda")
+  load("data/pgene_samples_hash.rda")
   
   cores = detectCores()
   cl <- makeCluster(cores[1] - N_UNUSED_CORES)
@@ -26,7 +26,6 @@ if (!is.na(SLURM_PROCID)) {
   
   #loop setup
   results_df <- data.frame(
-    Cancer.Type = character(),
     Interface = character(),
     DE.Gene = character(),
     DE.Gene.Wilcox.p = numeric(),
@@ -46,8 +45,8 @@ if (!is.na(SLURM_PROCID)) {
   ) %dopar% {
     if (mod(i, SLURM_JOB_NUM_NODES) == SLURM_PROCID) {
       #split job
-      gene1 <- mech_interfaces_df[i, 2] #1 for pancancer file/2 for cancerwise
-      gene2 <- mech_interfaces_df[i, 3] #2 for pancancer file/3 for cancerwise
+      gene1 <- mech_interfaces_df[i, 1] #1 for pancancer file/2 for cancerwise
+      gene2 <- mech_interfaces_df[i, 2] #2 for pancancer file/3 for cancerwise
       interface <- paste(gene1,
                          "-",
                          gene2,
@@ -56,7 +55,7 @@ if (!is.na(SLURM_PROCID)) {
       if (interface %in% reactome_fis_df$fwd_fi |
           interface %in% reactome_fis_df$rev_fi) {
         interface_samples <-
-          stringr::str_extract_all(mech_interfaces_df[i, 16], #15 for pancancer file/16 for cancerwise
+          stringr::str_extract_all(mech_interfaces_df[i, 15], #15 for pancancer file/16 for cancerwise
                                    "TCGA-[0-9A-Z]{2}-[0-9A-Z]{4}-[0-9A-Z]{2}") %>%
           unlist()
         interface_samples <- intersect(interface_samples,
@@ -77,7 +76,6 @@ if (!is.na(SLURM_PROCID)) {
           if (lni > N_INTERFACE_SAMPLES_THRESH) {
             for (j in 1:ncol(rna_seq_df)) {
               result_df <- data.frame(
-                Cancer.Type = mech_interfaces_df[i,1],
                 Interface = interface,
                 DE.Gene = de_gene_ids[j],
                 DE.Gene.Wilcox.p = wilcox.test(rna_seq_df[interface_samples, j],
@@ -98,15 +96,14 @@ if (!is.na(SLURM_PROCID)) {
   stopCluster(cl)
   
   results_df %>%
-    dplyr::select(Cancer.Type,
-                  Interface,
+    dplyr::select(Interface,
                   DE.Gene,
                   DE.Gene.Wilcox.p,
                   Num.Interface.Samples,
                   Num.NoInterface.Samples,
                   Interface.NoInterface.Diff) %>%
     write.table(
-      paste(LUSTRE_DIR,"/slurm_proc_",
+      paste(LUSTRE_DIR,"/pslurm_proc_",
             SLURM_PROCID,
             "_de.tsv",
             sep = ""),

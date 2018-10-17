@@ -28,13 +28,13 @@
 srun Rscript InterfacewiseDEAnalyzer.R
 
 # combine results
-echo -e "Interface\tDE.Gene\tDE.Gene.Wilcox.p\tNum.Interface.Samples\tNum.NoInterface.Samples\tInterface.NoInterface.Diff" > interfacewise_de.tsv
-cat slurm_proc_*_de.tsv >> interfacewise_de.tsv
-rm slurm_proc_*_de.tsv
+echo -e "Cancer.Type\tInterface\tDE.Gene\tDE.Gene.Wilcox.p\tNum.Interface.Samples\tNum.NoInterface.Samples\tInterface.NoInterface.Diff" > /home/exacloud/lustre1/WongLab/tmp/interfacewise_de.tsv
+cat /home/exacloud/lustre1/WongLab/tmp/slurm_proc_*_de.tsv >> /home/exacloud/lustre1/WongLab/tmp/interfacewise_de.tsv
+rm /home/exacloud/lustre1/WongLab/tmp/slurm_proc_*_de.tsv
 
 # post-processing
 Rscript InterfacewiseDEPostprocessor.R
 
 # compress results
-zip interfacewise_de.zip interfacewise_de.tsv
-rm interfacewise_de.tsv
+zip /home/exacloud/lustre1/WongLab/tmp/interfacewise_de.zip /home/exacloud/lustre1/WongLab/tmp/interfacewise_de.tsv
+rm /home/exacloud/lustre1/WongLab/tmp/interfacewise_de.tsv
