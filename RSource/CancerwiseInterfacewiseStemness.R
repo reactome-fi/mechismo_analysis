@@ -34,8 +34,7 @@ interface_cancer_types <- mech_interfaces_df[,1] %>%
   unique()
 
 mech_interfaces_df2 <- mech_interfaces_df %>%
-  dplyr::arrange(desc(V8)) %>%
-  dplyr::filter(V8 >= 5)
+  dplyr::arrange(desc(V8))
 
 dna_meth_stemns_df2 <- dna_meth_stemns_df %>%
   dplyr::mutate(
@@ -94,8 +93,9 @@ for(i in 1:nrow(mech_input_df)){
   }
 }
 
-#results df
+save(gene_samples_hash,file="cancerwise_gene_samples_hash.rda")
 
+#results df
 results_df3 <- data.frame(Cancer.Type = character(),
                           Interface = character(),
 													In.Reactome = logical(),
@@ -325,6 +325,8 @@ for(j in 1:length(interface_cancer_types)){
   
   results_df3 <- results_df3 %>%
     rbind(results_df2) 
+  
+  save(results_df3,file="cancerwise_results.rda")
 }
 
 results_df3 <- results_df3 %>%
@@ -452,7 +454,7 @@ results_df3 %>%
 
 ggsave("Cancerwise_interface_stemness_significance_mDNAsi_lwr_bounded_labeled.png",width=10,height=10,dpi=600)
 
-coi <- "LGG"
+coi <- "GBM"
 
 results_df3 %>%
   dplyr::filter(grepl(coi,Cancer.Type)) %>%
