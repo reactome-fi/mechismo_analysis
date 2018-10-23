@@ -11,8 +11,14 @@ REACTOME_FIS <- "/Users/joshuaburkhart/Downloads/ProteinFIsInReactions_073118.tx
 CANCER_CENSUS <- "/Users/joshuaburkhart/Downloads/Census_allWed Aug 22 22_25_41 2018.tsv"
 MECH_INPUT <- "/Users/joshuaburkhart/Downloads/TCGA_mech_input.tsv"
 
-
 #helper functions
+fix_barcodes <- function(barcodes){
+  lapply(barcodes,
+         str_extract,
+         pattern="^TCGA-[0-9A-Z]{2}-[0-9A-Z]{4}-[0-9A-Z]{2}") %>%
+    unlist()
+}
+
 load_data_dir_2_df <- function(data_dir){
   data_files <- dir(data_dir,
                     pattern='\\.data.txt',
@@ -20,11 +26,22 @@ load_data_dir_2_df <- function(data_dir){
   data_tables <- lapply(data_files,
                         read.delim,
                         check.names=FALSE)
+  data_files_cancer_types <- data_files %>%
+    stringr::str_match_all(string = .,
+                           pattern = ".+/([A-Z]+)\\.rnaseqv2.*")
+  cancer_type_sample_map <- list()
+  for(i in 1:length(data_tables)){
+    cur_data_table <- data_tables[[i]]
+    cur_cancer_type <- data_files_cancer_types[[i]][,2]
+    cancer_type_sample_map[[cur_cancer_type]] <- fix_barcodes(names(cur_data_table[1,-1]))
+  }
+  save(file="cancer_type_sample_map.rda",cancer_type_sample_map)
+  #compare tables
   do.call(cbind,data_tables)
 }
 
 #load data
-if(!file.exists("rna_seq_df.rda")){
+if(!file.exists("rna_seq_df.rda") | !file.exists("cancer_type_sample_map.rda")){
   rna_seq_df <- load_data_dir_2_df(RNA_SEQ_DIR)
   rna_seq_df <- rna_seq_df[-1,] %>% #remove 'gene_id' and 'normalized_count' row
     t()
@@ -32,13 +49,12 @@ if(!file.exists("rna_seq_df.rda")){
   rna_seq_df <- rna_seq_df[-1,] #remove 'gene name|entrez gene id' row
   row_names <- rownames(rna_seq_df)
   rna_seq_df <- matrix(as.numeric(unlist(rna_seq_df)),nrow=nrow(rna_seq_df))
-  rownames(rna_seq_df) <- lapply(row_names,
-                                 str_extract,
-                                 pattern="^TCGA-[0-9A-Z]{2}-[0-9A-Z]{4}-[0-9A-Z]{2}") %>%
-    unlist()
+  rownames(rna_seq_df) <- fix_barcodes(row_names)
   colnames(rna_seq_df) <- col_names
-  rna_seq_df <- rna_seq_df[,-which(grepl("\\?",colnames(rna_seq_df)))]
+  rna_seq_df <- rna_seq_df[,-which(grepl("\\?",colnames(rna_seq_df)))] # remove "?" genes
+  rna_seq_df <- rna_seq_df[,-which(grepl("LOC[0-9]+",colnames(rna_seq_df)))] # remove "LOC" genes
   #rna_seq_df <- t(genefilter::varFilter(t(rna_seq_df))) # Variance filter fails with large data mtx
+  rna_seq_df <- rna_seq_df[-which(rowSums(is.na(rna_seq_df))>0),]
   save(file="rna_seq_df.rda",rna_seq_df)
 }
 

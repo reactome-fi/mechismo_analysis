@@ -1,6 +1,6 @@
 library(magrittr)
 
-LUSTRE_DIR <- "/home/exacloud/lustre1/WongLab/tmp"
+LUSTRE_DIR <- "/home/users/burkhajo/results"
 
 read.delim(paste(LUSTRE_DIR,
                  "/interfacewise_de.tsv",sep="")) %>%
