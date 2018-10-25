@@ -9,5 +9,7 @@ for(i in 1:length(types)){
     dplyr::filter(as.character(Cancer.Type) == type) %>%
     dplyr::arrange(DE.Gene.Wilcox.BH.Adj.p,
                    Num.Interface.Samples) %>%
-    write.table(file=paste(type,"_interfacewise_de.tsv"))
+    write.table(file=paste(type,"_interfacewise_de.tsv",sep=""),
+              sep="\t",
+              row.names=FALSE)
 }
