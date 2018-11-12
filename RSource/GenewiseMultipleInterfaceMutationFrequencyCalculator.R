@@ -5,6 +5,7 @@ MECH_INPUT <- "/Users/joshuaburkhart/Downloads/TCGA_mech_input.tsv"
 MECH_OUTPUT <- "/Users/joshuaburkhart/Downloads/tcga_mechismo_stat_pancancer_undirected_significant.tsv"
 REACTOME_FIS <- "/Users/joshuaburkhart/Downloads/ProteinFIsInReactions_073118.txt"
 MIN_SAMPLES <- 2
+MIN_GOI_FDR <- 0.05
 
 if(!file.exists("mech_input_df.rda")){
   mech_input_df <- read.delim(MECH_INPUT,
@@ -163,35 +164,44 @@ for(i in 1:length(genes)){
   }
 }
 
-gene_interface_mutation_distribution_df %>%
-  dplyr::mutate(Single.v.Multi.Fisher.BH.Adj.p = p.adjust(Single.v.Multi.Fisher,method = "BH")) %>%
+gene_interface_mutation_distribution_df <- gene_interface_mutation_distribution_df %>%
+  dplyr::mutate(Single.v.Multi.Fisher.BH.Adj.p = p.adjust(Single.v.Multi.Fisher,
+                                                          method = "BH"))
+  
+gene_interface_mutation_distribution_df %>% 
   write.table("gene_interface_single_v_multi_mutation_distribution.tsv",
               row.names = FALSE,
               sep="\t")
 
-pmulti_samples <- multi_gene_samples_hash[["PIK3CA"]][["multi"]]
-psingle_samples <- setdiff(multi_gene_samples_hash[["PIK3CA"]][["single"]],
-                           multi_gene_samples_hash[["PIK3CA"]][["multi"]])
-pinterfaces <- names(gene_interfaces[["PIK3CA"]])
+genes_of_interest <- gene_interface_mutation_distribution_df %>%
+  dplyr::filter(Single.v.Multi.Fisher.BH.Adj.p <= MIN_GOI_FDR)
+
+for(i in 1:nrow(genes_of_interest)){
+  goi <- as.character(genes_of_interest[i,"Gene"])
+pmulti_samples <- multi_gene_samples_hash[[goi]][["multi"]]
+psingle_samples <- setdiff(multi_gene_samples_hash[[goi]][["single"]],
+                           multi_gene_samples_hash[[goi]][["multi"]])
+pinterfaces <- names(gene_interfaces[[goi]])
 pdists_df <- data.frame("Interface" = character(),
                         "Mutation.Group" = character(),
                         "Num.Samples" = numeric())
 for(i in 1:length(pinterfaces)){
   tmp <- data.frame("Interface" = pinterfaces[i],
   "Mutation.Group" = "Single Mutation",
-  "Num.Samples" = length(intersect(gene_interfaces[["PIK3CA"]][[pinterfaces[i]]],
+  "Num.Samples" = length(intersect(gene_interfaces[[goi]][[pinterfaces[i]]],
                                  psingle_samples)))
   pdists_df <- rbind(pdists_df,tmp)
   
   tmp <- data.frame("Interface" = pinterfaces[i],
   "Mutation.Group" = "Multiple Mutations",
-  "Num.Samples" = length(intersect(gene_interfaces[["PIK3CA"]][[pinterfaces[i]]],
+  "Num.Samples" = length(intersect(gene_interfaces[[goi]][[pinterfaces[i]]],
                                   pmulti_samples)))
   pdists_df <- rbind(pdists_df,tmp)
 }
 
 pdists_df %>%
-  write.table(file="PIK3CA_interface_single_v_multi_mutation_distribution.tsv",
+  write.table(file=paste(goi,"_interface_single_v_multi_mutation_distribution.tsv",
+                         sep=""),
               row.names = FALSE,
               sep="\t")
 
@@ -203,7 +213,7 @@ pdists_df %>%
                        -Num.Samples),
              y=Num.Samples,
              fill=Mutation.Group))+
-  scale_fill_brewer(palette = "Paired")+
+  scale_fill_brewer(palette = "Set2")+
   geom_col(position="stack")+
   geom_text(aes(label=Num.Samples),
             size=3,
@@ -214,21 +224,14 @@ pdists_df %>%
                            "points"),
         panel.grid.major = element_blank(),
         plot.title = element_text(hjust = 0.5))+
-  ggtitle("PIK3CA Interface Mutations")+
-  xlab("PIK3CA Interface")+
+  ggtitle(paste(goi," Interface Mutations",sep=""))+
+  xlab(paste(goi," Interface",sep=""))+
   ylab("Mutation Count")+
   labs(fill="Mutation Group")
 
-ggsave("PIK3CA_Interface_Mutations.png",
+ggsave(paste(goi,"_Interface_Mutations.png",
+            sep=""),
        width=8,
        height=8)
-  
-  
-  
-  
-  
-  
-  
-  
-
+}
 
