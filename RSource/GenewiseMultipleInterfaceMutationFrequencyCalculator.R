@@ -1,7 +1,10 @@
 library(magrittr)
+library(ggplot2)
 
 MECH_INPUT <- "/Users/joshuaburkhart/Downloads/TCGA_mech_input.tsv"
 MECH_OUTPUT <- "/Users/joshuaburkhart/Downloads/tcga_mechismo_stat_pancancer_undirected_significant.tsv"
+REACTOME_FIS <- "/Users/joshuaburkhart/Downloads/ProteinFIsInReactions_073118.txt"
+MIN_SAMPLES <- 2
 
 if(!file.exists("mech_input_df.rda")){
   mech_input_df <- read.delim(MECH_INPUT,
@@ -18,6 +21,17 @@ if(!file.exists("mech_output_df.rda")){
   save(mech_output_df,file="mech_output_df.rda")
 }else{
   load("mech_output_df.rda")
+}
+
+if(!file.exists("reactome_fis_df.rda")){
+  reactome_fis_df <- read.delim(REACTOME_FIS,
+                                stringsAsFactors = FALSE) %>%
+    dplyr::mutate(fwd_fi = paste(Gene1,"-",Gene2,sep=""),
+                  rev_fi = paste(Gene2,"-",Gene1,sep="")) %>%
+    dplyr::select(fwd_fi,rev_fi)
+  save(reactome_fis_df,file="reactome_fis_df.rda")
+}else{
+  load("reactome_fis_df.rda")
 }
 
 if(!file.exists("gene_interfaces.rda")){
@@ -42,25 +56,28 @@ if(!file.exists("gene_interfaces.rda")){
     
     interface_name <- paste(interface_genes[1],"-",interface_genes[2],sep="")
     
-    if(interface_name %in% names(cur_1_interfaces) |
-       interface_name %in% names(cur_2_interfaces)){
-      #this shouldn't happen unless interface names are duplicated out-of-order
-      print("ERROR: cur_#_interfaces[[interface_name]] should be empty.")
-      break
+    #if(interface_name %in% reactome_fis_df$fwd_fi |
+    #   interface_name %in% reactome_fis_df$rev_fi){
+      if(interface_name %in% names(cur_1_interfaces) |
+         interface_name %in% names(cur_2_interfaces)){
+        #this shouldn't happen unless interface names are duplicated out-of-order
+        print("ERROR: cur_#_interfaces[[interface_name]] should be empty.")
+        break
+      }
+      cur_1_interfaces[[interface_name]] <- interface_samples
+      cur_2_interfaces[[interface_name]] <- interface_samples
+      
+      gene_interfaces[[interface_genes[1]]] <- cur_1_interfaces
+      gene_interfaces[[interface_genes[2]]] <- cur_2_interfaces
     }
-    cur_1_interfaces[[interface_name]] <- interface_samples
-    cur_2_interfaces[[interface_name]] <- interface_samples
-    
-    gene_interfaces[[interface_genes[1]]] <- cur_1_interfaces
-    gene_interfaces[[interface_genes[2]]] <- cur_2_interfaces
-  }
+    #}
   save(gene_interfaces,file="gene_interfaces.rda")
 }else{
   load("gene_interfaces.rda")
 }
 
 # not sure how this needs to change but know we'll need to parse samples out like this
-if(!file.exists("multi_gene_samples_hash.rda")){
+if(!file.exists("pan_multi_gene_samples_hash.rda")){
   multi_gene_samples_hash <- new.env()
   for(i in 1:nrow(mech_input_df)){
     gene <- mech_input_df[i,"Gene.symbol"]
@@ -80,9 +97,9 @@ if(!file.exists("multi_gene_samples_hash.rda")){
     cur_samples[["single"]] <- union(cur_samples[["single"]],new_samples)
     multi_gene_samples_hash[[gene]] <- cur_samples
   }
-  save(multi_gene_samples_hash,file="multi_gene_samples_hash.rda")
+  save(multi_gene_samples_hash,file="pan_multi_gene_samples_hash.rda")
 }else{
-  load("multi_gene_samples_hash.rda")
+  load("pan_multi_gene_samples_hash.rda")
 }
 
 genes <- names(multi_gene_samples_hash)
@@ -94,10 +111,10 @@ gene_interface_mutation_distribution_df <- data.frame("Gene" = character(),
 for(i in 1:length(genes)){
   gene <- genes[[i]]
   multi_samples <- multi_gene_samples_hash[[gene]][["multi"]]
-  if(!is.null(multi_samples) & length(multi_samples) > 0){
+  if(!is.null(multi_samples) & length(multi_samples) >= MIN_SAMPLES){
     single_samples <- setdiff(multi_gene_samples_hash[[gene]][["single"]],
                               multi_gene_samples_hash[[gene]][["multi"]])
-    if(length(single_samples) > 0){
+    if(length(single_samples) >= MIN_SAMPLES){
       interfaces <- names(gene_interfaces[[gene]])
       if(length(interfaces) > 1){
         singles_inteface_counts <- numeric()
@@ -150,3 +167,44 @@ gene_interface_mutation_distribution_df %>%
   write.table("gene_interface_single_v_multi_mutation_distribution.tsv",
               row.names = FALSE,
               sep="\t")
+
+pmulti_samples <- multi_gene_samples_hash[["PIK3CA"]][["multi"]]
+psingle_samples <- setdiff(multi_gene_samples_hash[["PIK3CA"]][["single"]],
+                           multi_gene_samples_hash[["PIK3CA"]][["multi"]])
+pinterfaces <- names(gene_interfaces[["PIK3CA"]])
+pdists_df <- data.frame("Interface" = character(),
+                        "Mutation.Group" = character(),
+                        "Num.Samples" = numeric())
+for(i in 1:length(pinterfaces)){
+  tmp <- data.frame("Interface" = pinterfaces[i],
+  "Mutation.Group" = "Single Mutation",
+  "Num.Samples" = length(intersect(gene_interfaces[["PIK3CA"]][[pinterfaces[i]]],
+                                 psingle_samples)))
+  pdists_df <- rbind(pdists_df,tmp)
+  
+  tmp <- data.frame("Interface" = pinterfaces[i],
+  "Mutation.Group" = "Multiple Mutations",
+  "Num.Samples" = length(intersect(gene_interfaces[["PIK3CA"]][[pinterfaces[i]]],
+                                  pmulti_samples)))
+  pdists_df <- rbind(pdists_df,tmp)
+}
+
+pdists_df %>%
+  ggplot(aes(x=Interface,y=Num.Samples,fill=Mutation.Group))+
+      geom_col(position="stack")+
+  theme(axis.text.x=element_text(angle = 290, hjust=0.0, vjust=1.0),
+        plot.margin =unit( c(30,30,10,5),"points")
+        )+
+  scale_fill_discrete(guide = guide_legend(reverse=TRUE))
+  
+
+  
+  
+  
+  
+  
+  
+  
+  
+
+
