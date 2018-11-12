@@ -126,7 +126,7 @@ for(i in 1:length(genes)){
           interface_multis <- intersect(gene_interfaces[[gene]][[interface]],
                                         multi_samples)
           singles_count <- length(interface_singles)
-          multis_count <- length(interface_multis)#doubles aren't counted twice but should be
+          multis_count <- length(interface_multis)#doubles aren't counted twice but should be for two-tailed fisher
           singles_inteface_counts <- c(singles_inteface_counts,
                                        singles_count)
           multis_interface_counts <- c(multis_interface_counts,
@@ -151,7 +151,8 @@ for(i in 1:length(genes)){
                                "Num.Interfaces" = length(interfaces),
                                "Single.v.Multi.Fisher" = fisher.test(t(fisher.prep),
                                                                      simulate.p.value = TRUE,
-                                                                     B = 1e4)$p.value)
+                                                                     B = 1e4,
+                                                                     alternative = "greater")$p.value)
           gene_interface_mutation_distribution_df <-
             rbind(gene_interface_mutation_distribution_df,
                   tmp_df)
@@ -190,14 +191,37 @@ for(i in 1:length(pinterfaces)){
 }
 
 pdists_df %>%
-  ggplot(aes(x=Interface,y=Num.Samples,fill=Mutation.Group))+
-      geom_col(position="stack")+
-  theme(axis.text.x=element_text(angle = 290, hjust=0.0, vjust=1.0),
-        plot.margin =unit( c(30,30,10,5),"points")
-        )+
-  scale_fill_discrete(guide = guide_legend(reverse=TRUE))
-  
+  write.table(file="PIK3CA_interface_single_v_multi_mutation_distribution.tsv",
+              row.names = FALSE,
+              sep="\t")
 
+library(dplyr)
+library(viridis)
+
+pdists_df %>%
+  ggplot(aes(x=reorder(Interface,
+                       -Num.Samples),
+             y=Num.Samples,
+             fill=Mutation.Group))+
+  scale_fill_brewer(palette = "Paired")+
+  geom_col(position="stack")+
+  geom_text(aes(label=Num.Samples),
+            size=3,
+            position=position_stack(vjust = 0.5))+
+  theme(axis.text.x=element_text(angle = 290,
+                                 hjust=0.0, vjust=1.0),
+        plot.margin =unit( c(30,30,10,5),
+                           "points"),
+        panel.grid.major = element_blank(),
+        plot.title = element_text(hjust = 0.5))+
+  ggtitle("PIK3CA Interface Mutations")+
+  xlab("PIK3CA Interface")+
+  ylab("Mutation Count")+
+  labs(fill="Mutation Group")
+
+ggsave("PIK3CA_Interface_Mutations.png",
+       width=8,
+       height=8)
   
   
   
