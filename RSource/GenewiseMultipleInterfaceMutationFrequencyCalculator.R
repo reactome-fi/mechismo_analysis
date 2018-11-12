@@ -150,10 +150,9 @@ for(i in 1:length(genes)){
                                "Num.Singles.Samples" = length(single_samples),
                                "Num.Multis.Samples" = length(multi_samples),
                                "Num.Interfaces" = length(interfaces),
-                               "Single.v.Multi.Fisher" = fisher.test(t(fisher.prep),
+                               "Single.v.Multi.Fisher" = fisher.test(fisher.prep,
                                                                      simulate.p.value = TRUE,
-                                                                     B = 1e4,
-                                                                     alternative = "greater")$p.value)
+                                                                     B = 1e4)$p.value)
           gene_interface_mutation_distribution_df <-
             rbind(gene_interface_mutation_distribution_df,
                   tmp_df)
@@ -226,7 +225,7 @@ pdists_df %>%
         plot.title = element_text(hjust = 0.5))+
   ggtitle(paste(goi," Interface Mutations",sep=""))+
   xlab(paste(goi," Interface",sep=""))+
-  ylab("Mutation Count")+
+  ylab("Sample Count")+
   labs(fill="Mutation Group")
 
 ggsave(paste(goi,"_Interface_Mutations.png",
