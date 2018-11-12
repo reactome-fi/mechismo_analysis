@@ -86,8 +86,8 @@ if(!file.exists("multi_gene_samples_hash.rda")){
 
 genes <- names(multi_gene_samples_hash)
 gene_interface_mutation_distribution_df <- data.frame("Gene" = character(),
-                                                      "Num.Singles" = numeric(),
-                                                      "Num.Multis" = numeric(),
+                                                      "Num.Singles.Samples" = numeric(),
+                                                      "Num.Multis.Samples" = numeric(),
                                                       "Num.Interfaces" = numeric(),
                                                       "Single.v.Multi.Wilcox" = numeric())
 for(i in 1:length(genes)){
@@ -110,21 +110,33 @@ for(i in 1:length(genes)){
           singles_ratio <- length(interface_singles) / length(single_samples)
           multis_ratio <- length(interface_multis) / length(multi_samples)
           singles_inteface_ratios <- c(singles_inteface_ratios,
-                                           singles_ratio)
+                                       singles_ratio)
           multis_interface_ratios <- c(multis_interface_ratios,
-                                           multis_ratio)
+                                       multis_ratio)
         }
-        tmp_df <- data.frame("Gene" = gene,
-                             "Num.Singles" = length(single_samples),
-                             "Num.Multis" = length(multi_samples),
-                             "Num.Interfaces" = length(interfaces),
-                             "Single.v.Multi.Wilcox" = wilcox.test(x = singles_inteface_ratios,
-                                                                   y = multis_interface_ratios,
-                                                                   paired = TRUE,
-                                                                   alternative = "two.sided")$p.value)
-        gene_interface_mutation_distribution_df <-
-          rbind(gene_interface_mutation_distribution_df,
-                tmp_df)
+        
+        if(length(singles_inteface_ratios) > 1 &
+           length(multis_interface_ratios) > 1){
+          normalized_singles_interface_ratios <- singles_inteface_ratios
+          if(max(singles_inteface_ratios) > 0){
+            normalized_singles_interface_ratios <- singles_inteface_ratios / max(singles_inteface_ratios)
+          }
+          normalized_multis_interface_ratios <- multis_interface_ratios
+          if(max(multis_interface_ratios) > 0){
+            normalized_multis_interface_ratios <- multis_interface_ratios / max(multis_interface_ratios)
+          }
+          tmp_df <- data.frame("Gene" = gene,
+                               "Num.Singles.Samples" = length(single_samples),
+                               "Num.Multis.Samples" = length(multi_samples),
+                               "Num.Interfaces" = length(interfaces),
+                               "Single.v.Multi.Wilcox" = wilcox.test(x = normalized_singles_interface_ratios,
+                                                                     y = normalized_multis_interface_ratios,
+                                                                     paired = TRUE,
+                                                                     alternative = "two.sided")$p.value)
+          gene_interface_mutation_distribution_df <-
+            rbind(gene_interface_mutation_distribution_df,
+                  tmp_df)
+        }
       }
     }
   }
