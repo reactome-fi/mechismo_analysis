@@ -21,11 +21,13 @@ import java.util.stream.Stream;
 
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVRecord;
+import org.apache.log4j.Logger;
 import org.gk.model.GKInstance;
 import org.gk.model.InstanceUtilities;
 import org.gk.model.ReactomeJavaConstants;
 import org.gk.persistence.MySQLAdaptor;
 import org.gk.util.FileUtilities;
+import org.gk.util.GKApplicationUtilities;
 import org.junit.Test;
 import org.reactome.r3.graph.GraphAnalyzer;
 import org.reactome.r3.graph.NetworkBuilderForGeneSet;
@@ -40,8 +42,11 @@ import org.reactome.r3.util.Configuration;
  */
 @SuppressWarnings("unchecked")
 public class ReactionMapGenerator {
+    private static final Logger logger = Logger.getLogger(ReactionMapGenerator.class);
+    
     private final String DIR_NAME = "resources/";
-    private final String REACTION_NETWORK_NAME = DIR_NAME + "ReactionNetwork_070517.txt";
+//    private final String REACTION_NETWORK_NAME = DIR_NAME + "ReactionNetwork_070517.txt";
+    private final String REACTION_NETWORK_NAME = DIR_NAME + "ReactionNetwork_090120.txt";
     private Set<String> entityEscapeNames;
     
     /**
@@ -244,7 +249,7 @@ public class ReactionMapGenerator {
                                                       ReactomeJavaConstants.regulatedEntity});
         List<GKInstance> reactionList = new ArrayList<GKInstance>(reactions);
         
-        System.out.println("Total reactions: " + reactionList.size());
+        logger.info("Total reactions: " + reactionList.size());
 //        if (true)
 //            return;
         
@@ -255,7 +260,7 @@ public class ReactionMapGenerator {
         fu.setOutput(REACTION_NETWORK_NAME);
         for (int i = 0; i < reactionList.size(); i++) {
             GKInstance reaction1 = reactionList.get(i);
-            System.out.println(i + ": " + reaction1);
+            logger.info(i + ": " + reaction1);
             for (int j = 0; j < reactionList.size(); j++) { // Since it is possible two reactions may point to each other
                                                             // We need to check all
                 GKInstance reaction2 = reactionList.get(j);
@@ -384,7 +389,7 @@ public class ReactionMapGenerator {
             if (ca != null)
                 rtn.add(ca);
         }
-        Collection<GKInstance> regulations = reaction.getReferers(ReactomeJavaConstants.regulatedEntity);
+        Collection<GKInstance> regulations = InstanceUtilities.getRegulations(reaction);
         if (regulations != null && regulations.size() > 0) {
             for (GKInstance regulation : regulations) {
                 GKInstance regulator = (GKInstance) regulation.getAttributeValue(ReactomeJavaConstants.regulator);

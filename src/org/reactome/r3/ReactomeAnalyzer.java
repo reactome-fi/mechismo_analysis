@@ -16,6 +16,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import org.apache.log4j.Logger;
 import org.gk.model.GKInstance;
 import org.gk.model.InstanceUtilities;
 import org.gk.model.PersistenceAdaptor;
@@ -32,6 +33,8 @@ import org.reactome.r3.util.InteractionUtilities;
 
 @SuppressWarnings("unchecked")
 public class ReactomeAnalyzer {
+    private final static Logger logger = Logger.getLogger(ReactomeAnalyzer.class);
+    
     private boolean excludeComplex = false;
     protected PersistenceAdaptor dba;
     // A helper class
@@ -249,10 +252,24 @@ public class ReactomeAnalyzer {
      * @throws Exception
      */
     public List<GKInstance> loadHumanReactions(MySQLAdaptor dba) throws Exception {
-        Collection<GKInstance> reactions = dba.fetchInstanceByAttribute(ReactomeJavaConstants.ReactionlikeEvent,
-                ReactomeJavaConstants.dataSource,
-                "IS NULL",
-                null);
+        Collection<GKInstance> reactions = null;
+        // For any reactome_plus_i database
+        SchemaClass rxtCls = dba.fetchSchema().getClassByName(ReactomeJavaConstants.ReactionlikeEvent);
+        if (rxtCls.isValidAttribute(ReactomeJavaConstants.dataSource)) {
+            logger.info("Reactome_plus_i database. Loading based on data source.");
+            reactions = dba.fetchInstanceByAttribute(ReactomeJavaConstants.ReactionlikeEvent,
+                                                     ReactomeJavaConstants.dataSource,
+                                                     "IS NULL",
+                                                     null);
+        }
+        else {
+            logger.info("Reactome release database. Loading human reactions only.");
+            GKInstance human = dba.fetchInstance(48887L);
+            reactions = dba.fetchInstanceByAttribute(ReactomeJavaConstants.ReactionlikeEvent,
+                                                     ReactomeJavaConstants.species,
+                                                     "=",
+                                                     human);
+        }
         dba.loadInstanceAttributeValues(reactions, new String[]{
                 ReactomeJavaConstants.species,
                 ReactomeJavaConstants.disease
@@ -268,6 +285,7 @@ public class ReactomeAnalyzer {
                 continue;
             rtn.add(reaction);
         }
+        logger.info("Total loaded human reactions: " + rtn.size());
         return rtn;
     }
     
