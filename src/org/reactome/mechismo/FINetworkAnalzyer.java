@@ -3,8 +3,13 @@ package org.reactome.mechismo;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -13,12 +18,17 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.junit.Test;
+import org.reactome.cancer.driver.MechismoBFSHelper;
 import org.reactome.fi.util.FileUtility;
 import org.reactome.mechismo.model.AnalysisResult;
 import org.reactome.mechismo.model.CancerType;
 import org.reactome.mechismo.model.Interaction;
 import org.reactome.mechismo.model.Sample;
 import org.reactome.mechismows.MechismowsReader;
+import org.reactome.r3.ReactionMapGenerator;
+import org.reactome.r3.graph.BreadthFirstSearch;
+import org.reactome.r3.graph.GraphAnalyzer;
+import org.reactome.r3.graph.NetworkBuilderForGeneSet;
 import org.reactome.r3.util.InteractionUtilities;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 
@@ -30,9 +40,332 @@ import org.springframework.context.annotation.AnnotationConfigApplicationContext
  */
 public class FINetworkAnalzyer {
     // As of August, 2018, this cutoff is used for pancancer data only.
+    private final Double FDR_CUTOFF = 0.05d;
     private final int MUTATION_COUNT_CUTOFF = 5;
+    private final FileUtility fu = new FileUtility();
 
     public FINetworkAnalzyer() {
+    }
+    
+    private Set<String> loadGenesInSignificantReactomeFIs() throws IOException {
+        FileUtility fu = new FileUtility();
+        String file = "results/ReactomeSignificantFIs_082118.txt";
+        Set<String> genes = new HashSet<>();
+        fu.setInput(file);
+        String line = fu.readLine();
+        while ((line = fu.readLine()) != null) {
+            String[] tokens = line.split("\t");
+            genes.add(tokens[2]);
+            genes.add(tokens[3]);
+        }
+        fu.close();
+        return genes;
+    }
+    
+    /**
+     * Check cancers and significant FIs assigned to cancers.
+     * @throws IOException
+     */
+    @Test
+    public void checkCancerToSigFIs() throws IOException {
+        Map<String, Set<String>> cancerToFIs = loadCancerToSigFIs();
+        List<String> cancers = new ArrayList<>(cancerToFIs.keySet());
+        cancers.sort((c1, c2) -> cancerToFIs.get(c1).size() - cancerToFIs.get(c2).size());
+        System.out.println("Cancer\tNumber\tSignificantFIs");
+        cancers.forEach(key -> {
+            Set<String> set = cancerToFIs.get(key);
+            List<String> list = new ArrayList<>(set);
+            list.sort(Comparator.naturalOrder());
+            System.out.println(key + "\t" + set.size() + "\t" + String.join(", ", list));
+        });
+        
+        String outFileName = "results/SigFIs_based_Cancer_Dist_100818.txt";
+        
+        generatePairWiseNetworkDistance(cancerToFIs, outFileName);
+    }
+
+    protected void generatePairWiseNetworkDistance(Map<String, Set<String>> sampleToFIs,
+                                                   String outFileName) throws IOException {
+        // Calculate pair-wise distances between cancers
+        // Use a helper object
+        String networkFile = "results/FINodesNetwork_First_Component_010719.txt";
+        Set<String> network = fu.loadInteractions(networkFile);
+        BreadthFirstSearch bfs = new BreadthFirstSearch();
+        Map<String, Set<String>> idToPartners = bfs.generateIdToPartnersMap(network);
+        // Need a little bit filter
+        sampleToFIs.forEach((cancer, fis) -> fis.retainAll(idToPartners.keySet()));
+        // Check if there is any cancer having no FIs after the above filtering
+        System.out.println("\nThe following cancers don't have FIs in the largest component:");
+        for (Iterator<String> it = sampleToFIs.keySet().iterator(); it.hasNext();) {
+            String sample = it.next();
+            Set<String> fis = sampleToFIs.get(sample);
+            if (fis.size() == 0) {
+                System.out.println(sample);
+                it.remove();
+            }
+        }
+        
+        MechismoBFSHelper helper = new MechismoBFSHelper();
+        System.out.println("\nCalculating pair-wise distances among cancers:");
+        Map<String, Integer> pairToDist = helper.calculateShortestPath(sampleToFIs,
+                                                                       idToPartners,
+                                                                       bfs);
+        List<String> samples = sampleToFIs.keySet().stream().sorted().collect(Collectors.toList());
+        StringBuilder builder = new StringBuilder();
+        builder.append("Sample");
+        samples.forEach(cancer -> builder.append("\t").append(cancer));
+        System.out.println(builder.toString());
+        fu.setOutput(outFileName);
+        fu.printLine(builder.toString());
+        builder.setLength(0);
+        for (int i = 0; i < samples.size(); i++) {
+            String cancer = samples.get(i);
+            builder.append(cancer);
+            Set<String> set1 = sampleToFIs.get(cancer);
+            for (int j = 0; j < samples.size(); j++) {
+                String cancer2 = samples.get(j);
+                builder.append("\t");
+                if (i == j)
+                    builder.append(0.0d);
+                else {
+                    Set<String> set2 = sampleToFIs.get(cancer2);
+                    double dist = helper.calculateMinShortestPath(set1,
+                            set2,
+                            pairToDist);
+                    builder.append(dist);
+                }
+            }
+            System.out.println(builder.toString());
+            fu.printLine(builder.toString());
+            builder.setLength(0);
+        }
+        fu.close();
+    }
+    
+    @Test
+    public void calculateSampleDistancesOnFINodeNetwork() throws IOException {
+
+        String cancer = "GBM";
+        cancer = "PAAD";
+//        cancer = "SKCM";
+                cancer = "LGG";
+                cancer = "UCEC";
+//        cancer = "COADREAD";
+                cancer = "THCA";
+                cancer = "STAD";
+                cancer = "LUAD";
+                cancer = "HNSC";
+
+        // Generate distances based on significant FIs for individual cancers
+        String srcFileName = "datasets/Mechismo/FrancescoResults/080918/tcga_mechismo_stat_cancer_wise_undirected.tsv";
+        double fdrCutoff = 0.05d;
+        boolean hasHeader = true;
+
+        Map<String, Set<String>> sampleToFIs = loadSampleToFIs(srcFileName,
+                                                               cancer,
+                                                               fdrCutoff,
+                                                               hasHeader);
+
+        // A quick quality check
+        sampleToFIs.forEach((sample, set) -> System.out.println(sample + "\t" + set.size()));
+
+        //        filterSamplesWithoutReactions(sampleToReactions);
+
+        String date = "010719";
+
+        String fileName = "results/MechismoSamplePairWiseFINodeNetworkDist_" + cancer + "_" + date + ".txt";
+
+        generatePairWiseNetworkDistance(sampleToFIs, fileName);
+    }
+    
+    
+    @Test
+    public void testLoadSamplesToFIs() throws IOException {
+        String fileName = "datasets/Mechismo/FrancescoResults/080918/tcga_mechismo_stat_cancer_wise_undirected.tsv";
+        String cancer = "COADREAD";
+        double cutoff = 0.05d;
+        Map<String, Set<String>> sampleToFIs = loadSampleToFIs(fileName, cancer, cutoff, true);
+        sampleToFIs.forEach((sample, fis) -> System.out.println(sample + "\t" + fis.size() + "\t" + fis));
+    }
+    
+    /**
+     * Use this method to load sample to hit FIs.
+     *
+     * @param cancer
+     * @param fdrCutoff
+     * @return
+     * @throws IOException
+     */
+    private Map<String, Set<String>> loadSampleToFIs(String srcFileName,
+                                                     String cancer,
+                                                     double fdrCutoff,
+                                                     boolean hasHeader) throws IOException {
+        Map<String, Set<String>> sampleToFIs = new HashMap<>();
+        try (Stream<String> stream = Files.lines(Paths.get(srcFileName))) {
+            stream.skip(hasHeader ? 1 : 0)
+                    .map(line -> line.split("\t"))
+                    .filter(tokens -> tokens[0].equals(cancer)) // Filter to cancer type
+                    .filter(tokens -> !tokens[13].equals("-")) // Need to have reactions
+                    .filter(tokens -> Double.parseDouble(tokens[11]) < fdrCutoff) // Less than the predefined fdr cutoff
+                    .forEach(tokens -> {
+                        // Get FI
+                        String fi = InteractionUtilities.generateFIFromGene(tokens[1], tokens[2]);
+                        String fi1 = fi.replace('\t', ' ');
+                        // Get samples
+                        int index1 = tokens[15].indexOf("\'");
+                        int index2 = tokens[15].lastIndexOf("\'");
+                        String tmp = tokens[15].substring(index1, index2 + 1);
+                        String[] samples = tmp.split(", ");
+                        Arrays.asList(samples).forEach(sample -> {
+                            // Need to remove single quotes
+                            sample = sample.substring(1, sample.length() - 1);
+                            sampleToFIs.compute(sample, (key, set) -> {
+                                if (set == null)
+                                    set = new HashSet<>();
+                                set.add(fi1);
+                                return set;
+                            });
+                        });
+                    });
+        }
+        return sampleToFIs;
+    }
+    
+    public Map<String, Set<String>> loadCancerToSigFIs() throws IOException {
+        FileUtility fu = new FileUtility();
+        String file = "results/ReactomeSignificantFIs_082118.txt";
+        Map<String, Set<String>> cancerToFIs = new HashMap<>();
+        fu.setInput(file);
+        String line = fu.readLine();
+        String[] header = line.split("\t");
+        while ((line = fu.readLine()) != null) {
+            String[] tokens = line.split("\t");
+            String fi = InteractionUtilities.generateFIFromGene(tokens[2], tokens[3]);
+            String fi1 = fi.replaceAll("\t", " ");
+            for (int i = 9; i < tokens.length; i++) {
+                String token = tokens[i];
+                if (token.length() == 0)
+                    continue;
+                Double fdr = new Double(token);
+                if (fdr >= FDR_CUTOFF)
+                    continue;
+                String cancer = header[i];
+                cancerToFIs.compute(cancer, (key, set) -> {
+                    if (set == null)
+                        set = new HashSet<>();
+                    set.add(fi1);
+                    return set;
+                });
+            }
+        }
+        fu.close();
+        return cancerToFIs;
+    }
+    
+    /**
+     * Perform some check on the network constructed by using FIs as nodes and edges if two FIs having
+     * shared genes. See method convertGeneNetworkToFINetwork().
+     * @throws Exception
+     */
+    @Test
+    public void checkFINodeNetwork() throws Exception {
+        String fileName = "results/FINodesNetwork_100818.txt";
+        Set<String> edges = new HashSet<>();
+        Set<String> nodes = new HashSet<>();
+        fu.setInput(fileName);
+        String line = null;
+        while ((line = fu.readLine()) != null) {
+            line = line.replaceAll("\t", " ");
+            String[] tokens = line.split(",");
+            edges.add(tokens[0] + "\t" + tokens[1]);
+            nodes.add(tokens[0]);
+            nodes.add(tokens[1]);
+        }
+        fu.close();
+        System.out.println("Total edges: " + edges.size());
+        System.out.println("Total nodes: " + nodes.size());
+        
+        GraphAnalyzer graphAnalyzer = new GraphAnalyzer();
+        List<Set<String>> components = graphAnalyzer.calculateGraphComponents(edges);
+        System.out.println("Total components: " + components.size());
+        components.forEach(comp -> System.out.println(comp.size()));
+        // Output the first component
+        String outFileName = "results/FINodesNetwork_First_Component_100818.txt";
+        // All FIs are sorted
+        outFileName = "results/FINodesNetwork_First_Component_010719.txt";
+        fu.setOutput(outFileName);
+        Set<String> firstCompNodes = components.get(0);
+        for (String edge : edges) {
+            String[] fis = edge.split("\t");
+            if (firstCompNodes.contains(fis[0])) {// We need edges
+                String fi1 = sortFI(fis[0]);
+                String fi2 = sortFI(fis[1]);
+                String sortedEdge = InteractionUtilities.generateFIFromGene(fi1, fi2);
+                fu.printLine(sortedEdge);
+            }
+        }
+        fu.close();
+    }
+    
+    private String sortFI(String fi) {
+        String[] tokens = fi.split(" ");
+        return Stream.of(tokens).sorted().collect(Collectors.joining(" "));
+    }
+    
+    /**
+     * Convert from a gene-based network (aka genes are nodes) to FI-based network (aka FIs 
+     * are nodes)
+     * Note: A huge network file will be generated by using all FIs in the Reactome FI network. Instead,
+     * focus constructing a linked network for genes involved in the significant FIs collected
+     * in file, ReactomeSignificantFIs_082118.txt, and then try to link them together. 
+     * @throws IOException
+     */
+    @Test
+    public void convertGeneNetworkToFINetwork() throws IOException {
+        Set<String> significantGenes = loadGenesInSignificantReactomeFIs();
+        System.out.println("Total significant genes: " + significantGenes.size());
+        Set<String> fis = loadReactomeFIs();
+        System.out.println("Total FIs: " + fis.size());
+        NetworkBuilderForGeneSet builder = new NetworkBuilderForGeneSet();
+        builder.setAllFIs(fis);
+        // Work on a sub-network
+        // Since the original FI network may have multiple components, the generated
+        // sub-network may have multiple components.
+        fis = builder.constructFINetworkForGeneSet(significantGenes);
+        System.out.println("Size of sub-network: " + fis.size());
+        // Cache everything for quick performance
+        Map<String, String[]> fiToGenes = new HashMap<>();
+        fis.forEach(fi -> {
+            String[] tokens = fi.split("\t");
+            fiToGenes.put(fi, tokens);
+        });
+        System.out.println("Finished spliting!");
+        List<String> fiList = new ArrayList<>(fis);
+        Collections.sort(fiList);
+        String outFileName = "results/FINodesNetwork_100818.txt";
+        FileUtility fu = new FileUtility();
+        fu.setOutput(outFileName);
+        for (int i = 0; i < fiList.size() - 1; i++) {
+            String fi1 = fiList.get(i);
+            String[] genes1 = fiToGenes.get(fi1);
+            for (int j = i + 1; j < fiList.size(); j++) {
+                String fi2 = fiList.get(j);
+                String[] genes2 = fiToGenes.get(fi2);
+                if (hasSharedGenes(genes1, genes2))
+                    fu.printLine(fi1 + "," + fi2);
+            }
+        }
+        fu.close();
+    }
+    
+    private boolean hasSharedGenes(String[] genes1, String[] genes2) {
+        for (String gene1 : genes1) {
+            for (String gene2 : genes2) {
+                if (gene1.equals(gene2))
+                    return true;
+            }
+        }
+        return false;
     }
 
     private Set<String> loadReactomeFIs() throws IOException {
