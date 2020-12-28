@@ -27,8 +27,8 @@ import org.gk.model.InstanceUtilities;
 import org.gk.model.ReactomeJavaConstants;
 import org.gk.persistence.MySQLAdaptor;
 import org.gk.util.FileUtilities;
-import org.gk.util.GKApplicationUtilities;
 import org.junit.Test;
+import org.reactome.fi.util.FileUtility;
 import org.reactome.r3.graph.GraphAnalyzer;
 import org.reactome.r3.graph.NetworkBuilderForGeneSet;
 import org.reactome.r3.util.Configuration;
@@ -46,7 +46,8 @@ public class ReactionMapGenerator {
     
     private final String DIR_NAME = "resources/";
 //    private final String REACTION_NETWORK_NAME = DIR_NAME + "ReactionNetwork_070517.txt";
-    private final String REACTION_NETWORK_NAME = DIR_NAME + "ReactionNetwork_090120.txt";
+//    private final String REACTION_NETWORK_NAME = DIR_NAME + "ReactionNetwork_090120.txt";
+    private final String REACTION_NETWORK_NAME = DIR_NAME + "ReactionNetwork_Rel_71_122820.txt";
     private Set<String> entityEscapeNames;
     
     /**
@@ -233,6 +234,54 @@ public class ReactionMapGenerator {
     }
     
     @Test
+    public void generateReactionToPathwayMap() throws Exception {
+        MySQLAdaptor dba = getDBA();
+        // Get the top level pathways
+        Collection<GKInstance> frontPages = dba.fetchInstancesByClass(ReactomeJavaConstants.FrontPage);
+        // There should be only one
+        if (frontPages.size() != 1)
+            throw new IllegalStateException("Too many FrontPage instances.");
+        GKInstance frontPage = frontPages.stream().findAny().get();
+        List<GKInstance> frontPageItems = frontPage.getAttributeValuesList(ReactomeJavaConstants.frontPageItem);
+        logger.info("Total frontPageItems: " + frontPageItems.size());
+        // Exclude all pathways under the disease topic
+        Map<GKInstance, Set<GKInstance>> pathwayToReactions = new HashMap<>();
+        for (GKInstance topic : frontPageItems) {
+            if (topic.getDisplayName().equals("Disease")) {
+                logger.info("The Disease topic is excluded.");
+                continue;
+            }
+            generatePathwayToReactionMap(topic, pathwayToReactions);
+        }
+        // Output
+        String outFileName = DIR_NAME + "ReactionToPathway_Rel_71_122820.txt";
+        FileUtility fu = new FileUtility();
+        fu.setOutput(outFileName);
+        fu.printLine("ReactionlikeEvent\tPathway");
+        for (GKInstance pathway : pathwayToReactions.keySet()) {
+            Set<GKInstance> reactions = pathwayToReactions.get(pathway);
+            String pathwayId = getStableId(pathway);
+            for (GKInstance reaction : reactions) {
+                fu.printLine(getStableId(reaction) + "\t" + pathwayId);
+            }
+        }
+        fu.close();
+    }
+    
+    private void generatePathwayToReactionMap(GKInstance pathway,
+                                             Map<GKInstance, Set<GKInstance>> pathwayToReactions) throws Exception {
+        if (pathwayToReactions.containsKey(pathway))
+            return;
+        Set<GKInstance> contained = InstanceUtilities.getContainedEvents(pathway);
+        pathwayToReactions.put(pathway,
+                               contained.stream().filter(e -> e.getSchemClass().isa(ReactomeJavaConstants.ReactionlikeEvent)).collect(Collectors.toSet()));
+        for (GKInstance event : contained) {
+            if (event.getSchemClass().isa(ReactomeJavaConstants.Pathway))
+                generatePathwayToReactionMap(event, pathwayToReactions);
+        }
+    }
+    
+    @Test
     public void generate() throws Exception {
         MySQLAdaptor dba = getDBA();
         
@@ -267,12 +316,23 @@ public class ReactionMapGenerator {
                 if (i == j)
                     continue; // Escape itself
                 boolean isPreceding = isPrecedingTo(reaction1, reaction2);
-                if (isPreceding)
-                    fu.printLine(reaction1.getDBID() + " preceding " + reaction2.getDBID());
-                // The other direction will be checked by two loops
+                if (isPreceding) {
+//                    fu.printLine(reaction1.getDBID() + " preceding " + reaction2.getDBID());
+                    fu.printLine(getStableId(reaction1) + " preceding " + getStableId(reaction2));
+                }
             }
         }
         fu.close();
+    }
+    
+    private String getStableId(GKInstance inst) throws Exception {
+        GKInstance stableId = (GKInstance) inst.getAttributeValue(ReactomeJavaConstants.stableIdentifier);
+        if (stableId == null)
+            throw new IllegalStateException(inst + " doesn't have a stable id!");
+        String rtn = (String) stableId.getAttributeValue(ReactomeJavaConstants.identifier);
+        if (rtn == null)
+            throw new IllegalStateException(stableId + " doesn't have the id value!");
+        return rtn;
     }
     
     private boolean shouldEscape(GKInstance output) throws Exception {
