@@ -17,8 +17,10 @@ import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Calendar;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -45,6 +47,17 @@ public class FileUtility {
     private static boolean isLoggingInitialized = false;
     
     public FileUtility() {
+    }
+    
+    /**
+     * Get the today for time stamping the output files.
+     * @return
+     */
+    public static String getDateStamp() {
+        SimpleDateFormat format = new SimpleDateFormat("MMddyy");
+        String date = format.format(Calendar.getInstance().getTime());
+        System.out.println("date: " + date);
+        return date;
     }
     
     public static void initializeLogging() {

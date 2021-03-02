@@ -6,6 +6,7 @@ package org.reactome.r3;
 
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.io.Reader;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -45,9 +46,9 @@ public class ReactionMapGenerator {
     private static final Logger logger = Logger.getLogger(ReactionMapGenerator.class);
     
     private final String DIR_NAME = "resources/";
-//    private final String REACTION_NETWORK_NAME = DIR_NAME + "ReactionNetwork_070517.txt";
+    private final String REACTION_NETWORK_NAME = DIR_NAME + "ReactionNetwork_070517.txt";
 //    private final String REACTION_NETWORK_NAME = DIR_NAME + "ReactionNetwork_090120.txt";
-    private final String REACTION_NETWORK_NAME = DIR_NAME + "ReactionNetwork_Rel_71_122820.txt";
+//    private final String REACTION_NETWORK_NAME = DIR_NAME + "ReactionNetwork_Rel_71_122820.txt";
     private Set<String> entityEscapeNames;
     
     /**
@@ -145,25 +146,31 @@ public class ReactionMapGenerator {
         fu.close();
     }
     
-    public void generateSubNetwork(Set<String> reactionIds) throws IOException {
+    public void generateSubNetwork(Set<String> reactionIds,
+                                   PrintStream ps) throws IOException {
         try (Stream<String> stream = Files.lines(Paths.get(REACTION_NETWORK_NAME))){
             stream.forEach(line -> {
                 String[] tokens = line.split(" ");
                 if (reactionIds.contains(tokens[0]) && reactionIds.contains(tokens[2])) {
-                      System.out.println(line);
+                      ps.println(line);
                   }
             });
         }
     }
     
+    public void generateSubNetwork(Set<String> reactionIds) throws IOException {
+        generateSubNetwork(reactionIds, System.out);
+    }
+    
     /**
-     * Use this method to connect all reactions together. Extract reactions may be
+     * Use this method to connect all reactions together. Extract reactions that may be
      * used to connect all reactions together.
      * @param reactionIds
      * @throws IOException
      */
     public void generateSubNetworkForAll(Set<String> reactionIds,
-                                         Map<String, Double> reactionToScore) throws IOException {
+                                         Map<String, Double> reactionToScore,
+                                         PrintStream ps) throws IOException {
         try (Stream<String> stream = Files.lines(Paths.get(REACTION_NETWORK_NAME))) {
             // Convert the reaction fis as in the format for the FI network
             Set<String> edges = stream.map(line -> line.split(" "))
@@ -175,11 +182,16 @@ public class ReactionMapGenerator {
             reactionEdges.forEach(edge -> {
                 String[] tokens = edge.split("\t");
                 if (edges.contains(edge))
-                    System.out.println(tokens[0] + " preceding " + tokens[1]);
+                    ps.println(tokens[0] + " preceding " + tokens[1]);
                 else
-                    System.out.println(tokens[1] + " preceding " + tokens[0]);
+                    ps.println(tokens[1] + " preceding " + tokens[0]);
             });
         }
+    }
+    
+    public void generateSubNetworkForAll(Set<String> reactionIds,
+                                         Map<String, Double> reactionToScore) throws IOException {
+        generateSubNetworkForAll(reactionIds, reactionToScore, System.out);
     }
     
     /**

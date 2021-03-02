@@ -9,8 +9,10 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Calendar;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -21,6 +23,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiFunction;
+import java.util.logging.SimpleFormatter;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -29,6 +32,7 @@ import org.apache.commons.math.stat.correlation.PearsonsCorrelation;
 import org.apache.commons.math.stat.correlation.SpearmansCorrelation;
 import org.apache.log4j.Logger;
 import org.gk.model.GKInstance;
+import org.gk.model.ReactomeJavaConstants;
 import org.gk.persistence.MySQLAdaptor;
 import org.junit.Test;
 import org.reactome.annotate.AnnotationHelper;
@@ -64,6 +68,43 @@ public class MechismoAnalyzer {
         MechismoAnalyzer analyzer = new MechismoAnalyzer();
         analyzer.analyzeDistribution();
     }
+    
+    /**
+     * This method is used to parse the Excel file provided by Franscesco in the Google driver.
+     * @throws IOException
+     */
+    @Test
+    public void generateSampleToReactionMatrixViaSummaryFile() throws IOException {
+        String resultFileName = "results/TCGA_mechismo_reactome_reactions_02052021_Reaction_cancertype_CGC.txt";
+        resultFileName = "results/tcga_mechismo_stat_cancer_wise_reactions_sig_CGC_021921.tsv";
+        Map<String, Set<String>> sampleToReactions = new HashMap<>();
+        Map<String, String> sampleToCancerType = new HashMap<>();
+        Files.lines(Paths.get(resultFileName))
+        .skip(1)
+        .map(line -> line.split("\t"))
+        .forEach(tokens -> {
+            String token = tokens[18];
+            int index1 = token.indexOf("[");
+            int index2 = token.indexOf("]");
+            token = token.substring(index1 + 1, index2);
+            String[] cancers = token.split(", ");
+            for (String cancer : cancers) {
+                cancer = cancer.substring(1, cancer.length() - 1); // Remove ' and '.
+                sampleToReactions.compute(cancer, (key, set) -> {
+                    if (set == null)
+                        set = new HashSet<>();
+                    set.add(tokens[1]);
+                    return set;
+                });
+                sampleToCancerType.put(cancer, tokens[0]);
+            }
+        });
+        System.out.println("Total cancer samples in the summary file: " + sampleToReactions.size());
+            
+        // Generate the sample to hit reaction matrix
+        String outFileName = "results/MechismoSamplesToReactions_" + FileUtility.getDateStamp() + ".txt";
+        generateSampleToReactionMarix(sampleToCancerType, sampleToReactions, outFileName);
+    }
 
     @Test
     public void generateSampleToReactionMatrix() throws IOException {
@@ -97,37 +138,11 @@ public class MechismoAnalyzer {
                 });
 
         System.out.println("Total reactions: " + fiToReactions.size());
+        
         // Load TCGA samples
-        String mechResultFileName = dirName + "TCGA/TCGA_mech_output.tsv";
         Map<String, Set<String>> sampleToFIs = new HashMap<>(); // Sample to mutated FIs
         Map<String, String> sampleToCancerType = new HashMap<>();
-        Files.lines(Paths.get(mechResultFileName))
-                .skip(1) // Skip the first line
-                .map(line -> line.split("\t"))
-                .filter(tokens -> !tokens[0].equals("name_a1")) // Escape the head lines inside the file
-                .filter(tokens -> !tokens[4].equals(tokens[5])) // Escape synonymous mutations
-                .filter(tokens -> tokens.length > 18) // Need partner's information
-                .filter(tokens -> !tokens[18].equals("[PROT]")) // Escape self-interaction
-                .forEach(tokens -> {
-                    String fi = InteractionUtilities.generateFIFromGene(tokens[0], tokens[18]);
-                    String[] tokensTmp = tokens[6].split(" ");
-                    String[] sampleTokens = tokensTmp[tokensTmp.length - 1].split(";");
-                    for (String sampleToken : sampleTokens) {
-                        tokensTmp = sampleToken.split(":");
-                        String cancer = tokensTmp[0];
-                        tokensTmp = tokensTmp[1].split(",");
-                        for (String sample : tokensTmp) {
-                            sampleToCancerType.put(sample, cancer);
-                            sampleToFIs.compute(sample, (key, set) -> {
-                                if (set == null)
-                                    set = new HashSet<>();
-                                set.add(fi);
-                                return set;
-                            });
-                        }
-                    }
-                });
-        System.out.println("Total samples: " + sampleToCancerType.size());
+        loadSampleToCancerTyp(sampleToFIs, sampleToCancerType);
         // Just a quick check
         Map<String, Set<String>> cancerTypeToSamples = new HashMap<>();
         sampleToCancerType.forEach((sample, cancer) -> cancerTypeToSamples.compute(cancer, (key, set) -> {
@@ -158,6 +173,12 @@ public class MechismoAnalyzer {
 
         // Output into a local file
         String outFileName = "results/MechismoSamplesToReactions_103017.txt";
+        generateSampleToReactionMarix(sampleToCancerType, sampleToReactions, outFileName);
+    }
+
+    protected void generateSampleToReactionMarix(Map<String, String> sampleToCancerType,
+                                                 Map<String, Set<String>> sampleToReactions,
+                                                 String outFileName) throws IOException {
         fu.setOutput(outFileName);
         Set<String> reactions = sampleToReactions.values().stream().flatMap(set -> set.stream()).collect(Collectors.toSet());
         List<String> reactionList = new ArrayList<>(reactions);
@@ -167,8 +188,11 @@ public class MechismoAnalyzer {
         reactionList.forEach(reaction -> builder.append("\t").append(reaction));
         fu.printLine(builder.toString());
         builder.setLength(0);
-        for (String sample : sampleToReactions.keySet()) {
+        Set<String> emptySet = Collections.emptySet();
+        for (String sample : sampleToCancerType.keySet()) {
             Set<String> sampleReactions = sampleToReactions.get(sample);
+            if (sampleReactions == null)
+                sampleReactions = emptySet; // To generate a line for a sample having no hit.
             String cancer = sampleToCancerType.get(sample);
             builder.append(cancer).append("\t").append(sample);
             for (String reaction : reactionList) {
@@ -179,6 +203,40 @@ public class MechismoAnalyzer {
             builder.setLength(0);
         }
         fu.close();
+    }
+
+    protected void loadSampleToCancerTyp(Map<String, Set<String>> sampleToFIs, Map<String, String> sampleToCancerType)
+            throws IOException {
+        // New location on 2/8/2021
+        String dirName = "/Volumes/ssd/datasets/Mechismo/";
+        String mechResultFileName = dirName + "TCGA/TCGA_mech_output.tsv";
+        Files.lines(Paths.get(mechResultFileName))
+                .skip(1) // Skip the first line
+                .map(line -> line.split("\t"))
+                .filter(tokens -> !tokens[0].equals("name_a1")) // Escape the head lines inside the file
+                .filter(tokens -> !tokens[4].equals(tokens[5])) // Escape synonymous mutations
+                .filter(tokens -> tokens.length > 18) // Need partner's information
+                .filter(tokens -> !tokens[18].equals("[PROT]")) // Escape self-interaction
+                .forEach(tokens -> {
+                    String fi = InteractionUtilities.generateFIFromGene(tokens[0], tokens[18]);
+                    String[] tokensTmp = tokens[6].split(" ");
+                    String[] sampleTokens = tokensTmp[tokensTmp.length - 1].split(";");
+                    for (String sampleToken : sampleTokens) {
+                        tokensTmp = sampleToken.split(":");
+                        String cancer = tokensTmp[0];
+                        tokensTmp = tokensTmp[1].split(",");
+                        for (String sample : tokensTmp) {
+                            sampleToCancerType.put(sample, cancer);
+                            sampleToFIs.compute(sample, (key, set) -> {
+                                if (set == null)
+                                    set = new HashSet<>();
+                                set.add(fi);
+                                return set;
+                            });
+                        }
+                    }
+                });
+        System.out.println("Total samples: " + sampleToCancerType.size());
     }
 
     @Test
@@ -204,26 +262,45 @@ public class MechismoAnalyzer {
 //             });
 
         // Based a new analysis result
-        String reactioneFileName = resultDirName + "tcga_mechismo_stat_cancer_wise.tsv";
-        String output = "results/MechismoReactionToTCGACancer_100217.txt";
-        Files.lines(Paths.get(reactioneFileName))
-                .skip(1)
-                .map(line -> line.split("\t"))
-                .filter(tokens -> Double.parseDouble(tokens[11]) < 0.01d) // FDR cutoff = 0.01
-                .filter(tokens -> !tokens[13].equals("-")) // Make sure we have DB_IDs
-                .forEach(tokens -> {
-                    cancers.add(tokens[0]);
-                    String[] reactionIds = tokens[13].split(",");
-                    for (String reactionId : reactionIds) {
-                        reactionToCancers.compute(reactionId, (reaction, set) -> {
-                            if (set == null)
-                                set = new HashSet<>();
-                            set.add(tokens[0]);
-                            return set;
-                        });
-                    }
-                });
-
+//        String reactioneFileName = resultDirName + "tcga_mechismo_stat_cancer_wise.tsv";
+//        String output = "results/MechismoReactionToTCGACancer_100217.txt";
+//        Files.lines(Paths.get(reactioneFileName))
+//                .skip(1)
+//                .map(line -> line.split("\t"))
+//                .filter(tokens -> Double.parseDouble(tokens[11]) < 0.01d) // FDR cutoff = 0.01
+//                .filter(tokens -> !tokens[13].equals("-")) // Make sure we have DB_IDs
+//                .forEach(tokens -> {
+//                    cancers.add(tokens[0]);
+//                    String[] reactionIds = tokens[13].split(",");
+//                    for (String reactionId : reactionIds) {
+//                        reactionToCancers.compute(reactionId, (reaction, set) -> {
+//                            if (set == null)
+//                                set = new HashSet<>();
+//                            set.add(tokens[0]);
+//                            return set;
+//                        });
+//                    }
+//                });
+        // Based on the summary file provided by Francesco. A new file format is used.
+        String reactionFileName = "results/TCGA_mechismo_reactome_reactions_02052021_Reaction_cancertype_CGC.txt";
+        reactionFileName = "results/tcga_mechismo_stat_cancer_wise_reactions_sig_CGC_021921.tsv";
+        String output = "results/MechismoReactionToTCGACancer_" + FileUtility.getDateStamp() + ".txt";
+//        String output = "results/MechismoReactionToTCGACancer_0_1_020521.txt";
+        
+        Files.lines(Paths.get(reactionFileName))
+             .skip(1)
+             .map(line -> line.split("\t"))
+             .filter(tokens -> Double.parseDouble(tokens[11]) < 0.10d) // FDR cutoff = 0.10. This is different from previous!
+             .forEach(tokens -> {
+                 cancers.add(tokens[0]);
+                 reactionToCancers.compute(tokens[1], (key, set) -> {
+                     if (set == null)
+                         set = new HashSet<>();
+                     set.add(tokens[0]);
+                     return set;
+                 });
+             });
+        
         System.out.println("Total cancers: " + cancers.size());
         System.out.println("Total reactions: " + reactionToCancers.size());
 
@@ -231,8 +308,8 @@ public class MechismoAnalyzer {
         List<String> cancerList = new ArrayList<>(cancers);
         Collections.sort(cancerList);
 
-        if (true)
-            return;
+//        if (true)
+//            return;
 
         fu.setOutput(output);
         StringBuilder builder = new StringBuilder();
@@ -244,7 +321,7 @@ public class MechismoAnalyzer {
             builder.append(reaction);
             cancerList.forEach(cancer -> {
                 builder.append("\t");
-                builder.append(set.contains(cancer));
+                builder.append(set.contains(cancer) ? 1 : 0);
             });
             try {
                 fu.printLine(builder.toString());
@@ -259,6 +336,8 @@ public class MechismoAnalyzer {
     @Test
     public void checkSampleToHitReactions() throws IOException {
         String srcFileName = "results/MechismoSamplesToReactions_103017.txt";
+        srcFileName = "results/MechismoSamplesToReactions_020821.txt";
+        srcFileName = "results/MechismoSamplesToReactions_" + FileUtility.getDateStamp() + ".txt";
         Map<String, Set<String>> cancerToSamples = new HashMap<>();
         Map<String, Set<String>> cancerToHitSamples = new HashMap<>();
         fu.setInput(srcFileName);
@@ -289,6 +368,8 @@ public class MechismoAnalyzer {
         for (String cancer : cancerToSamples.keySet()) {
             Set<String> samples = cancerToSamples.get(cancer);
             Set<String> hitSamples = cancerToHitSamples.get(cancer);
+            if (hitSamples == null)
+                hitSamples = Collections.EMPTY_SET;
             Double percent = (double) hitSamples.size() / samples.size();
             System.out.println(cancer + "\t" +
                     samples.size() + "\t" +
@@ -396,6 +477,34 @@ public class MechismoAnalyzer {
         fu.close();
         return clusterToSamples;
     }
+    
+    /**
+     * Based on new summary file downloaded from Google drive.
+     * @throws Exception
+     */
+    @Test
+    public void calculateSampleDistancesOnReactionNetworkForCancers() throws Exception {
+        // Picked up based on output from method, checkSampleToHitReactions().
+        // Collect cancers having at least 50 hit samples.
+        String[] cancers = {
+                "BRCA",
+                "SKCM",
+                "THCA",
+                "UCEC",
+                "STAD",
+                "HNSC",
+                "LGG",
+                "UVM",
+                "COAD"
+        };
+        String date = FileUtility.getDateStamp();
+        for (String cancer : cancers) {
+            System.out.println("Processing " + cancer + "...");
+            Map<String, Set<String>> sampleToReactions = loadSampleToReactions(cancer);
+            String outFileName = "results/MechismoSamplePairWiseReactionNetworkDist_" + cancer + "_" + date + ".txt";
+            generatePairWiseNetworkDistance(sampleToReactions, outFileName);
+        }
+    }
 
     @Test
     public void calculateSampleDistancesOnReactionNetwork() throws IOException {
@@ -451,6 +560,7 @@ public class MechismoAnalyzer {
 
     private Map<String, Set<String>> loadSampleToReactions(String cancer) throws IOException {
         String srcFileName = "results/MechismoSamplesToReactions_103017.txt";
+        srcFileName = "results/MechismoSamplesToReactions_020821.txt";
         Map<String, Set<String>> sampleToReactions = new HashMap<>();
         fu.setInput(srcFileName);
         String line = fu.readLine();
@@ -812,6 +922,52 @@ public class MechismoAnalyzer {
                 "Histogram of Maximum Mechismo Score",
                 "Mechismo Maximum Score",
                 "Frequency");
+    }
+    
+    @Test
+    public void generateTopicsToReactionsList() throws Exception {
+        AnnotationHelper annotationHelper = new AnnotationHelper();
+        annotationHelper.setReactionIdToPathwayFile("resources/ReactomeReactionsToPathways_051017.txt");
+        Map<String, Set<String>> r2p = annotationHelper.loadReactomeReactionToPathwaysMap();
+        Map<String, Set<String>> p2r = new HashMap<>();
+        r2p.forEach((r, ps) -> {
+            ps.forEach(p -> {
+                p2r.compute(p, (key, set) -> {
+                    if (set == null)
+                        set = new HashSet<>();
+                    set.add(r);
+                    return set;
+                });
+            });
+        });
+        
+        String[] rxtIds = {"210977", "392054"};
+        for (String rxtId : rxtIds) {
+            System.out.println(rxtId);
+            Set<String> pathways = r2p.get(rxtId);
+            System.out.println(String.join(",", pathways));
+        }
+//        if (true)
+//            return;
+        
+        // Get the top lists
+        MySQLAdaptor dba = new MySQLAdaptor("localhost",
+                                            "reactome_71_plus_i_mm", 
+                                            "root", 
+                                            "macmysql01");
+        GKInstance frontPage = (GKInstance) dba.fetchInstancesByClass(ReactomeJavaConstants.FrontPage).iterator().next();
+        List<GKInstance> frontPageItems = frontPage.getAttributeValuesList(ReactomeJavaConstants.frontPageItem);
+        String topic = "Immune System";
+        topic = "Signal Transduction";
+        for (GKInstance item : frontPageItems) {
+            if (!item.getDisplayName().equals(topic))
+                continue;
+            System.out.println(item.getDisplayName());
+            Set<String> reactions = p2r.get(item.getDisplayName());
+            if (reactions == null)
+                continue;
+            System.out.println(String.join("\n", reactions));
+        }
     }
 
     @Test

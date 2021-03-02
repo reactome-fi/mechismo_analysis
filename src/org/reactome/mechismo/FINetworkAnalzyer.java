@@ -25,7 +25,6 @@ import org.reactome.mechismo.model.CancerType;
 import org.reactome.mechismo.model.Interaction;
 import org.reactome.mechismo.model.Sample;
 import org.reactome.mechismows.MechismowsReader;
-import org.reactome.r3.ReactionMapGenerator;
 import org.reactome.r3.graph.BreadthFirstSearch;
 import org.reactome.r3.graph.GraphAnalyzer;
 import org.reactome.r3.graph.NetworkBuilderForGeneSet;
@@ -57,6 +56,25 @@ public class FINetworkAnalzyer {
             String[] tokens = line.split("\t");
             genes.add(tokens[2]);
             genes.add(tokens[3]);
+        }
+        fu.close();
+        return genes;
+    }
+    
+    /**
+     * Load genes from Francesco's summary file.
+     * @return
+     * @throws IOException
+     */
+    private Set<String> loadGenesInSignificantReactomeFIsInSummary() throws IOException {
+        String file = "results/tcga_mechismo_stat_cancer_wise_interfaces_sig_021921.tsv";
+        Set<String> genes = new HashSet<>();
+        fu.setInput(file);
+        String line = fu.readLine();
+        while ((line = fu.readLine()) != null) {
+            String[] tokens = line.split("\t");
+            genes.add(tokens[1]);
+            genes.add(tokens[2]);
         }
         fu.close();
         return genes;
@@ -313,6 +331,142 @@ public class FINetworkAnalzyer {
     }
     
     /**
+     * This method is used to generate a connected FI subnetwork contains all significant FIs.
+     * @throws IOException
+     */
+    @Test
+    public void generateFINetworkForSignificantFIs() throws IOException {
+        Set<String> significantGenes = loadGenesInSignificantReactomeFIsInSummary();
+        System.out.println("Total significant genes: " + significantGenes.size());
+        Set<String> fis = loadReactomeFIs();
+        System.out.println("Total FIs: " + fis.size());
+        NetworkBuilderForGeneSet builder = new NetworkBuilderForGeneSet();
+        builder.setAllFIs(fis);
+        // Work on a sub-network
+        // Since the original FI network may have multiple components, the generated
+        // sub-network may have multiple components.
+        fis = builder.constructFINetworkForGeneSet(significantGenes);
+        System.out.println("Size of sub-network: " + fis.size());
+        // Output the FI network
+        String outputFileName = "results/SignificantFIsNetwork_022721.txt";
+        fu.saveInteractions(fis, outputFileName);
+        // The following genes are not in the network
+        Set<String> genesInFIs = InteractionUtilities.grepIDsFromInteractions(fis);
+        System.out.println("Total genes in the constructed network: " + genesInFIs.size());
+        significantGenes.removeAll(genesInFIs);
+        System.out.println("Significant genes not in the network: " + significantGenes.size());
+        significantGenes.stream().sorted().forEach(System.out::println);
+    }
+    
+    @Test
+    public void selectFIsInReactionForCancer() throws IOException {
+        String srcFileName = "results/tcga_mechismo_stat_cancer_wise_reactions_sig_CGC_021921.tsv";
+        String cancer = "STAD";
+        fu.setInput(srcFileName);
+        String line = fu.readLine();
+        String output = "results/" + cancer + "_FIsInSignificantReactions_030121.txt";
+        Set<String> fis = new HashSet<>();
+        Map<String, Set<String>> fiToRxts = new HashMap<>();
+        Set<String> genes = new HashSet<>();
+        while ((line = fu.readLine()) != null) {
+            String[] tokens = line.split("\t");
+            if (!tokens[0].equals(cancer))
+                continue;
+            String[] tokens1 = tokens[15].split(",");
+            for (String token : tokens1) {
+                String[] tokens2 = token.split(":|\\|");
+                String fi = InteractionUtilities.generateFIFromGene(tokens2[0], tokens2[1]);
+                genes.add(tokens2[0]);
+                genes.add(tokens2[1]);
+                fiToRxts.compute(fi, (key, set) -> {
+                    if (set == null)
+                        set = new HashSet<>();
+                    set.add(tokens[1]);
+                    return set;
+                });
+                fi = fi.replace("\t", "\tFI\t");
+                fis.add(fi);
+            }
+        }
+        fu.close();
+        fu.saveInteractions(fis, output);
+        System.out.println("Total selected FIs: " + fis.size());
+        // Build a connected network
+        Set<String> allFIs = loadReactomeFIs();
+        System.out.println("Total FIs: " + allFIs.size());
+        NetworkBuilderForGeneSet builder = new NetworkBuilderForGeneSet();
+        builder.setAllFIs(allFIs);
+        // Work on a sub-network
+        // Since the original FI network may have multiple components, the generated
+        // sub-network may have multiple components.
+        fis = builder.constructFINetworkForGeneSet(genes);
+        System.out.println("Size of sub-network: " + fis.size());
+        // The returned FIs are not sorted in individual FIs
+        fis = fis.stream()
+                 .map(fi -> fi.split("\t"))
+                 .map(tokens -> InteractionUtilities.generateFIFromGene(tokens[0], tokens[1]))
+                 .collect(Collectors.toSet());
+        System.out.println("Re-formated FIs: " + fis.size());
+        // Output the FI network
+        String outputFileName = "results/" + cancer + "_FIsInSignificantReactions_Connected_030121.txt";
+        fu.setOutput(outputFileName);
+        fu.printLine("Protein1\tType\tProtein2\tSigReactionNumber\tSigReactions");
+        for (String fi : fis) {
+            String[] tokens = fi.split("\t");
+            Set<String> rxts = fiToRxts.get(fi);
+            fu.printLine(tokens[0] + "\tFI\t" + tokens[1] + "\t" + 
+                         (rxts == null ? "0" : rxts.size()) + "\t" + 
+                         (rxts == null ? "" : String.join(",", rxts)));
+        }
+        fu.close();
+    }
+    
+    @Test
+    public void selectSignficantReactionFIsInCancer() throws IOException {
+        String srcFileName = "results/tcga_mechismo_stat_cancer_wise_interfaces_sig_021921.tsv";
+        String cancer = "STAD";
+        fu.setInput(srcFileName);
+        String output = "results/" + cancer + "_ReactomeSigFIs_021921.txt";
+        fu.setOutput(output);
+        String line = fu.readLine();
+        Set<String> genes = new HashSet<>();
+        while ((line = fu.readLine()) != null) {
+            String[] tokens = line.split("\t");
+            if (!tokens[0].equals(cancer) ||
+                tokens[13].equals("-")) // Not from Reaction
+                continue; 
+            fu.printLine(tokens[1] + "\t" + tokens[2]);
+            String fi = InteractionUtilities.generateFIFromGene(tokens[1], tokens[2]);
+            fi = fi.replace("\t", " (FI) ");
+            System.out.println(fi + "\t1");
+            if (!tokens[1].startsWith("[)"))
+                genes.add(tokens[1]);
+            if (!tokens[2].startsWith("["))
+                genes.add(tokens[2]);
+        }
+        fu.close();
+        System.out.println("Selected genes: " + genes.size());
+        if (true)
+            return;
+        // Build a connected network
+        Set<String> fis = loadReactomeFIs();
+        System.out.println("Total FIs: " + fis.size());
+        NetworkBuilderForGeneSet builder = new NetworkBuilderForGeneSet();
+        builder.setAllFIs(fis);
+        // Work on a sub-network
+        // Since the original FI network may have multiple components, the generated
+        // sub-network may have multiple components.
+        fis = builder.constructFINetworkForGeneSet(genes);
+        System.out.println("Size of sub-network: " + fis.size());
+        // Output the FI network
+        String outputFileName = "results/" + cancer + "_ReactomeSigFIs_Connected_021921.txt";
+        fu.saveInteractions(fis, outputFileName);
+        
+        // For selection
+        genes.stream().sorted().forEach(System.out::println);
+    }
+    
+    /**
      * Convert from a gene-based network (aka genes are nodes) to FI-based network (aka FIs 
      * are nodes)
      * Note: A huge network file will be generated by using all FIs in the Reactome FI network. Instead,
@@ -322,7 +476,8 @@ public class FINetworkAnalzyer {
      */
     @Test
     public void convertGeneNetworkToFINetwork() throws IOException {
-        Set<String> significantGenes = loadGenesInSignificantReactomeFIs();
+//        Set<String> significantGenes = loadGenesInSignificantReactomeFIs();
+        Set<String> significantGenes = loadGenesInSignificantReactomeFIsInSummary();
         System.out.println("Total significant genes: " + significantGenes.size());
         Set<String> fis = loadReactomeFIs();
         System.out.println("Total FIs: " + fis.size());
@@ -342,7 +497,8 @@ public class FINetworkAnalzyer {
         System.out.println("Finished spliting!");
         List<String> fiList = new ArrayList<>(fis);
         Collections.sort(fiList);
-        String outFileName = "results/FINodesNetwork_100818.txt";
+//        String outFileName = "results/FINodesNetwork_100818.txt";
+        String outFileName = "results/FINodesNetwork_022721.txt";
         FileUtility fu = new FileUtility();
         fu.setOutput(outFileName);
         for (int i = 0; i < fiList.size() - 1; i++) {
@@ -370,13 +526,21 @@ public class FINetworkAnalzyer {
 
     private Set<String> loadReactomeFIs() throws IOException {
 //        String fileName = "results/ProteinFIsInReactions_032017.txt";
-        String fileName = "results/ProteinFIsInReactions_073118.txt";
+//        String fileName = "results/ProteinFIsInReactions_073118.txt";
+        // This is the file used to generate tcga_mechismo_stat_cancer_wise_interfaces_sig_021921.tsv by
+        // Francesco (N.B. by GW on Feb 27, 2021)
+        String fileName = "results/ProteinFIsInReactionsWithPPIEvidence_032017.txt";
         try (Stream<String> lines = Files.lines(Paths.get(fileName))) {
             Set<String> fis = lines.map(line -> {
                 String[] tokens = line.split("\t");
+                if (tokens[2].equals("null") || tokens[3].equals("null"))
+                    return null;
+//                if (tokens[2].startsWith("UB") || tokens[3].equals("UB")) // Too many FIs
+//                    return null;
                 String fi = InteractionUtilities.generateFIFromGene(tokens[2], tokens[3]);
                 return fi;
             })
+                    .filter(fi -> fi != null)
                     .collect(Collectors.toSet());
             return fis;
         }
